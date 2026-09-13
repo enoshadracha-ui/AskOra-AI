@@ -4,7 +4,7 @@ import threading
 import logging
 from datetime import datetime, timedelta, timezone
 
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from google import genai
 
 from telegram import (
@@ -21,12 +21,14 @@ from telegram.ext import (
     filters,
 )
 
-# =========================
-# CONFIGURATION
-# =========================
 
-TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
-GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
+# ============================================================
+# CONFIGURATION
+# ============================================================
+
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+RENDER_EXTERNAL_URL = os.environ.get("RENDER_EXTERNAL_URL")
 
 ADMIN_ID = 7721346673
 
@@ -34,15 +36,18 @@ PREMIUM_PRICE = 600
 PREMIUM_DAYS = 30
 FREE_DAILY_LIMIT = 10
 
-BANK_NAME = os.environ.get("BANK_NAME", "YOUR BANK")
-ACCOUNT_NAME = os.environ.get("ACCOUNT_NAME", "YOUR ACCOUNT NAME")
-ACCOUNT_NUMBER = os.environ.get("ACCOUNT_NUMBER", "YOUR ACCOUNT NUMBER")
-
 MODEL = "gemini-3.6-flash"
 
-# =========================
+PORT = int(os.environ.get("PORT", 10000))
+
+BANK_NAME = "YOUR BANK NAME"
+ACCOUNT_NAME = "YOUR ACCOUNT NAME"
+ACCOUNT_NUMBER = "YOUR ACCOUNT NUMBER"
+
+
+# ============================================================
 # LOGGING
-# =========================
+# ============================================================
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -51,38 +56,56 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-# =========================
-# DATA
-# =========================
 
-users = {}
-payment_requests = {}
+# ============================================================
+# BASIC CHECKS
+# ============================================================
 
-# =========================
+if not TELEGRAM_BOT_TOKEN:
+    raise RuntimeError("TELEGRAM_BOT_TOKEN is missing")
+
+if not GEMINI_API_KEY:
+    raise RuntimeError("GEMINI_API_KEY is missing")
+
+if not RENDER_EXTERNAL_URL:
+    raise RuntimeError("RENDER_EXTERNAL_URL is missing")
+
+
+# ============================================================
 # GEMINI
-# =========================
+# ============================================================
 
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
-# =========================
-# USER DATA HELPERS
-# =========================
+
+# ============================================================
+# USER DATA
+# ============================================================
+
+users = {}
+payment_requests = {}
+awaiting_payment_details = set()
+
 
 def get_user(user_id):
+    today = datetime.now(timezone.utc).date()
+
     if user_id not in users:
         users[user_id] = {
             "questions": 0,
-            "date": datetime.now(timezone.utc).date(),
+            "date": today,
             "premium_until": None,
+            "chat_history": [],
         }
 
     user = users[user_id]
 
-    today = datetime.now(timezone.utc).date()
-
     if user.get("date") != today:
-        user["date"] = today
         user["questions"] = 0
+        user["date"] = today
+
+    if "chat_history" not in user:
+        user["chat_history"] = []
 
     return user
 
@@ -93,97 +116,140 @@ def is_premium(user):
     if not premium_until:
         return False
 
-    return premium_until > datetime.now(timezone.utc)
+    return datetime.now(timezone.utc) < premium_until
 
 
-# =========================
-# START
-# =========================
+# ============================================================
+# TELEGRAM MESSAGE LENGTH FIX
+# ============================================================
+
+def split_message(text, max_length=4000):
+    """
+    Telegram allows messages of roughly 4096 characters.
+    We use 4000 to leave a safe margin.
+    """
+
+    if not text:
+        return ["Sorry, Gemini returned an empty response."]
+
+    if len(text) <= max_length:
+        return [text]
+
+    chunks = []
+
+    while len(text) > max_length:
+        split_at = text.rfind("\n", 0, max_length)
+
+        if split_at < 1000:
+            split_at = text.rfind(" ", 0, max_length)
+
+        if split_at < 1000:
+            split_at = max_length
+
+        chunks.append(text[:split_at].strip())
+        text = text[split_at:].strip()
+
+    if text:
+        chunks.append(text)
+
+    return chunks
+
+
+async def send_long_message(update, text):
+    """
+    Sends a Gemini response safely even if it is longer
+    than Telegram's message limit.
+    """
+
+    for chunk in split_message(text):
+        await update.message.reply_text(chunk)
+
+
+# ============================================================
+# /START
+# ============================================================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
     get_user(user_id)
 
-    await update.message.reply_text(
+    message = (
         "Welcome to Askora 🤖\n\n"
         "I'm your AI assistant powered by Gemini.\n\n"
-        "🆓 Free users: 10 questions/day\n"
-        "⭐ Premium: ₦600 for 30 days\n\n"
+        "Free users: 10 questions/day.\n"
+        "Premium: ₦600 for 30 days.\n\n"
         "Just send me a message to begin.\n\n"
         "Use /status to check your usage.\n"
         "Use /premium to upgrade."
     )
 
+    await update.message.reply_text(message)
 
-# =========================
-# STATUS
-# =========================
+
+# ============================================================
+# /STATUS
+# ============================================================
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-
     user = get_user(user_id)
-
-    questions = user.get("questions", 0)
 
     if is_premium(user):
-        plan = "⭐ Premium"
-        premium_until = user["premium_until"].strftime("%d %b %Y")
-        usage = "Unlimited"
-        remaining = "Unlimited"
+        remaining_time = user["premium_until"] - datetime.now(timezone.utc)
+
+        days = remaining_time.days
+
+        if days < 0:
+            days = 0
 
         await update.message.reply_text(
             "📊 Your Askora Status\n\n"
-            f"Plan: {plan}\n"
-            f"Premium until: {premium_until}\n"
-            f"Questions today: {questions}\n"
-            f"Remaining: {remaining}"
+            "⭐ Plan: Premium\n"
+            f"📅 Premium remaining: {days} day(s)\n\n"
+            "Premium users have unlimited questions."
         )
 
-    else:
-        plan = "🆓 Free"
-        remaining = max(0, FREE_DAILY_LIMIT - questions)
+        return
 
-        await update.message.reply_text(
-            "📊 Your Askora Status\n\n"
-            f"Plan: {plan}\n"
-            f"Questions today: {questions}/{FREE_DAILY_LIMIT}\n"
-            f"Remaining today: {remaining}\n"
-            "Premium: Not active\n\n"
-            "Use /premium to upgrade."
-        )
-
-
-# =========================
-# RESET CHAT
-# =========================
-
-async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-
-    user = get_user(user_id)
-
-    # Reset conversation-related data only.
-    # The daily question counter is NOT reset.
-    user["chat_history"] = []
+    used = user["questions"]
+    remaining = max(0, FREE_DAILY_LIMIT - used)
 
     await update.message.reply_text(
-        "🔄 Chat reset successfully.\n\n"
-        "Your next question will start a fresh conversation.\n"
-        "Your daily question count has NOT been reset."
+        "📊 Your Askora Status\n\n"
+        "🆓 Plan: Free\n"
+        f"❓ Questions used today: {used}/{FREE_DAILY_LIMIT}\n"
+        f"✅ Questions remaining: {remaining}\n\n"
+        "Your free allowance resets each day."
     )
 
 
-# =========================
-# PREMIUM
-# =========================
+# ============================================================
+# /RESET
+# ============================================================
+
+async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    user = get_user(user_id)
+
+    user["chat_history"] = []
+
+    await update.message.reply_text(
+        "🔄 Conversation context has been reset."
+    )
+
+
+# ============================================================
+# /PREMIUM
+# ============================================================
 
 async def premium(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+
     keyboard = [
         [
             InlineKeyboardButton(
-                "💳 I've Made Payment",
+                "💳 Pay ₦600",
                 callback_data="payment_done",
             )
         ]
@@ -192,258 +258,229 @@ async def premium(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "⭐ Askora Premium\n\n"
         "Price: ₦600\n"
-        "Duration: 30 days\n\n"
-        "🏦 Bank: " + BANK_NAME + "\n"
-        "👤 Account Name: " + ACCOUNT_NAME + "\n"
-        "💳 Account Number: " + ACCOUNT_NUMBER + "\n\n"
-        "Transfer exactly ₦600, then press the button below.\n\n"
-        "Your payment will be manually verified by the admin.",
+        "Duration: 30 days\n"
+        "Unlimited questions.\n\n"
+        "Make a bank transfer using the details "
+        "provided after you continue.\n\n"
+        "After payment, submit your payment details "
+        "for admin verification.",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
 
-# =========================
-# PAYMENT BUTTON
-# =========================
+# ============================================================
+# PAYMENT START
+# ============================================================
 
 async def payment_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-
     await query.answer()
 
     user_id = query.from_user.id
 
-    payment_requests[user_id] = {
-        "step": "name",
-        "name": None,
-        "amount": None,
-        "reference": None,
-    }
+    awaiting_payment_details.add(user_id)
 
     await query.message.reply_text(
-        "💳 Payment verification\n\n"
-        "Please send the name used for the bank transfer."
+        "💳 Premium Payment\n\n"
+        f"Amount: ₦{PREMIUM_PRICE}\n\n"
+        f"Bank: {BANK_NAME}\n"
+        f"Account Name: {ACCOUNT_NAME}\n"
+        f"Account Number: {ACCOUNT_NUMBER}\n\n"
+        "After making the transfer, send me:\n"
+        "1. Your name\n"
+        "2. Amount paid\n"
+        "3. Transaction/reference ID\n\n"
+        "An admin will verify your payment."
     )
 
 
-# =========================
-# PAYMENT ADMIN APPROVAL
-# =========================
+# ============================================================
+# ADMIN PAYMENT APPROVAL
+# ============================================================
 
-async def approve_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def approve_payment(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
     query = update.callback_query
-
     await query.answer()
 
     if query.from_user.id != ADMIN_ID:
-        await query.message.reply_text("❌ You are not authorized.")
+        await query.message.reply_text("Unauthorized.")
         return
 
     try:
         user_id = int(query.data.split(":")[1])
     except Exception:
-        await query.message.reply_text("❌ Invalid payment request.")
+        await query.message.reply_text("Invalid payment request.")
         return
 
     user = get_user(user_id)
 
-    now = datetime.now(timezone.utc)
+    user["premium_until"] = (
+        datetime.now(timezone.utc)
+        + timedelta(days=PREMIUM_DAYS)
+    )
 
-    current_until = user.get("premium_until")
-
-    if current_until and current_until > now:
-        start_date = current_until
-    else:
-        start_date = now
-
-    user["premium_until"] = start_date + timedelta(days=PREMIUM_DAYS)
-
-    payment_requests.pop(user_id, None)
+    awaiting_payment_details.discard(user_id)
 
     await query.message.reply_text(
-        f"✅ Payment approved.\n\n"
-        f"User ID: {user_id}\n"
-        f"Premium until: "
-        f"{user['premium_until'].strftime('%d %b %Y')}"
+        f"✅ Payment approved for user {user_id}."
     )
 
     try:
         await context.bot.send_message(
             chat_id=user_id,
             text=(
-                "🎉 Premium activated!\n\n"
-                f"Your Askora Premium is active until "
-                f"{user['premium_until'].strftime('%d %b %Y')}."
+                "🎉 Premium Activated!\n\n"
+                "Your ₦600 payment has been approved.\n"
+                "You now have Askora Premium for 30 days.\n\n"
+                "Enjoy unlimited questions! 🚀"
             ),
         )
-    except Exception as error:
-        logger.exception("Could not notify user: %s", error)
+    except Exception as e:
+        logger.exception("Could not notify premium user: %s", e)
 
 
-# =========================
-# PAYMENT REJECTION
-# =========================
+# ============================================================
+# ADMIN PAYMENT REJECTION
+# ============================================================
 
-async def reject_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def reject_payment(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
     query = update.callback_query
-
     await query.answer()
 
     if query.from_user.id != ADMIN_ID:
-        await query.message.reply_text("❌ You are not authorized.")
+        await query.message.reply_text("Unauthorized.")
         return
 
     try:
         user_id = int(query.data.split(":")[1])
     except Exception:
-        await query.message.reply_text("❌ Invalid payment request.")
+        await query.message.reply_text("Invalid payment request.")
         return
 
-    payment_requests.pop(user_id, None)
+    awaiting_payment_details.discard(user_id)
 
     await query.message.reply_text(
-        f"❌ Payment rejected.\n\nUser ID: {user_id}"
+        f"❌ Payment rejected for user {user_id}."
     )
 
     try:
         await context.bot.send_message(
             chat_id=user_id,
             text=(
-                "❌ Your payment could not be verified.\n\n"
-                "Please check your payment details and contact support."
+                "❌ Your Premium payment could not be verified.\n\n"
+                "Please contact support or submit the correct "
+                "payment information."
             ),
         )
-    except Exception as error:
-        logger.exception("Could not notify user: %s", error)
+    except Exception as e:
+        logger.exception("Could not notify user: %s", e)
 
 
-# =========================
-# PAYMENT INFORMATION
-# =========================
+# ============================================================
+# PAYMENT DETAILS
+# ============================================================
 
-async def handle_payment_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_payment_details(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
     user_id = update.effective_user.id
 
-    if user_id not in payment_requests:
+    if user_id not in awaiting_payment_details:
         return False
 
-    request_data = payment_requests[user_id]
+    details = update.message.text
 
-    text = update.message.text.strip()
+    payment_requests[user_id] = {
+        "user_id": user_id,
+        "details": details,
+        "created_at": datetime.now(timezone.utc),
+    }
 
-    if request_data["step"] == "name":
+    awaiting_payment_details.discard(user_id)
 
-        request_data["name"] = text
-        request_data["step"] = "amount"
-
-        await update.message.reply_text(
-            "How much did you transfer?\n\n"
-            "Please enter the amount in naira."
-        )
-
-        return True
-
-    if request_data["step"] == "amount":
-
-        try:
-            amount = float(text.replace(",", "").replace("₦", "").strip())
-        except ValueError:
-
-            await update.message.reply_text(
-                "❌ Please enter a valid amount.\n\n"
-                "Example: 600"
-            )
-
-            return True
-
-        request_data["amount"] = amount
-        request_data["step"] = "reference"
-
-        await update.message.reply_text(
-            "Please send your bank transfer reference/transaction ID."
-        )
-
-        return True
-
-    if request_data["step"] == "reference":
-
-        request_data["reference"] = text
-
-        name = request_data["name"]
-        amount = request_data["amount"]
-        reference = request_data["reference"]
-
-        keyboard = [
-            [
-                InlineKeyboardButton(
-                    "✅ Approve",
-                    callback_data=f"approve:{user_id}",
-                ),
-                InlineKeyboardButton(
-                    "❌ Reject",
-                    callback_data=f"reject:{user_id}",
-                ),
-            ]
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "✅ Approve",
+                callback_data=f"approve:{user_id}",
+            ),
+            InlineKeyboardButton(
+                "❌ Reject",
+                callback_data=f"reject:{user_id}",
+            ),
         ]
+    ]
 
+    try:
         await context.bot.send_message(
             chat_id=ADMIN_ID,
             text=(
-                "💰 New Premium Payment\n\n"
-                f"User ID: {user_id}\n"
-                f"Transfer Name: {name}\n"
-                f"Amount: ₦{amount}\n"
-                f"Reference: {reference}"
+                "💰 NEW PREMIUM PAYMENT\n\n"
+                f"User ID: {user_id}\n\n"
+                "Payment details:\n"
+                f"{details}"
             ),
             reply_markup=InlineKeyboardMarkup(keyboard),
         )
 
-        payment_requests.pop(user_id, None)
-
         await update.message.reply_text(
-            "✅ Payment details submitted.\n\n"
-            "Your payment is now waiting for admin verification."
+            "✅ Payment details received.\n\n"
+            "Your payment has been sent to the admin for verification."
         )
 
-        return True
+    except Exception as e:
+        logger.exception("Payment notification failed: %s", e)
 
-    return False
+        await update.message.reply_text(
+            "⚠️ Your payment details were received, "
+            "but there was a problem notifying the admin."
+        )
+
+    return True
 
 
-# =========================
-# GEMINI CHAT
-# =========================
+# ============================================================
+# CHAT WITH GEMINI
+# ============================================================
 
 async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message or not update.message.text:
-        return
-
     user_id = update.effective_user.id
-
     user = get_user(user_id)
 
-    # Check if user is currently submitting payment details
-    handled = await handle_payment_message(update, context)
+    # --------------------------------------------------------
+    # Payment details get priority over normal chat
+    # --------------------------------------------------------
 
-    if handled:
+    if await handle_payment_details(update, context):
         return
 
-    # Premium users have unlimited questions
+    # --------------------------------------------------------
+    # Free user daily limit
+    # --------------------------------------------------------
+
     if not is_premium(user):
-
         if user["questions"] >= FREE_DAILY_LIMIT:
-
             await update.message.reply_text(
-                "🛑 You have reached your 10-question daily limit.\n\n"
-                "Your limit resets automatically each day.\n\n"
-                "Use /premium to get Premium for ₦600 / 30 days."
+                "⚠️ You have used all 10 free questions for today.\n\n"
+                "Your allowance resets tomorrow.\n\n"
+                "Use /premium to get unlimited questions for 30 days."
             )
-
             return
 
     prompt = update.message.text
 
     try:
+        logger.info(
+            "Generating Gemini response for user %s",
+            user_id
+        )
 
         response = await asyncio.to_thread(
             gemini_client.models.generate_content,
@@ -454,28 +491,54 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         answer = response.text
 
         if not answer:
-            answer = "⚠️ Gemini returned an empty response."
+            answer = "Sorry, Gemini returned an empty response."
 
-        # Count the question only after Gemini successfully responds
+        # Only count the question after successful generation.
         if not is_premium(user):
             user["questions"] += 1
 
-        await update.message.reply_text(answer)
+        # Save basic conversation history.
+        user["chat_history"].append({
+            "user": prompt,
+            "assistant": answer,
+        })
 
-    except Exception as error:
+        # Keep memory from growing forever.
+        if len(user["chat_history"]) > 20:
+            user["chat_history"] = user["chat_history"][-20:]
 
-        logger.exception("Gemini error: %s", error)
+        logger.info(
+            "Gemini response generated successfully for user %s",
+            user_id
+        )
+
+        # ----------------------------------------------------
+        # IMPORTANT: send long answers in multiple messages
+        # ----------------------------------------------------
+
+        await send_long_message(update, answer)
+
+    except Exception as e:
+        logger.exception(
+            "Gemini/chat error for user %s: %s",
+            user_id,
+            e
+        )
 
         await update.message.reply_text(
             "⚠️ Sorry, something went wrong while generating the response."
         )
 
 
-# =========================
+# ============================================================
 # TELEGRAM APPLICATION
-# =========================
+# ============================================================
 
-application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+application = (
+    Application.builder()
+    .token(TELEGRAM_BOT_TOKEN)
+    .build()
+)
 
 application.add_handler(
     CommandHandler("start", start)
@@ -494,27 +557,37 @@ application.add_handler(
 )
 
 application.add_handler(
-    CallbackQueryHandler(payment_done, pattern="^payment_done$")
+    CallbackQueryHandler(
+        payment_done,
+        pattern="^payment_done$"
+    )
 )
 
 application.add_handler(
-    CallbackQueryHandler(approve_payment, pattern="^approve:")
+    CallbackQueryHandler(
+        approve_payment,
+        pattern="^approve:"
+    )
 )
 
 application.add_handler(
-    CallbackQueryHandler(reject_payment, pattern="^reject:")
+    CallbackQueryHandler(
+        reject_payment,
+        pattern="^reject:"
+    )
 )
 
 application.add_handler(
     MessageHandler(
         filters.TEXT & ~filters.COMMAND,
-        chat,
+        chat
     )
 )
 
-# =========================
-# PERSISTENT ASYNCIO LOOP
-# =========================
+
+# ============================================================
+# PERSISTENT ASYNCIO EVENT LOOP
+# ============================================================
 
 event_loop = asyncio.new_event_loop()
 
@@ -526,101 +599,101 @@ def run_event_loop():
 
 loop_thread = threading.Thread(
     target=run_event_loop,
-    daemon=True,
+    daemon=True
 )
 
 loop_thread.start()
 
 
-async def initialize_application():
+# ============================================================
+# START TELEGRAM APPLICATION
+# ============================================================
 
+async def initialize_bot():
     await application.initialize()
-
     await application.start()
 
-    render_url = os.environ.get("RENDER_EXTERNAL_URL")
+    webhook_url = f"{RENDER_EXTERNAL_URL.rstrip('/')}/webhook"
 
-    if render_url:
+    await application.bot.set_webhook(
+        url=webhook_url
+    )
 
-        webhook_url = render_url.rstrip("/") + "/webhook"
-
-        await application.bot.set_webhook(
-            url=webhook_url
-        )
-
-        logger.info(
-            "Webhook set to %s",
-            webhook_url
-        )
+    logger.info(
+        "Webhook set to %s",
+        webhook_url
+    )
 
 
-startup_future = asyncio.run_coroutine_threadsafe(
-    initialize_application(),
-    event_loop,
+future = asyncio.run_coroutine_threadsafe(
+    initialize_bot(),
+    event_loop
 )
 
-startup_future.result()
+future.result(timeout=60)
 
-# =========================
+
+# ============================================================
 # FLASK WEB SERVER
-# =========================
+# ============================================================
 
 flask_app = Flask(__name__)
 
 
 @flask_app.route("/", methods=["GET"])
 def home():
-
-    return "🤖 Askora Bot is running!", 200
+    return jsonify({
+        "status": "online",
+        "service": "Askora Telegram Bot"
+    })
 
 
 @flask_app.route("/webhook", methods=["POST"])
 def webhook():
-
     try:
-
         data = request.get_json(force=True)
 
         update = Update.de_json(
             data,
-            application.bot,
+            application.bot
         )
 
         future = asyncio.run_coroutine_threadsafe(
             application.process_update(update),
-            event_loop,
+            event_loop
         )
 
-        future.result(timeout=30)
+        future.result(timeout=60)
 
-        return "OK", 200
+        return jsonify({
+            "ok": True
+        })
 
-    except Exception as error:
-
+    except Exception as e:
         logger.exception(
-            "Webhook error: %s",
-            error,
+            "Webhook processing error: %s",
+            e
         )
 
-        return "Webhook error", 500
+        return jsonify({
+            "ok": False,
+            "error": str(e)
+        }), 200
 
 
-# =========================
-# START SERVER
-# =========================
+# ============================================================
+# RUN SERVER
+# ============================================================
 
 if __name__ == "__main__":
-
-    port = int(
-        os.environ.get(
-            "PORT",
-            10000,
-        )
+    logger.info(
+        "Askora starting on port %s",
+        PORT
     )
 
     flask_app.run(
         host="0.0.0.0",
-        port=port,
+        port=PORT,
         debug=False,
         use_reloader=False,
     )
