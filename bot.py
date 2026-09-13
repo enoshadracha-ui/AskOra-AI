@@ -1,6 +1,8 @@
 import os
 import logging
 from datetime import datetime, timedelta, timezone
+
+from google import genai
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -10,6 +12,7 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
+from flask import Flask, request
 
 # =========================
 # SETTINGS
@@ -28,9 +31,7 @@ BANK_NAME = os.environ.get("BANK_NAME", "YOUR BANK")
 ACCOUNT_NAME = os.environ.get("ACCOUNT_NAME", "YOUR ACCOUNT NAME")
 ACCOUNT_NUMBER = os.environ.get("ACCOUNT_NUMBER", "YOUR ACCOUNT NUMBER")
 
-MODEL = "llama-3.3-70b-versatile"
-
-from google import genai
+MODEL = "gemini-2.5-flash"
 
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
@@ -39,8 +40,6 @@ logging.basicConfig(
     level=logging.INFO,
 )
 
-# Temporary storage.
-# We will replace this with PostgreSQL before production.
 users = {}
 payment_requests = {}
 
@@ -95,7 +94,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         "🤖 Welcome!\n\n"
-        "I'm your AI assistant powered by Groq.\n\n"
+        "I'm your AI assistant powered by Gemini.\n\n"
         f"🆓 Free users: {FREE_DAILY_LIMIT} questions/day\n"
         f"💎 Premium: ₦{PREMIUM_PRICE} for {PREMIUM_DAYS} days"
         f"{premium_text}\n\n"
@@ -190,10 +189,15 @@ async def handle_payment_info(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if step == "amount":
         try:
-            amount = int(text.replace(",", "").replace("₦", "").strip())
+            amount = int(
+                text.replace(",", "")
+                .replace("₦", "")
+                .strip()
+            )
         except ValueError:
             await update.message.reply_text(
-                "Please enter the amount as a number.\nExample: 600"
+                "Please enter the amount as a number.\n"
+                "Example: 600"
             )
             return True
 
@@ -269,7 +273,10 @@ async def payment_decision(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
 
     if query.from_user.id != ADMIN_ID:
-        await query.answer("You are not authorized.", show_alert=True)
+        await query.answer(
+            "You are not authorized.",
+            show_alert=True,
+        )
         return
 
     await query.answer()
@@ -320,7 +327,7 @@ async def payment_decision(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "💎 Premium is now active.\n"
                 f"⏳ Duration: {PREMIUM_DAYS} days\n"
                 f"💰 Amount: ₦{payment['amount']}\n\n"
-                f"Premium expires:\n"
+                "Premium expires:\n"
                 f"{user['premium_until'].strftime('%Y-%m-%d %H:%M UTC')}"
             ),
         )
@@ -347,18 +354,18 @@ async def payment_decision(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # =========================
-# AI CHAT
+# GEMINI AI CHAT
 # =========================
 
 async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user = get_user(user_id)
 
-    # Payment conversation takes priority
     if await handle_payment_info(update, context):
         return
 
     if not is_premium(user):
+
         if user["questions_today"] >= FREE_DAILY_LIMIT:
             await update.message.reply_text(
                 "🆓 You have reached your daily free limit.\n\n"
@@ -372,43 +379,46 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     message = update.message.text
 
-    user["history"].append({
-        "role": "user",
-        "content": message,
-    })
-
-    # Keep the conversation reasonably small
-    messages = [
+    user["history"].append(
         {
-            "role": "system",
-            "content": (
-                "You are a helpful AI assistant. "
-                "Answer clearly, accurately and naturally."
-            ),
+            "role": "user",
+            "content": message,
         }
-    ]
+    )
 
-    messages.extend(user["history"][-10:])
+    conversation = []
 
-    try:
-        response = groq_client.chat.completions.create(
-            model=MODEL,
-            messages=messages,
-            temperature=0.7,
-            max_tokens=1000,
+    for item in user["history"][-10:]:
+        conversation.append(
+            f"{item['role'].upper()}: {item['content']}"
         )
 
-        answer = response.choices[0].message.content
+    prompt = (
+        "You are a helpful AI assistant. "
+        "Answer clearly, accurately and naturally.\n\n"
+        "Conversation:\n"
+        + "\n".join(conversation)
+    )
 
-        user["history"].append({
-            "role": "assistant",
-            "content": answer,
-        })
+    try:
+        response = gemini_client.models.generate_content(
+            model=MODEL,
+            contents=prompt,
+        )
+
+        answer = response.text
+
+        user["history"].append(
+            {
+                "role": "assistant",
+                "content": answer,
+            }
+        )
 
         await update.message.reply_text(answer)
 
     except Exception as error:
-        logging.error("Groq error: %s", error)
+        logging.error("Gemini error: %s", error)
 
         await update.message.reply_text(
             "⚠️ Sorry, something went wrong while generating the response."
@@ -416,7 +426,7 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # =========================
-# PAY SUPPORT
+# PAYMENT SUPPORT
 # =========================
 
 async def paysupport(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -427,43 +437,99 @@ async def paysupport(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # =========================
-# MAIN
+# TELEGRAM APPLICATION
 # =========================
 
-def main():
-    app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+application = Application.builder().token(
+    TELEGRAM_BOT_TOKEN
+).build()
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("premium", premium))
-    app.add_handler(CommandHandler("reset", reset))
-    app.add_handler(CommandHandler("paysupport", paysupport))
+application.add_handler(CommandHandler("start", start))
+application.add_handler(CommandHandler("premium", premium))
+application.add_handler(CommandHandler("reset", reset))
+application.add_handler(CommandHandler("paysupport", paysupport))
 
-    app.add_handler(
-        CallbackQueryHandler(
-            payment_decision,
-            pattern=r"^(approve|reject)_\d+$",
-        )
+application.add_handler(
+    CallbackQueryHandler(
+        payment_decision,
+        pattern=r"^(approve|reject)_\d+$",
+    )
+)
+
+application.add_handler(
+    CallbackQueryHandler(
+        payment_made,
+        pattern=r"^payment_made$",
+    )
+)
+
+application.add_handler(
+    MessageHandler(
+        filters.TEXT & ~filters.COMMAND,
+        chat,
+    )
+)
+
+
+# =========================
+# FLASK WEBHOOK SERVER
+# =========================
+
+flask_app = Flask(__name__)
+
+
+@flask_app.route("/", methods=["GET"])
+def home():
+    return "🤖 Bot is running!", 200
+
+
+@flask_app.route("/webhook", methods=["POST"])
+async def webhook():
+    data = request.get_json(force=True)
+
+    update = Update.de_json(
+        data,
+        application.bot,
     )
 
-    app.add_handler(
-        CallbackQueryHandler(
-            payment_made,
-            pattern=r"^payment_made$",
+    await application.process_update(update)
+
+    return "OK", 200
+
+
+# =========================
+# START WEBHOOK
+# =========================
+
+async def setup():
+    await application.initialize()
+    await application.start()
+
+    port = int(os.environ.get("PORT", 10000))
+
+    render_url = os.environ.get("RENDER_EXTERNAL_URL")
+
+    if render_url:
+        webhook_url = f"{render_url}/webhook"
+
+        await application.bot.set_webhook(
+            url=webhook_url
         )
-    )
 
-    app.add_handler(
-        MessageHandler(
-            filters.TEXT & ~filters.COMMAND,
-            chat,
+        logging.info(
+            "Webhook set to %s",
+            webhook_url,
         )
-    )
 
-    print("🤖 Bot is running...")
-
-    app.run_polling()
+    return port
 
 
 if __name__ == "__main__":
-    main()
+    import asyncio
 
+    port = asyncio.run(setup())
+
+    flask_app.run(
+        host="0.0.0.0",
+        port=port,
+    )
