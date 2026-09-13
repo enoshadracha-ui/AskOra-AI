@@ -594,7 +594,35 @@ async def paysupport(
         "please contact the administrator."
     )
 
+async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    today = datetime.now(timezone.utc).date()
 
+    data = users.get(user_id, {})
+
+    if data.get("date") != today:
+        data["date"] = today
+        data["questions"] = 0
+
+    questions = data.get("questions", 0)
+    remaining = max(0, FREE_DAILY_LIMIT - questions)
+
+    premium_until = data.get("premium_until")
+
+    if premium_until and premium_until > datetime.now(timezone.utc):
+        plan = "Premium"
+        premium_text = f"Active until {premium_until.strftime('%d %b %Y')}"
+    else:
+        plan = "Free"
+        premium_text = "Not active"
+
+    await update.message.reply_text(
+        f"📊 Your Askora Status\n\n"
+        f"Plan: {plan}\n"
+        f"Questions today: {questions}/{FREE_DAILY_LIMIT}\n"
+        f"Remaining: {remaining}\n"
+        f"Premium: {premium_text}"
+    )
 # ============================================================
 # TELEGRAM APPLICATION
 # ============================================================
@@ -617,6 +645,8 @@ application.add_handler(
 
 application.add_handler(
     CommandHandler("reset", reset)
+)
+    application.add_handler(CommandHandler("status", status)
 )
 
 application.add_handler(
