@@ -1,8 +1,6 @@
 import os
 import logging
 from datetime import datetime, timedelta, timezone
-
-from groq import Groq
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -18,7 +16,7 @@ from telegram.ext import (
 # =========================
 
 TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
-GROQ_API_KEY = os.environ["GROQ_API_KEY"]
+GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 
 ADMIN_ID = 7721346673
 
@@ -32,7 +30,9 @@ ACCOUNT_NUMBER = os.environ.get("ACCOUNT_NUMBER", "YOUR ACCOUNT NUMBER")
 
 MODEL = "llama-3.3-70b-versatile"
 
-groq_client = Groq(api_key=GROQ_API_KEY)
+from google import genai
+
+gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
