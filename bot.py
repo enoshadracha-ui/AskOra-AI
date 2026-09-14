@@ -206,4 +206,68 @@ def initialize_bot():
 
     future.result()
 
-   
+    logging.info(
+        f"Webhook set to {webhook_url}"
+    )
+
+
+initialize_bot()
+
+
+flask_app = Flask(__name__)
+
+
+@flask_app.route("/", methods=["GET"])
+def home():
+
+    return jsonify({
+        "status": "online",
+        "bot": "Askora",
+        "mode": "free",
+        "limit": "unlimited"
+    })
+
+
+@flask_app.route("/webhook", methods=["POST"])
+def webhook():
+
+    try:
+
+        data = request.get_json(force=True)
+
+        update = Update.de_json(
+            data,
+            application.bot
+        )
+
+        asyncio.run_coroutine_threadsafe(
+            application.process_update(update),
+            event_loop
+        )
+
+        return jsonify({
+            "ok": True
+        })
+
+    except Exception as e:
+
+        logging.exception("Webhook error")
+
+        return jsonify({
+            "ok": False,
+            "error": str(e)
+        }), 500
+
+
+if __name__ == "__main__":
+
+    logging.basicConfig(
+        level=logging.INFO
+    )
+
+    flask_app.run(
+        host="0.0.0.0",
+        port=PORT,
+        debug=False,
+        use_reloader=False
+    )
