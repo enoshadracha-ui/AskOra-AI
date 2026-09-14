@@ -81,7 +81,8 @@ async def send_long_message(message, text):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👋 Welcome to AskOra.\n\n"
-        "Ask me anything."
+        "🤖 Your simple AI assistant.\n"
+        "Ask me anything — by text or voice. 🎤"
     )
 
 
@@ -120,6 +121,12 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     try:
+        # Show Telegram's "typing..." indicator
+        await context.bot.send_chat_action(
+            chat_id=update.effective_chat.id,
+            action="typing"
+        )
+
         completion = groq_client.chat.completions.create(
             model=TEXT_MODEL,
             messages=messages,
@@ -166,6 +173,12 @@ async def voice_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🎤 Processing...")
 
     try:
+        # Show typing while AskOra prepares the answer
+        await context.bot.send_chat_action(
+            chat_id=update.effective_chat.id,
+            action="typing"
+        )
+
         voice = await update.message.voice.get_file()
 
         audio_bytes = await voice.download_as_bytearray()
@@ -210,6 +223,9 @@ async def voice_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         answer = completion.choices[0].message.content
+
+        if not answer:
+            answer = "Sorry, I couldn't generate a response."
 
         history.append(
             {
