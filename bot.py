@@ -30,12 +30,13 @@ groq_client = Groq(api_key=GROQ_API_KEY)
 SYSTEM_INSTRUCTION = """
 You are AskOra, a helpful AI assistant.
 
-Answer questions clearly and accurately.
+Give short, clear and direct answers.
 Use simple language.
-For school assignments, explain the answer clearly and directly.
-Keep normal answers reasonably concise unless the user asks for more detail.
-Do not add unnecessary sections or filler.
-Be friendly and helpful.
+For school questions, give a clear answer without unnecessary details.
+Usually answer in 2 to 5 sentences.
+Do not use tables unless the user specifically asks.
+Do not add unnecessary headings or sections.
+Only give a longer explanation when the user asks for one.
 """
 
 users = {}
@@ -79,14 +80,8 @@ async def send_long_message(message, text):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "👋 Welcome to AskOra!\n\n"
-        "Ask me anything.\n"
-        "You can also send me a voice note.\n\n"
-        "Example:\n"
-        "What is engineering materials?\n\n"
-        "Commands:\n"
-        "/start - Start AskOra\n"
-        "/reset - Clear your conversation"
+        "👋 Welcome to AskOra.\n\n"
+        "Ask me anything."
     )
 
 
@@ -95,7 +90,7 @@ async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     users[user_id] = []
 
     await update.message.reply_text(
-        "✅ Your conversation has been cleared."
+        "Conversation cleared."
     )
 
 
@@ -128,8 +123,8 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         completion = groq_client.chat.completions.create(
             model=TEXT_MODEL,
             messages=messages,
-            temperature=0.7,
-            max_tokens=2048,
+            temperature=0.5,
+            max_tokens=500,
         )
 
         answer = completion.choices[0].message.content
@@ -160,7 +155,7 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.exception("Groq text generation failed")
 
         await update.message.reply_text(
-            "Sorry, something went wrong while processing your question."
+            "Sorry, something went wrong."
         )
 
 
@@ -168,7 +163,7 @@ async def voice_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.voice:
         return
 
-    await update.message.reply_text("🎤 Processing your voice note...")
+    await update.message.reply_text("🎤 Processing...")
 
     try:
         voice = await update.message.voice.get_file()
@@ -184,7 +179,7 @@ async def voice_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if not text:
             await update.message.reply_text(
-                "Sorry, I couldn't understand that voice note."
+                "I couldn't understand the voice note."
             )
             return
 
@@ -210,8 +205,8 @@ async def voice_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         completion = groq_client.chat.completions.create(
             model=TEXT_MODEL,
             messages=messages,
-            temperature=0.7,
-            max_tokens=2048,
+            temperature=0.5,
+            max_tokens=500,
         )
 
         answer = completion.choices[0].message.content
@@ -260,10 +255,7 @@ telegram_application.add_handler(
 )
 
 telegram_application.add_handler(
-    MessageHandler(
-        filters.VOICE,
-        voice_chat
-    )
+    MessageHandler(filters.VOICE, voice_chat)
 )
 
 telegram_application.add_handler(
@@ -272,7 +264,6 @@ telegram_application.add_handler(
         chat
     )
 )
-
 
 loop = asyncio.new_event_loop()
 
@@ -312,11 +303,7 @@ def home():
         {
             "status": "online",
             "bot": "AskOra",
-            "ai": "Groq",
-            "features": [
-                "text",
-                "voice"
-            ]
+            "ai": "Groq"
         }
     )
 
