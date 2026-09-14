@@ -14,6 +14,7 @@ from telegram import (
 )
 from telegram.ext import (
     Application,
+    CommandHandler,
     MessageHandler,
     ContextTypes,
     filters,
@@ -115,6 +116,14 @@ async def send_long_message(message, text):
             )
         else:
             await message.reply_text(part)
+
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "👋 Welcome to AskOra!\n\n"
+        "🤖 Your simple AI assistant.\n"
+        "Ask me anything — by text or voice. 🎤"
+    )
 
 
 async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -297,6 +306,10 @@ telegram_application = (
     Application.builder()
     .token(TELEGRAM_BOT_TOKEN)
     .build()
+)
+
+telegram_application.add_handler(
+    CommandHandler("start", start)
 )
 
 telegram_application.add_handler(
