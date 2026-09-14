@@ -14,7 +14,6 @@ from telegram import (
 )
 from telegram.ext import (
     Application,
-    CommandHandler,
     MessageHandler,
     ContextTypes,
     filters,
@@ -50,12 +49,6 @@ Only give a longer explanation when the user asks for one.
 # Conversation history
 users = {}
 
-# Referral tracking
-referrals = {}
-
-# Users who have already been referred
-referred_users = set()
-
 
 def get_user(user_id):
     if user_id not in users:
@@ -88,18 +81,12 @@ def split_message(text, limit=4000):
     return parts
 
 
-def referral_link(user_id):
-    return f"{BOT_LINK}?start={user_id}"
-
-
-def invite_button(user_id):
-    personal_link = referral_link(user_id)
-
+def invite_button():
     share_url = (
         "https://t.me/share/url?"
         + urlencode(
             {
-                "url": personal_link,
+                "url": BOT_LINK,
                 "text": "Try AskOra 🤖 — a free AI assistant on Telegram!",
             }
         )
@@ -118,76 +105,16 @@ def invite_button(user_id):
 
 
 async def send_long_message(message, text):
-    user_id = message.from_user.id
     parts = split_message(text)
 
     for index, part in enumerate(parts):
         if index == len(parts) - 1:
             await message.reply_text(
                 part,
-                reply_markup=invite_button(user_id),
+                reply_markup=invite_button(),
             )
         else:
             await message.reply_text(part)
-
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-
-    # Handle referral
-    if context.args:
-        try:
-            referrer_id = int(context.args[0])
-
-            if (
-                referrer_id != user_id
-                and user_id not in referred_users
-            ):
-                if referrer_id not in referrals:
-                    referrals[referrer_id] = set()
-
-                referrals[referrer_id].add(user_id)
-                referred_users.add(user_id)
-
-                logging.info(
-                    "Referral: %s invited %s",
-                    referrer_id,
-                    user_id,
-                )
-
-        except (ValueError, TypeError):
-            pass
-
-    await update.message.reply_text(
-        "👋 Welcome to AskOra.\n\n"
-        "🤖 Your simple AI assistant.\n"
-        "Ask me anything — by text or voice. 🎤"
-    )
-
-
-async def referral_stats(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-):
-    user_id = update.effective_user.id
-
-    count = len(referrals.get(user_id, set()))
-    link = referral_link(user_id)
-
-    await update.message.reply_text(
-        f"👥 Your AskOra referrals: {count}\n\n"
-        f"🔗 Your personal invite link:\n{link}\n\n"
-        "Share your link with friends to bring them to AskOra. 🚀"
-    )
-
-
-async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    users[user_id] = []
-
-    await update.message.reply_text(
-        "Conversation cleared."
-    )
 
 
 async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -370,18 +297,6 @@ telegram_application = (
     Application.builder()
     .token(TELEGRAM_BOT_TOKEN)
     .build()
-)
-
-telegram_application.add_handler(
-    CommandHandler("start", start)
-)
-
-telegram_application.add_handler(
-    CommandHandler("referrals", referral_stats)
-)
-
-telegram_application.add_handler(
-    CommandHandler("reset", reset)
 )
 
 telegram_application.add_handler(
