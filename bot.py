@@ -20,7 +20,9 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 RENDER_EXTERNAL_URL = os.environ.get("RENDER_EXTERNAL_URL")
 
-MODEL = "gemini-3.6-flash"
+TEXT_MODEL = "gemini-3.6-flash"
+IMAGE_MODEL = "gemini-3.1-flash-image"
+
 PORT = int(os.environ.get("PORT", 10000))
 
 if not TELEGRAM_BOT_TOKEN:
@@ -43,12 +45,6 @@ Keep normal answers short, usually 2 to 5 sentences.
 
 Use simple language that is easy to understand.
 
-If the user sends a photo, carefully read the image and answer the question shown in it.
-
-If the user sends a photo with a caption, follow the caption and focus exactly on what the user asks about.
-
-If the user sends a voice note, understand the spoken request and answer it directly.
-
 For school assignments, give the useful answer clearly and explain important steps when needed.
 
 Do not add unnecessary sections, tables, long examples, summaries, or extra explanations.
@@ -62,6 +58,7 @@ users = {}
 
 
 def get_user(user_id):
+
     if user_id not in users:
         users[user_id] = {
             "chat_history": []
@@ -71,6 +68,7 @@ def get_user(user_id):
 
 
 def split_message(text, max_length=4000):
+
     return [
         text[i:i + max_length]
         for i in range(0, len(text), max_length)
@@ -78,6 +76,7 @@ def split_message(text, max_length=4000):
 
 
 async def send_long_message(update, text):
+
     for part in split_message(text):
         await update.message.reply_text(part)
 
@@ -87,13 +86,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = (
         "Welcome to Askora 🤖\n\n"
         "Your AI assistant powered by Gemini.\n\n"
-        "💬 Send a question\n"
-        "📸 Send a photo of an assignment or question\n"
-        "🎤 Send a voice note\n\n"
-        "You can also send a photo with a caption like "
-        "\"Answer question 3\".\n\n"
-        "Askora is completely free with unlimited questions.\n\n"
-        "Just send me anything to begin."
+        "💬 Ask me anything\n"
+        "🎤 Send me a voice note\n"
+        "🎨 Ask me to generate an image\n\n"
+        "Example:\n"
+        "\"Generate a futuristic city at night\"\n\n"
+        "Askora is completely free with unlimited questions."
     )
 
     await update.message.reply_text(message)
@@ -129,7 +127,7 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         response = await asyncio.to_thread(
             client.models.generate_content,
-            model=MODEL,
+            model=TEXT_MODEL,
             contents=question,
             config=types.GenerateContentConfig(
                 system_instruction=SYSTEM_INSTRUCTION
@@ -161,74 +159,78 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
-async def photo_chat(
+async def generate_image(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE
 ):
 
-    if not update.message or not update.message.photo:
+    if not update.message or not update.message.text:
         return
 
-    user_id = update.effective_user.id
-    user = get_user(user_id)
+    prompt = update.message.text.strip()
 
-    await update.message.chat.send_action("typing")
+    if not prompt:
+        return
+
+    await update.message.chat.send_action("upload_photo")
 
     try:
 
-        photo = update.message.photo[-1]
-
-        telegram_file = await context.bot.get_file(
-            photo.file_id
-        )
-
-        image_bytes = await telegram_file.download_as_bytearray()
-
-        caption = (
-            update.message.caption.strip()
-            if update.message.caption
-            else "Read this image carefully and answer the question shown in it."
-        )
-
-        image_part = types.Part.from_bytes(
-            data=bytes(image_bytes),
-            mime_type="image/jpeg"
+        image_prompt = (
+            "Generate an image based on this user's request. "
+            "Create the image directly and follow the user's "
+            "description as accurately as possible.\n\n"
+            "User request: "
+            + prompt
         )
 
         response = await asyncio.to_thread(
             client.models.generate_content,
-            model=MODEL,
-            contents=[
-                image_part,
-                caption
-            ],
+            model=IMAGE_MODEL,
+            contents=image_prompt,
             config=types.GenerateContentConfig(
-                system_instruction=SYSTEM_INSTRUCTION
+                response_modalities=["IMAGE"]
             )
         )
 
-        answer = response.text
+        image_found = False
 
-        if not answer:
-            answer = "I could not read the question in that image."
+        for part in response.parts:
 
-        user["chat_history"].append({
-            "user": "[Photo] " + caption,
-            "assistant": answer
-        })
+            if part.inline_data is not None:
 
-        if len(user["chat_history"]) > 50:
-            user["chat_history"] = user["chat_history"][-50:]
+                image = part.as_image()
 
-        await send_long_message(update, answer)
+                image_path = (
+                    f"/tmp/askora_{update.effective_user.id}.png"
+                )
+
+                image.save(image_path)
+
+                with open(image_path, "rb") as image_file:
+
+                    await update.message.reply_photo(
+                        photo=image_file,
+                        caption="🎨 Generated by Askora"
+                    )
+
+                image_found = True
+                break
+
+        if not image_found:
+
+            await update.message.reply_text(
+                "Sorry, I couldn't generate the image. "
+                "Please try another description."
+            )
 
     except Exception:
 
-        logging.exception("PHOTO ERROR")
+        logging.exception("Gemini image generation error")
 
         await update.message.reply_text(
-            "I couldn't process that photo. "
-            "Please send a clearer image and try again."
+            "Sorry, I couldn't generate that image. "
+            "Please try again."
         )
 
 
@@ -262,7 +264,7 @@ async def voice_chat(
 
         response = await asyncio.to_thread(
             client.models.generate_content,
-            model=MODEL,
+            model=TEXT_MODEL,
             contents=[
                 audio_part,
                 (
@@ -317,10 +319,7 @@ application.add_handler(
 )
 
 application.add_handler(
-    MessageHandler(
-        filters.PHOTO,
-        photo_chat
-    )
+    CommandHandler("image", generate_image)
 )
 
 application.add_handler(
@@ -398,8 +397,8 @@ def home():
         "limit": "unlimited",
         "features": [
             "text",
-            "photo",
-            "voice"
+            "voice",
+            "image_generation"
         ]
     })
 
