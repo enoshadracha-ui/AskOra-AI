@@ -5,6 +5,7 @@ import logging
 
 from flask import Flask, request, jsonify
 from google import genai
+from google.genai import types
 
 from telegram import Update
 from telegram.ext import (
@@ -32,6 +33,24 @@ if not RENDER_EXTERNAL_URL:
     raise RuntimeError("RENDER_EXTERNAL_URL is missing")
 
 client = genai.Client(api_key=GEMINI_API_KEY)
+
+SYSTEM_INSTRUCTION = """
+You are Askora, a helpful AI assistant.
+
+Answer questions simply, clearly, and directly.
+
+Keep normal answers short, usually 2 to 5 sentences.
+
+Use simple language that is easy to understand.
+
+Do not add unnecessary sections, tables, long examples, summaries, or extra explanations.
+
+For simple questions, give a simple answer.
+
+If the user asks for more detail, then explain in more detail.
+
+If the user asks for a definition, give a short definition and one simple example when useful.
+"""
 
 users = {}
 
@@ -98,7 +117,10 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         response = await asyncio.to_thread(
             client.models.generate_content,
             model=MODEL,
-            contents=question
+            contents=question,
+            config=types.GenerateContentConfig(
+                system_instruction=SYSTEM_INSTRUCTION
+            )
         )
 
         answer = response.text
@@ -184,68 +206,4 @@ def initialize_bot():
 
     future.result()
 
-    logging.info(
-        f"Webhook set to {webhook_url}"
-    )
-
-
-initialize_bot()
-
-
-flask_app = Flask(__name__)
-
-
-@flask_app.route("/", methods=["GET"])
-def home():
-
-    return jsonify({
-        "status": "online",
-        "bot": "Askora",
-        "mode": "free",
-        "limit": "unlimited"
-    })
-
-
-@flask_app.route("/webhook", methods=["POST"])
-def webhook():
-
-    try:
-
-        data = request.get_json(force=True)
-
-        update = Update.de_json(
-            data,
-            application.bot
-        )
-
-        asyncio.run_coroutine_threadsafe(
-            application.process_update(update),
-            event_loop
-        )
-
-        return jsonify({
-            "ok": True
-        })
-
-    except Exception as e:
-
-        logging.exception("Webhook error")
-
-        return jsonify({
-            "ok": False,
-            "error": str(e)
-        }), 500
-
-
-if __name__ == "__main__":
-
-    logging.basicConfig(
-        level=logging.INFO
-    )
-
-    flask_app.run(
-        host="0.0.0.0",
-        port=PORT,
-        debug=False,
-        use_reloader=False
-    )
+   
