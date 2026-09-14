@@ -2,11 +2,16 @@ import os
 import asyncio
 import threading
 import logging
+from urllib.parse import urlencode
 
 from flask import Flask, request, jsonify
 from groq import Groq
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import (
+    Update,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+)
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -25,6 +30,9 @@ PORT = int(os.environ.get("PORT", 10000))
 
 TEXT_MODEL = "openai/gpt-oss-120b"
 
+BOT_USERNAME = "askora_official_bot"
+BOT_LINK = f"https://t.me/{BOT_USERNAME}"
+
 groq_client = Groq(api_key=GROQ_API_KEY)
 
 SYSTEM_INSTRUCTION = """
@@ -39,7 +47,14 @@ Do not add unnecessary headings or sections.
 Only give a longer explanation when the user asks for one.
 """
 
+# Conversation history
 users = {}
+
+# Referral tracking
+referrals = {}
+
+# Users who have already been referred
+referred_users = set()
 
 
 def get_user(user_id):
@@ -73,12 +88,28 @@ def split_message(text, limit=4000):
     return parts
 
 
-def invite_button():
+def referral_link(user_id):
+    return f"{BOT_LINK}?start={user_id}"
+
+
+def invite_button(user_id):
+    personal_link = referral_link(user_id)
+
+    share_url = (
+        "https://t.me/share/url?"
+        + urlencode(
+            {
+                "url": personal_link,
+                "text": "Try AskOra 🤖 — a free AI assistant on Telegram!",
+            }
+        )
+    )
+
     keyboard = [
         [
             InlineKeyboardButton(
                 "✨ Invite a Friend",
-                switch_inline_query="Try AskOra 🤖 https://t.me/askora_official_bot"
+                url=share_url,
             )
         ]
     ]
@@ -87,23 +118,66 @@ def invite_button():
 
 
 async def send_long_message(message, text):
+    user_id = message.from_user.id
     parts = split_message(text)
 
     for index, part in enumerate(parts):
         if index == len(parts) - 1:
             await message.reply_text(
                 part,
-                reply_markup=invite_button()
+                reply_markup=invite_button(user_id),
             )
         else:
             await message.reply_text(part)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+
+    # Handle referral
+    if context.args:
+        try:
+            referrer_id = int(context.args[0])
+
+            if (
+                referrer_id != user_id
+                and user_id not in referred_users
+            ):
+                if referrer_id not in referrals:
+                    referrals[referrer_id] = set()
+
+                referrals[referrer_id].add(user_id)
+                referred_users.add(user_id)
+
+                logging.info(
+                    "Referral: %s invited %s",
+                    referrer_id,
+                    user_id,
+                )
+
+        except (ValueError, TypeError):
+            pass
+
     await update.message.reply_text(
         "👋 Welcome to AskOra.\n\n"
         "🤖 Your simple AI assistant.\n"
         "Ask me anything — by text or voice. 🎤"
+    )
+
+
+async def referral_stats(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+):
+    user_id = update.effective_user.id
+
+    count = len(referrals.get(user_id, set()))
+    link = referral_link(user_id)
+
+    await update.message.reply_text(
+        f"👥 Your AskOra referrals: {count}\n\n"
+        f"🔗 Your personal invite link:\n{link}\n\n"
+        "Share your link with friends to bring them to AskOra. 🚀"
     )
 
 
@@ -144,7 +218,7 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         await context.bot.send_chat_action(
             chat_id=update.effective_chat.id,
-            action="typing"
+            action="typing",
         )
 
         completion = groq_client.chat.completions.create(
@@ -176,35 +250,47 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if len(history) > 20:
             del history[:-20]
 
-        await send_long_message(update.message, answer)
+        await send_long_message(
+            update.message,
+            answer,
+        )
 
     except Exception:
-        logging.exception("Groq text generation failed")
+        logging.exception(
+            "Groq text generation failed"
+        )
 
         await update.message.reply_text(
             "Sorry, something went wrong."
         )
 
 
-async def voice_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def voice_chat(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+):
     if not update.message or not update.message.voice:
         return
 
-    await update.message.reply_text("🎤 Processing...")
+    await update.message.reply_text(
+        "🎤 Processing..."
+    )
 
     try:
         await context.bot.send_chat_action(
             chat_id=update.effective_chat.id,
-            action="typing"
+            action="typing",
         )
 
         voice = await update.message.voice.get_file()
 
         audio_bytes = await voice.download_as_bytearray()
 
-        transcription = groq_client.audio.transcriptions.create(
-            file=("voice.ogg", bytes(audio_bytes)),
-            model="whisper-large-v3-turbo",
+        transcription = (
+            groq_client.audio.transcriptions.create(
+                file=("voice.ogg", bytes(audio_bytes)),
+                model="whisper-large-v3-turbo",
+            )
         )
 
         text = transcription.text.strip()
@@ -263,10 +349,15 @@ async def voice_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if len(history) > 20:
             del history[:-20]
 
-        await send_long_message(update.message, answer)
+        await send_long_message(
+            update.message,
+            answer,
+        )
 
     except Exception:
-        logging.exception("Groq voice processing failed")
+        logging.exception(
+            "Groq voice processing failed"
+        )
 
         await update.message.reply_text(
             "Sorry, I couldn't process that voice note."
@@ -286,17 +377,24 @@ telegram_application.add_handler(
 )
 
 telegram_application.add_handler(
+    CommandHandler("referrals", referral_stats)
+)
+
+telegram_application.add_handler(
     CommandHandler("reset", reset)
 )
 
 telegram_application.add_handler(
-    MessageHandler(filters.VOICE, voice_chat)
+    MessageHandler(
+        filters.VOICE,
+        voice_chat,
+    )
 )
 
 telegram_application.add_handler(
     MessageHandler(
         filters.TEXT & ~filters.COMMAND,
-        chat
+        chat,
     )
 )
 
@@ -310,7 +408,7 @@ def run_loop():
 
 loop_thread = threading.Thread(
     target=run_loop,
-    daemon=True
+    daemon=True,
 )
 
 loop_thread.start()
@@ -320,13 +418,14 @@ async def initialize_bot():
     await telegram_application.initialize()
 
     await telegram_application.bot.set_webhook(
-        url=RENDER_EXTERNAL_URL.rstrip("/") + "/webhook"
+        url=RENDER_EXTERNAL_URL.rstrip("/")
+        + "/webhook"
     )
 
 
 future = asyncio.run_coroutine_threadsafe(
     initialize_bot(),
-    loop
+    loop,
 )
 
 future.result()
@@ -338,7 +437,7 @@ def home():
         {
             "status": "online",
             "bot": "AskOra",
-            "ai": "Groq"
+            "ai": "Groq",
         }
     )
 
@@ -350,18 +449,22 @@ def webhook():
 
         update = Update.de_json(
             data,
-            telegram_application.bot
+            telegram_application.bot,
         )
 
         asyncio.run_coroutine_threadsafe(
-            telegram_application.process_update(update),
-            loop
+            telegram_application.process_update(
+                update
+            ),
+            loop,
         )
 
         return jsonify({"ok": True})
 
     except Exception:
-        logging.exception("Webhook error")
+        logging.exception(
+            "Webhook error"
+        )
 
         return jsonify({"ok": False}), 500
 
@@ -371,5 +474,5 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=PORT,
         debug=False,
-        use_reloader=False
+        use_reloader=False,
     )
