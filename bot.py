@@ -43,13 +43,19 @@ Keep normal answers short, usually 2 to 5 sentences.
 
 Use simple language that is easy to understand.
 
+If the user sends a photo, carefully read the image and answer the question shown in it.
+
+If the user sends a photo with a caption, follow the caption and focus on exactly what the user asks about.
+
+If the user sends a voice note, understand the spoken request and answer it directly.
+
+For school assignments, show the useful answer clearly and explain the important steps when needed.
+
 Do not add unnecessary sections, tables, long examples, summaries, or extra explanations.
 
 For simple questions, give a simple answer.
 
 If the user asks for more detail, then explain in more detail.
-
-If the user asks for a definition, give a short definition and one simple example when useful.
 """
 
 users = {}
@@ -79,10 +85,14 @@ async def send_long_message(update, text):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = (
         "Welcome to Askora 🤖\n\n"
-        "I'm your AI assistant powered by Gemini.\n\n"
-        "Ask me anything and I'll do my best to help.\n\n"
+        "Your AI assistant powered by Gemini.\n\n"
+        "💬 Send a question\n"
+        "📸 Send a photo of an assignment or question\n"
+        "🎤 Send a voice note\n\n"
+        "You can also send a photo with a caption like "
+        "\"Answer question 3\".\n\n"
         "Askora is completely free with unlimited questions.\n\n"
-        "Just send me a message to begin."
+        "Just send me anything to begin."
     )
 
     await update.message.reply_text(message)
@@ -139,11 +149,154 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_long_message(update, answer)
 
     except Exception:
-        logging.exception("Gemini error")
+        logging.exception("Gemini text error")
 
         await update.message.reply_text(
             "Sorry, something went wrong while processing your question. "
             "Please try again."
+        )
+
+
+async def photo_chat(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    if not update.message or not update.message.photo:
+        return
+
+    user_id = update.effective_user.id
+    user = get_user(user_id)
+
+    await update.message.chat.send_action("typing")
+
+    try:
+        photo = update.message.photo[-1]
+
+        telegram_file = await context.bot.get_file(
+            photo.file_id
+        )
+
+        image_bytes = await telegram_file.download_as_bytearray()
+
+        caption = (
+            update.message.caption.strip()
+            if update.message.caption
+            else ""
+        )
+
+        if not caption:
+            caption = (
+                "Read this image carefully. "
+                "If it contains a question or assignment, "
+                "answer it directly."
+            )
+
+        image_part = types.Part.from_bytes(
+            data=bytes(image_bytes),
+            mime_type="image/jpeg"
+        )
+
+        response = await asyncio.to_thread(
+            client.models.generate_content,
+            model=MODEL,
+            contents=[
+                image_part,
+                caption
+            ],
+            config=types.GenerateContentConfig(
+                system_instruction=SYSTEM_INSTRUCTION
+            )
+        )
+
+        answer = response.text
+
+        if not answer:
+            answer = "Sorry, I couldn't understand the image."
+
+        user["chat_history"].append({
+            "user": "[Photo] " + caption,
+            "assistant": answer
+        })
+
+        if len(user["chat_history"]) > 50:
+            user["chat_history"] = user["chat_history"][-50:]
+
+        await send_long_message(update, answer)
+
+    except Exception:
+        logging.exception("Gemini image error")
+
+        await update.message.reply_text(
+            "Sorry, I couldn't process that photo. "
+            "Please try sending it again with a clear image."
+        )
+
+
+async def voice_chat(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    if not update.message or not update.message.voice:
+        return
+
+    user_id = update.effective_user.id
+    user = get_user(user_id)
+
+    await update.message.chat.send_action("typing")
+
+    try:
+        voice = update.message.voice
+
+        telegram_file = await context.bot.get_file(
+            voice.file_id
+        )
+
+        audio_bytes = await telegram_file.download_as_bytearray()
+
+        audio_part = types.Part.from_bytes(
+            data=bytes(audio_bytes),
+            mime_type="audio/ogg"
+        )
+
+        response = await asyncio.to_thread(
+            client.models.generate_content,
+            model=MODEL,
+            contents=[
+                audio_part,
+                (
+                    "Listen to this voice note carefully. "
+                    "Understand what the user is asking and "
+                    "answer the request directly."
+                )
+            ],
+            config=types.GenerateContentConfig(
+                system_instruction=SYSTEM_INSTRUCTION
+            )
+        )
+
+        answer = response.text
+
+        if not answer:
+            answer = "Sorry, I couldn't understand the voice note."
+
+        user["chat_history"].append({
+            "user": "[Voice note]",
+            "assistant": answer
+        })
+
+        if len(user["chat_history"]) > 50:
+            user["chat_history"] = user["chat_history"][-50:]
+
+        await send_long_message(update, answer)
+
+    except Exception:
+        logging.exception("Gemini audio error")
+
+        await update.message.reply_text(
+            "Sorry, I couldn't process that voice note. "
+            "Please try sending it again."
         )
 
 
@@ -153,12 +306,27 @@ application = (
     .build()
 )
 
+
 application.add_handler(
     CommandHandler("start", start)
 )
 
 application.add_handler(
     CommandHandler("reset", reset)
+)
+
+application.add_handler(
+    MessageHandler(
+        filters.PHOTO,
+        photo_chat
+    )
+)
+
+application.add_handler(
+    MessageHandler(
+        filters.VOICE,
+        voice_chat
+    )
 )
 
 application.add_handler(
@@ -224,7 +392,12 @@ def home():
         "status": "online",
         "bot": "Askora",
         "mode": "free",
-        "limit": "unlimited"
+        "limit": "unlimited",
+        "features": [
+            "text",
+            "photo",
+            "voice"
+        ]
     })
 
 
