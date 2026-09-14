@@ -2,6 +2,8 @@ import os
 import asyncio
 import threading
 import logging
+import sqlite3
+from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
 
 from flask import Flask, request, jsonify
@@ -20,6 +22,10 @@ from telegram.ext import (
     filters,
 )
 
+# =========================
+# SETTINGS
+# =========================
+
 logging.basicConfig(level=logging.INFO)
 
 TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
@@ -29,6 +35,8 @@ RENDER_EXTERNAL_URL = os.environ["RENDER_EXTERNAL_URL"]
 PORT = int(os.environ.get("PORT", 10000))
 
 TEXT_MODEL = "openai/gpt-oss-120b"
+
+ADMIN_ID = 7721346673
 
 BOT_USERNAME = "askora_official_bot"
 BOT_LINK = f"https://t.me/{BOT_USERNAME}"
@@ -47,7 +55,160 @@ Do not add unnecessary headings or sections.
 Only give a longer explanation when the user asks for one.
 """
 
-# Conversation history
+# =========================
+# DATABASE
+# =========================
+
+DB_FILE = "askora.db"
+
+
+def init_database():
+    connection = sqlite3.connect(DB_FILE)
+
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            user_id INTEGER PRIMARY KEY,
+            first_seen TEXT NOT NULL,
+            last_seen TEXT NOT NULL,
+            messages INTEGER DEFAULT 0,
+            voice_messages INTEGER DEFAULT 0
+        )
+    """)
+
+    connection.commit()
+    connection.close()
+
+
+def record_user(user_id, is_voice=False):
+    now = datetime.now(timezone.utc).isoformat()
+
+    connection = sqlite3.connect(DB_FILE)
+    cursor = connection.cursor()
+
+    cursor.execute(
+        "SELECT user_id FROM users WHERE user_id = ?",
+        (user_id,),
+    )
+
+    exists = cursor.fetchone()
+
+    if exists:
+        if is_voice:
+            cursor.execute(
+                """
+                UPDATE users
+                SET last_seen = ?,
+                    messages = messages + 1,
+                    voice_messages = voice_messages + 1
+                WHERE user_id = ?
+                """,
+                (now, user_id),
+            )
+        else:
+            cursor.execute(
+                """
+                UPDATE users
+                SET last_seen = ?,
+                    messages = messages + 1
+                WHERE user_id = ?
+                """,
+                (now, user_id),
+            )
+
+    else:
+        cursor.execute(
+            """
+            INSERT INTO users
+            (
+                user_id,
+                first_seen,
+                last_seen,
+                messages,
+                voice_messages
+            )
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                now,
+                now,
+                1,
+                1 if is_voice else 0,
+            ),
+        )
+
+    connection.commit()
+    connection.close()
+
+
+def get_statistics():
+    connection = sqlite3.connect(DB_FILE)
+    cursor = connection.cursor()
+
+    now = datetime.now(timezone.utc)
+
+    today_start = now.replace(
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+    )
+
+    week_start = now - timedelta(days=7)
+
+    month_start = now - timedelta(days=30)
+
+    cursor.execute(
+        "SELECT COUNT(*) FROM users"
+    )
+    total_users = cursor.fetchone()[0]
+
+    cursor.execute(
+        "SELECT COUNT(*) FROM users WHERE last_seen >= ?",
+        (today_start.isoformat(),),
+    )
+    active_today = cursor.fetchone()[0]
+
+    cursor.execute(
+        "SELECT COUNT(*) FROM users WHERE last_seen >= ?",
+        (week_start.isoformat(),),
+    )
+    active_week = cursor.fetchone()[0]
+
+    cursor.execute(
+        "SELECT COUNT(*) FROM users WHERE last_seen >= ?",
+        (month_start.isoformat(),),
+    )
+    active_month = cursor.fetchone()[0]
+
+    cursor.execute(
+        "SELECT COALESCE(SUM(messages), 0) FROM users"
+    )
+    total_messages = cursor.fetchone()[0]
+
+    cursor.execute(
+        "SELECT COALESCE(SUM(voice_messages), 0) FROM users"
+    )
+    voice_messages = cursor.fetchone()[0]
+
+    connection.close()
+
+    return {
+        "total_users": total_users,
+        "active_today": active_today,
+        "active_week": active_week,
+        "active_month": active_month,
+        "total_messages": total_messages,
+        "voice_messages": voice_messages,
+    }
+
+
+# =========================
+# USER HISTORY
+# =========================
+
 users = {}
 
 
@@ -57,6 +218,10 @@ def get_user(user_id):
 
     return users[user_id]
 
+
+# =========================
+# MESSAGE HELPERS
+# =========================
 
 def split_message(text, limit=4000):
     if len(text) <= limit:
@@ -74,6 +239,7 @@ def split_message(text, limit=4000):
             cut = limit
 
         parts.append(text[:cut])
+
         text = text[cut:].lstrip()
 
     if text:
@@ -109,6 +275,7 @@ async def send_long_message(message, text):
     parts = split_message(text)
 
     for index, part in enumerate(parts):
+
         if index == len(parts) - 1:
             await message.reply_text(
                 part,
@@ -118,7 +285,16 @@ async def send_long_message(message, text):
             await message.reply_text(part)
 
 
+# =========================
+# START
+# =========================
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    user_id = update.effective_user.id
+
+    record_user(user_id)
+
     await update.message.reply_text(
         "👋 Welcome to AskOra!\n\n"
         "🤖 Your simple AI assistant.\n"
@@ -126,12 +302,47 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+# =========================
+# ADMIN DASHBOARD
+# =========================
+
+async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    user_id = update.effective_user.id
+
+    if user_id != ADMIN_ID:
+        await update.message.reply_text(
+            "⛔ You are not authorized to use this command."
+        )
+        return
+
+    stats = get_statistics()
+
+    await update.message.reply_text(
+        "📊 ASKORA ADMIN DASHBOARD\n\n"
+        f"👥 Total users: {stats['total_users']}\n"
+        f"🟢 Active today: {stats['active_today']}\n"
+        f"📅 Active this week: {stats['active_week']}\n"
+        f"📆 Active this month: {stats['active_month']}\n\n"
+        f"💬 Total messages: {stats['total_messages']}\n"
+        f"🎤 Voice messages: {stats['voice_messages']}"
+    )
+
+
+# =========================
+# TEXT CHAT
+# =========================
+
 async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     if not update.message or not update.message.text:
         return
 
     question = update.message.text.strip()
+
     user_id = update.effective_user.id
+
+    record_user(user_id)
 
     history = get_user(user_id)
 
@@ -152,6 +363,7 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     try:
+
         await context.bot.send_chat_action(
             chat_id=update.effective_chat.id,
             action="typing",
@@ -192,6 +404,7 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     except Exception:
+
         logging.exception(
             "Groq text generation failed"
         )
@@ -201,18 +414,31 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
+# =========================
+# VOICE CHAT
+# =========================
+
 async def voice_chat(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ):
+
     if not update.message or not update.message.voice:
         return
+
+    user_id = update.effective_user.id
+
+    record_user(
+        user_id,
+        is_voice=True,
+    )
 
     await update.message.reply_text(
         "🎤 Processing..."
     )
 
     try:
+
         await context.bot.send_chat_action(
             chat_id=update.effective_chat.id,
             action="typing",
@@ -224,7 +450,10 @@ async def voice_chat(
 
         transcription = (
             groq_client.audio.transcriptions.create(
-                file=("voice.ogg", bytes(audio_bytes)),
+                file=(
+                    "voice.ogg",
+                    bytes(audio_bytes),
+                ),
                 model="whisper-large-v3-turbo",
             )
         )
@@ -232,12 +461,13 @@ async def voice_chat(
         text = transcription.text.strip()
 
         if not text:
+
             await update.message.reply_text(
                 "I couldn't understand the voice note."
             )
+
             return
 
-        user_id = update.effective_user.id
         history = get_user(user_id)
 
         messages = [
@@ -256,11 +486,13 @@ async def voice_chat(
             }
         )
 
-        completion = groq_client.chat.completions.create(
-            model=TEXT_MODEL,
-            messages=messages,
-            temperature=0.5,
-            max_tokens=500,
+        completion = (
+            groq_client.chat.completions.create(
+                model=TEXT_MODEL,
+                messages=messages,
+                temperature=0.5,
+                max_tokens=500,
+            )
         )
 
         answer = completion.choices[0].message.content
@@ -291,6 +523,7 @@ async def voice_chat(
         )
 
     except Exception:
+
         logging.exception(
             "Groq voice processing failed"
         )
@@ -300,7 +533,23 @@ async def voice_chat(
         )
 
 
+# =========================
+# DATABASE INITIALIZATION
+# =========================
+
+init_database()
+
+
+# =========================
+# FLASK
+# =========================
+
 app = Flask(__name__)
+
+
+# =========================
+# TELEGRAM APPLICATION
+# =========================
 
 telegram_application = (
     Application.builder()
@@ -308,9 +557,22 @@ telegram_application = (
     .build()
 )
 
+
 telegram_application.add_handler(
-    CommandHandler("start", start)
+    CommandHandler(
+        "start",
+        start,
+    )
 )
+
+
+telegram_application.add_handler(
+    CommandHandler(
+        "admin",
+        admin,
+    )
+)
+
 
 telegram_application.add_handler(
     MessageHandler(
@@ -319,6 +581,7 @@ telegram_application.add_handler(
     )
 )
 
+
 telegram_application.add_handler(
     MessageHandler(
         filters.TEXT & ~filters.COMMAND,
@@ -326,11 +589,18 @@ telegram_application.add_handler(
     )
 )
 
+
+# =========================
+# ASYNCIO LOOP
+# =========================
+
 loop = asyncio.new_event_loop()
 
 
 def run_loop():
+
     asyncio.set_event_loop(loop)
+
     loop.run_forever()
 
 
@@ -342,7 +612,12 @@ loop_thread = threading.Thread(
 loop_thread.start()
 
 
+# =========================
+# INITIALIZE BOT
+# =========================
+
 async def initialize_bot():
+
     await telegram_application.initialize()
 
     await telegram_application.bot.set_webhook(
@@ -359,8 +634,16 @@ future = asyncio.run_coroutine_threadsafe(
 future.result()
 
 
-@app.route("/", methods=["GET"])
+# =========================
+# HOME
+# =========================
+
+@app.route(
+    "/",
+    methods=["GET"],
+)
 def home():
+
     return jsonify(
         {
             "status": "online",
@@ -370,10 +653,21 @@ def home():
     )
 
 
-@app.route("/webhook", methods=["POST"])
+# =========================
+# WEBHOOK
+# =========================
+
+@app.route(
+    "/webhook",
+    methods=["POST"],
+)
 def webhook():
+
     try:
-        data = request.get_json(force=True)
+
+        data = request.get_json(
+            force=True
+        )
 
         update = Update.de_json(
             data,
@@ -387,17 +681,31 @@ def webhook():
             loop,
         )
 
-        return jsonify({"ok": True})
+        return jsonify(
+            {
+                "ok": True
+            }
+        )
 
     except Exception:
+
         logging.exception(
             "Webhook error"
         )
 
-        return jsonify({"ok": False}), 500
+        return jsonify(
+            {
+                "ok": False
+            }
+        ), 500
 
+
+# =========================
+# RUN
+# =========================
 
 if __name__ == "__main__":
+
     app.run(
         host="0.0.0.0",
         port=PORT,
