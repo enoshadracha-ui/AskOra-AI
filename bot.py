@@ -6,7 +6,7 @@ import logging
 from flask import Flask, request, jsonify
 from groq import Groq
 
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -73,9 +73,30 @@ def split_message(text, limit=4000):
     return parts
 
 
+def invite_button():
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "✨ Invite a Friend",
+                switch_inline_query="Try AskOra 🤖 https://t.me/askora_official_bot"
+            )
+        ]
+    ]
+
+    return InlineKeyboardMarkup(keyboard)
+
+
 async def send_long_message(message, text):
-    for part in split_message(text):
-        await message.reply_text(part)
+    parts = split_message(text)
+
+    for index, part in enumerate(parts):
+        if index == len(parts) - 1:
+            await message.reply_text(
+                part,
+                reply_markup=invite_button()
+            )
+        else:
+            await message.reply_text(part)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -121,7 +142,6 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     try:
-        # Show Telegram's "typing..." indicator
         await context.bot.send_chat_action(
             chat_id=update.effective_chat.id,
             action="typing"
@@ -173,7 +193,6 @@ async def voice_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🎤 Processing...")
 
     try:
-        # Show typing while AskOra prepares the answer
         await context.bot.send_chat_action(
             chat_id=update.effective_chat.id,
             action="typing"
