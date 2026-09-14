@@ -2,10 +2,10 @@ import os
 import asyncio
 import threading
 import logging
-import sqlite3
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
 
+import psycopg2
 from flask import Flask, request, jsonify
 from groq import Groq
 
@@ -14,6 +14,7 @@ from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
 )
+
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -21,6 +22,7 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
+
 
 # =========================
 # SETTINGS
@@ -31,6 +33,7 @@ logging.basicConfig(level=logging.INFO)
 TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 GROQ_API_KEY = os.environ["GROQ_API_KEY"]
 RENDER_EXTERNAL_URL = os.environ["RENDER_EXTERNAL_URL"]
+DATABASE_URL = os.environ["DATABASE_URL"]
 
 PORT = int(os.environ.get("PORT", 10000))
 
@@ -42,6 +45,11 @@ BOT_USERNAME = "askora_official_bot"
 BOT_LINK = f"https://t.me/{BOT_USERNAME}"
 
 groq_client = Groq(api_key=GROQ_API_KEY)
+
+
+# =========================
+# AI INSTRUCTION
+# =========================
 
 SYSTEM_INSTRUCTION = """
 You are AskOra, a helpful AI assistant.
@@ -55,96 +63,72 @@ Do not add unnecessary headings or sections.
 Only give a longer explanation when the user asks for one.
 """
 
+
 # =========================
 # DATABASE
 # =========================
 
-DB_FILE = "askora.db"
+def get_connection():
+    return psycopg2.connect(DATABASE_URL)
 
 
 def init_database():
-    connection = sqlite3.connect(DB_FILE)
-
+    connection = get_connection()
     cursor = connection.cursor()
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
-            user_id INTEGER PRIMARY KEY,
-            first_seen TEXT NOT NULL,
-            last_seen TEXT NOT NULL,
+            user_id BIGINT PRIMARY KEY,
+            first_seen TIMESTAMPTZ NOT NULL,
+            last_seen TIMESTAMPTZ NOT NULL,
             messages INTEGER DEFAULT 0,
             voice_messages INTEGER DEFAULT 0
         )
     """)
 
     connection.commit()
+    cursor.close()
     connection.close()
 
 
 def record_user(user_id, is_voice=False):
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(timezone.utc)
 
-    connection = sqlite3.connect(DB_FILE)
+    connection = get_connection()
     cursor = connection.cursor()
 
     cursor.execute(
-        "SELECT user_id FROM users WHERE user_id = ?",
-        (user_id,),
+        """
+        INSERT INTO users (
+            user_id,
+            first_seen,
+            last_seen,
+            messages,
+            voice_messages
+        )
+        VALUES (%s, %s, %s, 1, %s)
+        ON CONFLICT (user_id)
+        DO UPDATE SET
+            last_seen = EXCLUDED.last_seen,
+            messages = users.messages + 1,
+            voice_messages =
+                users.voice_messages + EXCLUDED.voice_messages
+        """,
+        (
+            user_id,
+            now,
+            now,
+            1 if is_voice else 0,
+        ),
     )
 
-    exists = cursor.fetchone()
-
-    if exists:
-        if is_voice:
-            cursor.execute(
-                """
-                UPDATE users
-                SET last_seen = ?,
-                    messages = messages + 1,
-                    voice_messages = voice_messages + 1
-                WHERE user_id = ?
-                """,
-                (now, user_id),
-            )
-        else:
-            cursor.execute(
-                """
-                UPDATE users
-                SET last_seen = ?,
-                    messages = messages + 1
-                WHERE user_id = ?
-                """,
-                (now, user_id),
-            )
-
-    else:
-        cursor.execute(
-            """
-            INSERT INTO users
-            (
-                user_id,
-                first_seen,
-                last_seen,
-                messages,
-                voice_messages
-            )
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (
-                user_id,
-                now,
-                now,
-                1,
-                1 if is_voice else 0,
-            ),
-        )
-
     connection.commit()
+    cursor.close()
     connection.close()
 
 
 def get_statistics():
-    connection = sqlite3.connect(DB_FILE)
+    connection = get_connection()
     cursor = connection.cursor()
 
     now = datetime.now(timezone.utc)
@@ -163,36 +147,61 @@ def get_statistics():
     cursor.execute(
         "SELECT COUNT(*) FROM users"
     )
+
     total_users = cursor.fetchone()[0]
 
     cursor.execute(
-        "SELECT COUNT(*) FROM users WHERE last_seen >= ?",
-        (today_start.isoformat(),),
+        """
+        SELECT COUNT(*)
+        FROM users
+        WHERE last_seen >= %s
+        """,
+        (today_start,),
     )
+
     active_today = cursor.fetchone()[0]
 
     cursor.execute(
-        "SELECT COUNT(*) FROM users WHERE last_seen >= ?",
-        (week_start.isoformat(),),
+        """
+        SELECT COUNT(*)
+        FROM users
+        WHERE last_seen >= %s
+        """,
+        (week_start,),
     )
+
     active_week = cursor.fetchone()[0]
 
     cursor.execute(
-        "SELECT COUNT(*) FROM users WHERE last_seen >= ?",
-        (month_start.isoformat(),),
+        """
+        SELECT COUNT(*)
+        FROM users
+        WHERE last_seen >= %s
+        """,
+        (month_start,),
     )
+
     active_month = cursor.fetchone()[0]
 
     cursor.execute(
-        "SELECT COALESCE(SUM(messages), 0) FROM users"
+        """
+        SELECT COALESCE(SUM(messages), 0)
+        FROM users
+        """
     )
+
     total_messages = cursor.fetchone()[0]
 
     cursor.execute(
-        "SELECT COALESCE(SUM(voice_messages), 0) FROM users"
+        """
+        SELECT COALESCE(SUM(voice_messages), 0)
+        FROM users
+        """
     )
+
     voice_messages = cursor.fetchone()[0]
 
+    cursor.close()
     connection.close()
 
     return {
@@ -206,7 +215,7 @@ def get_statistics():
 
 
 # =========================
-# USER HISTORY
+# USER CHAT HISTORY
 # =========================
 
 users = {}
@@ -224,12 +233,14 @@ def get_user(user_id):
 # =========================
 
 def split_message(text, limit=4000):
+
     if len(text) <= limit:
         return [text]
 
     parts = []
 
     while len(text) > limit:
+
         cut = text.rfind("\n", 0, limit)
 
         if cut < 1000:
@@ -249,12 +260,16 @@ def split_message(text, limit=4000):
 
 
 def invite_button():
+
     share_url = (
         "https://t.me/share/url?"
         + urlencode(
             {
                 "url": BOT_LINK,
-                "text": "Try AskOra 🤖 — a free AI assistant on Telegram!",
+                "text": (
+                    "Try AskOra 🤖 — "
+                    "a free AI assistant on Telegram!"
+                ),
             }
         )
     )
@@ -272,16 +287,20 @@ def invite_button():
 
 
 async def send_long_message(message, text):
+
     parts = split_message(text)
 
     for index, part in enumerate(parts):
 
         if index == len(parts) - 1:
+
             await message.reply_text(
                 part,
                 reply_markup=invite_button(),
             )
+
         else:
+
             await message.reply_text(part)
 
 
@@ -311,22 +330,36 @@ async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
     if user_id != ADMIN_ID:
+
         await update.message.reply_text(
             "⛔ You are not authorized to use this command."
         )
+
         return
 
-    stats = get_statistics()
+    try:
 
-    await update.message.reply_text(
-        "📊 ASKORA ADMIN DASHBOARD\n\n"
-        f"👥 Total users: {stats['total_users']}\n"
-        f"🟢 Active today: {stats['active_today']}\n"
-        f"📅 Active this week: {stats['active_week']}\n"
-        f"📆 Active this month: {stats['active_month']}\n\n"
-        f"💬 Total messages: {stats['total_messages']}\n"
-        f"🎤 Voice messages: {stats['voice_messages']}"
-    )
+        stats = get_statistics()
+
+        await update.message.reply_text(
+            "📊 ASKORA ADMIN DASHBOARD\n\n"
+            f"👥 Total users: {stats['total_users']}\n"
+            f"🟢 Active today: {stats['active_today']}\n"
+            f"📅 Active this week: {stats['active_week']}\n"
+            f"📆 Active this month: {stats['active_month']}\n\n"
+            f"💬 Total messages: {stats['total_messages']}\n"
+            f"🎤 Voice messages: {stats['voice_messages']}"
+        )
+
+    except Exception:
+
+        logging.exception(
+            "Admin statistics failed"
+        )
+
+        await update.message.reply_text(
+            "⚠️ I couldn't load the statistics."
+        )
 
 
 # =========================
