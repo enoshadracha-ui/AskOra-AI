@@ -45,17 +45,17 @@ Use simple language that is easy to understand.
 
 If the user sends a photo, carefully read the image and answer the question shown in it.
 
-If the user sends a photo with a caption, follow the caption and focus on exactly what the user asks about.
+If the user sends a photo with a caption, follow the caption and focus exactly on what the user asks about.
 
 If the user sends a voice note, understand the spoken request and answer it directly.
 
-For school assignments, show the useful answer clearly and explain the important steps when needed.
+For school assignments, give the useful answer clearly and explain important steps when needed.
 
 Do not add unnecessary sections, tables, long examples, summaries, or extra explanations.
 
 For simple questions, give a simple answer.
 
-If the user asks for more detail, then explain in more detail.
+If the user asks for more detail, explain in more detail.
 """
 
 users = {}
@@ -83,6 +83,7 @@ async def send_long_message(update, text):
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     message = (
         "Welcome to Askora 🤖\n\n"
         "Your AI assistant powered by Gemini.\n\n"
@@ -99,6 +100,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     user = get_user(update.effective_user.id)
 
     user["chat_history"] = []
@@ -124,6 +126,7 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.chat.send_action("typing")
 
     try:
+
         response = await asyncio.to_thread(
             client.models.generate_content,
             model=MODEL,
@@ -149,6 +152,7 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_long_message(update, answer)
 
     except Exception:
+
         logging.exception("Gemini text error")
 
         await update.message.reply_text(
@@ -171,6 +175,7 @@ async def photo_chat(
     await update.message.chat.send_action("typing")
 
     try:
+
         photo = update.message.photo[-1]
 
         telegram_file = await context.bot.get_file(
@@ -182,15 +187,8 @@ async def photo_chat(
         caption = (
             update.message.caption.strip()
             if update.message.caption
-            else ""
+            else "Read this image carefully and answer the question shown in it."
         )
-
-        if not caption:
-            caption = (
-                "Read this image carefully. "
-                "If it contains a question or assignment, "
-                "answer it directly."
-            )
 
         image_part = types.Part.from_bytes(
             data=bytes(image_bytes),
@@ -212,7 +210,7 @@ async def photo_chat(
         answer = response.text
 
         if not answer:
-            answer = "Sorry, I couldn't understand the image."
+            answer = "I could not read the question in that image."
 
         user["chat_history"].append({
             "user": "[Photo] " + caption,
@@ -225,11 +223,12 @@ async def photo_chat(
         await send_long_message(update, answer)
 
     except Exception:
-        logging.exception("Gemini image error")
+
+        logging.exception("PHOTO ERROR")
 
         await update.message.reply_text(
-            "Sorry, I couldn't process that photo. "
-            "Please try sending it again with a clear image."
+            "I couldn't process that photo. "
+            "Please send a clearer image and try again."
         )
 
 
@@ -247,6 +246,7 @@ async def voice_chat(
     await update.message.chat.send_action("typing")
 
     try:
+
         voice = update.message.voice
 
         telegram_file = await context.bot.get_file(
@@ -292,6 +292,7 @@ async def voice_chat(
         await send_long_message(update, answer)
 
     except Exception:
+
         logging.exception("Gemini audio error")
 
         await update.message.reply_text(
@@ -341,7 +342,9 @@ event_loop = asyncio.new_event_loop()
 
 
 def run_event_loop():
+
     asyncio.set_event_loop(event_loop)
+
     event_loop.run_forever()
 
 
