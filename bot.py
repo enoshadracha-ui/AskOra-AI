@@ -15,20 +15,12 @@ from telegram.ext import (
     filters,
 )
 
-# =========================
-# CONFIG
-# =========================
-
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 RENDER_EXTERNAL_URL = os.environ.get("RENDER_EXTERNAL_URL")
 
 MODEL = "gemini-3.6-flash"
 PORT = int(os.environ.get("PORT", 10000))
-
-# =========================
-# CHECK ENVIRONMENT
-# =========================
 
 if not TELEGRAM_BOT_TOKEN:
     raise RuntimeError("TELEGRAM_BOT_TOKEN is missing")
@@ -39,15 +31,7 @@ if not GEMINI_API_KEY:
 if not RENDER_EXTERNAL_URL:
     raise RuntimeError("RENDER_EXTERNAL_URL is missing")
 
-# =========================
-# GEMINI
-# =========================
-
 client = genai.Client(api_key=GEMINI_API_KEY)
-
-# =========================
-# USER DATA
-# =========================
 
 users = {}
 
@@ -61,10 +45,6 @@ def get_user(user_id):
     return users[user_id]
 
 
-# =========================
-# MESSAGE SPLITTING
-# =========================
-
 def split_message(text, max_length=4000):
     return [
         text[i:i + max_length]
@@ -76,10 +56,6 @@ async def send_long_message(update, text):
     for part in split_message(text):
         await update.message.reply_text(part)
 
-
-# =========================
-# START
-# =========================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = (
@@ -93,10 +69,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(message)
 
 
-# =========================
-# RESET
-# =========================
-
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = get_user(update.effective_user.id)
 
@@ -106,10 +78,6 @@ async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Your conversation has been reset. 🔄"
     )
 
-
-# =========================
-# CHAT
-# =========================
 
 async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -157,10 +125,6 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
-# =========================
-# TELEGRAM APPLICATION
-# =========================
-
 application = (
     Application.builder()
     .token(TELEGRAM_BOT_TOKEN)
@@ -183,10 +147,6 @@ application.add_handler(
 )
 
 
-# =========================
-# PERSISTENT EVENT LOOP
-# =========================
-
 event_loop = asyncio.new_event_loop()
 
 
@@ -202,10 +162,6 @@ loop_thread = threading.Thread(
 
 loop_thread.start()
 
-
-# =========================
-# INITIALIZE BOT
-# =========================
 
 def initialize_bot():
 
@@ -235,10 +191,6 @@ def initialize_bot():
 
 initialize_bot()
 
-
-# =========================
-# FLASK
-# =========================
 
 flask_app = Flask(__name__)
 
@@ -285,10 +237,6 @@ def webhook():
         }), 500
 
 
-# =========================
-# START SERVER
-# =========================
-
 if __name__ == "__main__":
 
     logging.basicConfig(
@@ -301,15 +249,3 @@ if __name__ == "__main__":
         debug=False,
         use_reloader=False
     )
-
-After pasting it:
-
-Save → Commit → Push to GitHub → Render redeploys → wait for “Live” → test "/start".
-
-And keep only these important Render variables:
-
-"TELEGRAM_BOT_TOKEN"
-"GEMINI_API_KEY"
-"RENDER_EXTERNAL_URL"
-
-Delete the old bank/payment variables.
