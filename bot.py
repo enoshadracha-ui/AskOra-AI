@@ -86,7 +86,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Welcome to Askora 🤖\n\n"
         "I'm your AI assistant powered by Gemini.\n\n"
         "Ask me anything and I'll do my best to help.\n\n"
-        "You can use Askora completely free and without a daily question limit.\n\n"
+        "Askora is completely free with unlimited questions.\n\n"
         "Just send me a message to begin."
     )
 
@@ -124,7 +124,6 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not question:
         return
 
-    # Show typing indicator
     await update.message.chat.send_action("typing")
 
     try:
@@ -139,19 +138,17 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not answer:
             answer = "Sorry, I couldn't generate a response."
 
-        # Save local history
         user["chat_history"].append({
             "user": question,
             "assistant": answer
         })
 
-        # Keep history from growing forever
         if len(user["chat_history"]) > 50:
             user["chat_history"] = user["chat_history"][-50:]
 
         await send_long_message(update, answer)
 
-    except Exception as e:
+    except Exception:
         logging.exception("Gemini error")
 
         await update.message.reply_text(
@@ -207,7 +204,7 @@ loop_thread.start()
 
 
 # =========================
-# INITIALIZE TELEGRAM
+# INITIALIZE BOT
 # =========================
 
 def initialize_bot():
@@ -305,23 +302,14 @@ if __name__ == "__main__":
         use_reloader=False
     )
 
-Then do this
+After pasting it:
 
-1. Replace everything in "bot.py".
-2. Save.
-3. Commit/push the change to GitHub.
-4. Render should automatically start a new deployment.
-5. Wait until Render says Live.
-6. Open Telegram.
-7. Send:
-   "/start"
-8. Then test:
-   "2 + 2"
+Save → Commit → Push to GitHub → Render redeploys → wait for “Live” → test "/start".
 
-Your Render environment should now only need:
+And keep only these important Render variables:
 
-TELEGRAM_BOT_TOKEN
-GEMINI_API_KEY
-RENDER_EXTERNAL_URL
+"TELEGRAM_BOT_TOKEN"
+"GEMINI_API_KEY"
+"RENDER_EXTERNAL_URL"
 
-And yes — delete "BANK_NAME", "ACCOUNT_NAME", and "ACCOUNT_NUMBER" from Render.
+Delete the old bank/payment variables.
