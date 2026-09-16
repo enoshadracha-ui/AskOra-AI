@@ -1,737 +1,1315 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
-    >
+import os
+import asyncio
+import threading
+import logging
+import hashlib
+import hmac
+import json
+import time
+from datetime import datetime, timezone
+from urllib.parse import urlencode, parse_qsl
+from io import BytesIO
 
-    <title>AskOra</title>
+import psycopg2
+from flask import Flask, request, jsonify, render_template
+from groq import Groq
 
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+from telegram import (
+    Update,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+)
 
-    <style>
-        * {
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-        }
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
+)
 
-        body {
-            margin: 0;
-            min-height: 100vh;
-            font-family: Arial, sans-serif;
-            background:
-                radial-gradient(circle at top, #18204a 0%, #0b1024 45%, #080b18 100%);
-            color: #f5f7ff;
-        }
 
-        .app {
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            max-width: 700px;
-            margin: auto;
-        }
+# ============================================================
+# SETTINGS
+# ============================================================
 
-        .header {
-            padding: 18px 16px 14px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            border-bottom: 1px solid rgba(255,255,255,0.08);
-            background: rgba(8,11,24,0.75);
-            backdrop-filter: blur(12px);
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
+TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
+GROQ_API_KEY = os.environ["GROQ_API_KEY"]
+RENDER_EXTERNAL_URL = os.environ["RENDER_EXTERNAL_URL"]
+DATABASE_URL = os.environ["DATABASE_URL"]
 
-        .brand {
-            display: flex;
-            align-items: center;
-            gap: 11px;
-        }
+PORT = int(os.environ.get("PORT", 10000))
 
-        .logo {
-            width: 42px;
-            height: 42px;
-            border-radius: 13px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 22px;
-            font-weight: 800;
-            background: linear-gradient(135deg, #3b82f6, #7c3aed);
-            box-shadow: 0 0 25px rgba(59,130,246,0.25);
-        }
+TEXT_MODEL = "openai/gpt-oss-120b"
+VOICE_MODEL = "whisper-large-v3-turbo"
 
-        .brand-name {
-            font-size: 19px;
-            font-weight: 700;
-        }
+ADMIN_ID = 7721346673
 
-        .tagline {
-            font-size: 12px;
-            color: #9ca3af;
-            margin-top: 2px;
-        }
+BOT_USERNAME = "askora_official_bot"
+BOT_LINK = f"https://t.me/{BOT_USERNAME}"
 
-        .header-actions {
-            display: flex;
-            gap: 7px;
-        }
+groq_client = Groq(api_key=GROQ_API_KEY)
 
-        .small-btn {
-            border: 1px solid rgba(255,255,255,0.1);
-            background: rgba(255,255,255,0.06);
-            color: #f5f7ff;
-            border-radius: 10px;
-            padding: 8px 10px;
-            font-size: 12px;
-        }
 
-        .chat {
-            flex: 1;
-            padding: 20px 14px 130px;
-            overflow-y: auto;
-        }
+# ============================================================
+# LOGGING
+# ============================================================
 
-        .welcome {
-            text-align: center;
-            padding: 55px 20px 30px;
-        }
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO,
+)
 
-        .welcome-icon {
-            font-size: 50px;
-            margin-bottom: 15px;
-        }
+logger = logging.getLogger(__name__)
 
-        .welcome h1 {
-            margin: 0 0 8px;
-            font-size: 27px;
-        }
 
-        .welcome p {
-            margin: 0;
-            color: #aeb5c7;
-            line-height: 1.5;
-        }
+# ============================================================
+# ASKORA AI INSTRUCTION
+# ============================================================
 
-        .message {
-            display: flex;
-            margin-bottom: 14px;
-        }
+SYSTEM_INSTRUCTION = """
+You are AskOra, a helpful AI assistant.
 
-        .message.user {
-            justify-content: flex-end;
-        }
+Give short, clear and direct answers.
 
-        .bubble {
-            max-width: 85%;
-            padding: 12px 14px;
-            border-radius: 17px;
-            line-height: 1.5;
-            font-size: 15px;
-            white-space: pre-wrap;
-            overflow-wrap: anywhere;
-        }
+Use simple language.
 
-        .message.user .bubble {
-            background: linear-gradient(135deg, #2563eb, #4f46e5);
-            border-bottom-right-radius: 5px;
-        }
+For school questions, give a clear answer without unnecessary details.
 
-        .message.assistant .bubble {
-            background: rgba(255,255,255,0.075);
-            border: 1px solid rgba(255,255,255,0.07);
-            border-bottom-left-radius: 5px;
-        }
+Usually answer in 2 to 5 sentences.
 
-        .typing {
-            display: inline-flex;
-            gap: 4px;
-            align-items: center;
-        }
+Do not use tables unless the user specifically asks.
 
-        .typing span {
-            width: 6px;
-            height: 6px;
-            background: #aeb5c7;
-            border-radius: 50%;
-            animation: bounce 1.2s infinite;
-        }
+Do not add unnecessary headings or sections.
 
-        .typing span:nth-child(2) {
-            animation-delay: 0.15s;
-        }
+Only give a longer explanation when the user asks for one.
 
-        .typing span:nth-child(3) {
-            animation-delay: 0.3s;
-        }
+Be accurate, natural and helpful.
+"""
 
-        @keyframes bounce {
-            0%, 60%, 100% {
-                transform: translateY(0);
+
+# ============================================================
+# DATABASE
+# ============================================================
+
+def get_connection():
+    return psycopg2.connect(DATABASE_URL)
+
+
+def init_database():
+    connection = get_connection()
+
+    try:
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                user_id BIGINT PRIMARY KEY,
+                first_seen TIMESTAMPTZ NOT NULL,
+                last_seen TIMESTAMPTZ NOT NULL
+            )
+            """
+        )
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS usage_events (
+                id BIGSERIAL PRIMARY KEY,
+                user_id BIGINT NOT NULL,
+                event_type TEXT NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL
+            )
+            """
+        )
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS conversations (
+                id BIGSERIAL PRIMARY KEY,
+                user_id BIGINT NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL
+            )
+            """
+        )
+
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_usage_user
+            ON usage_events(user_id)
+            """
+        )
+
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_usage_created
+            ON usage_events(created_at)
+            """
+        )
+
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_conversations_user_date
+            ON conversations(user_id, created_at)
+            """
+        )
+
+        connection.commit()
+
+        logger.info("Database initialized successfully.")
+
+    finally:
+        connection.close()
+
+
+def record_user(user_id):
+    now = datetime.now(timezone.utc)
+
+    connection = get_connection()
+
+    try:
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            INSERT INTO users (user_id, first_seen, last_seen)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (user_id)
+            DO UPDATE SET last_seen = EXCLUDED.last_seen
+            """,
+            (user_id, now, now),
+        )
+
+        connection.commit()
+
+    finally:
+        connection.close()
+
+
+def record_usage(user_id, event_type):
+    now = datetime.now(timezone.utc)
+
+    connection = get_connection()
+
+    try:
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            INSERT INTO usage_events
+            (user_id, event_type, created_at)
+            VALUES (%s, %s, %s)
+            """,
+            (user_id, event_type, now),
+        )
+
+        connection.commit()
+
+    finally:
+        connection.close()
+
+
+def save_message(user_id, role, content):
+    now = datetime.now(timezone.utc)
+
+    connection = get_connection()
+
+    try:
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            INSERT INTO conversations
+            (user_id, role, content, created_at)
+            VALUES (%s, %s, %s, %s)
+            """,
+            (user_id, role, content, now),
+        )
+
+        connection.commit()
+
+    finally:
+        connection.close()
+
+
+def get_history(user_id, limit=20):
+    connection = get_connection()
+
+    try:
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            SELECT role, content
+            FROM (
+                SELECT role, content, created_at, id
+                FROM conversations
+                WHERE user_id = %s
+                ORDER BY created_at DESC, id DESC
+                LIMIT %s
+            ) recent
+            ORDER BY created_at ASC, id ASC
+            """,
+            (user_id, limit),
+        )
+
+        rows = cursor.fetchall()
+
+        return [
+            {
+                "role": row[0],
+                "content": row[1],
             }
+            for row in rows
+        ]
 
-            30% {
-                transform: translateY(-5px);
-            }
-        }
+    finally:
+        connection.close()
 
-        .bottom {
-            position: fixed;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
-            background: rgba(8,11,24,0.9);
-            backdrop-filter: blur(15px);
-            border-top: 1px solid rgba(255,255,255,0.08);
-            z-index: 20;
-        }
 
-        .input-row {
-            max-width: 700px;
-            margin: auto;
-            display: flex;
-            align-items: flex-end;
-            gap: 8px;
-        }
+def clear_history(user_id):
+    connection = get_connection()
 
-        textarea {
-            flex: 1;
-            resize: none;
-            min-height: 46px;
-            max-height: 120px;
-            padding: 13px 14px;
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 15px;
-            outline: none;
-            background: rgba(255,255,255,0.07);
-            color: #fff;
-            font-size: 15px;
-            font-family: inherit;
-        }
+    try:
+        cursor = connection.cursor()
 
-        textarea::placeholder {
-            color: #8d95aa;
-        }
+        cursor.execute(
+            """
+            DELETE FROM conversations
+            WHERE user_id = %s
+            """,
+            (user_id,),
+        )
 
-        .action-btn {
-            width: 46px;
-            height: 46px;
-            border: none;
-            border-radius: 14px;
-            color: white;
-            font-size: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
+        deleted_count = cursor.rowcount
 
-        .voice {
-            background: rgba(255,255,255,0.1);
-        }
+        connection.commit()
 
-        .voice.recording {
-            background: #dc2626;
-            animation: pulse 1.2s infinite;
-        }
+        return deleted_count
 
-        .send {
-            background: linear-gradient(135deg, #3b82f6, #7c3aed);
-        }
+    finally:
+        connection.close()
 
-        .action-btn:disabled {
-            opacity: 0.45;
-        }
 
-        @keyframes pulse {
-            50% {
-                transform: scale(1.06);
-            }
-        }
+# ============================================================
+# STATISTICS
+# ============================================================
 
-        .notice {
-            text-align: center;
-            font-size: 12px;
-            color: #8d95aa;
-            padding: 8px 0 2px;
-        }
+def get_statistics():
+    now = datetime.now(timezone.utc)
 
-        .error {
-            text-align: center;
-            color: #fca5a5;
-            padding: 20px;
-        }
-    </style>
-</head>
+    today_start = now.replace(
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+    )
 
-<body>
+    week_start = today_start
 
-<div class="app">
+    month_start = today_start.replace(day=1)
 
-    <header class="header">
-        <div class="brand">
-            <div class="logo">A</div>
+    connection = get_connection()
 
-            <div>
-                <div class="brand-name">AskOra</div>
-                <div class="tagline">Ask. Get answers.</div>
-            </div>
-        </div>
+    try:
+        cursor = connection.cursor()
 
-        <div class="header-actions">
-            <button class="small-btn" id="inviteBtn">✨ Invite</button>
-            <button class="small-btn" id="resetBtn">Clear</button>
-        </div>
-    </header>
+        cursor.execute(
+            """
+            SELECT COUNT(*)
+            FROM users
+            """
+        )
+        total_users = cursor.fetchone()[0]
 
-    <main class="chat" id="chat">
+        cursor.execute(
+            """
+            SELECT COUNT(*)
+            FROM users
+            WHERE last_seen >= %s
+            """,
+            (today_start,),
+        )
+        active_today = cursor.fetchone()[0]
 
-        <div class="welcome" id="welcome">
-            <div class="welcome-icon">🤖</div>
+        cursor.execute(
+            """
+            SELECT COUNT(*)
+            FROM users
+            WHERE last_seen >= %s
+            """,
+            (week_start,),
+        )
+        active_week = cursor.fetchone()[0]
 
-            <h1>Welcome to AskOra</h1>
+        cursor.execute(
+            """
+            SELECT COUNT(*)
+            FROM users
+            WHERE last_seen >= %s
+            """,
+            (month_start,),
+        )
+        active_month = cursor.fetchone()[0]
 
-            <p>
-                Your simple AI assistant.<br>
-                Ask anything by text or voice.
-            </p>
-        </div>
+        cursor.execute(
+            """
+            SELECT COUNT(*)
+            FROM users
+            WHERE first_seen >= %s
+            """,
+            (today_start,),
+        )
+        new_today = cursor.fetchone()[0]
 
-    </main>
+        cursor.execute(
+            """
+            SELECT COUNT(*)
+            FROM users
+            WHERE first_seen >= %s
+            """,
+            (month_start,),
+        )
+        new_month = cursor.fetchone()[0]
 
-    <div class="bottom">
+        cursor.execute(
+            """
+            SELECT COUNT(*)
+            FROM usage_events
+            WHERE event_type = 'text'
+            """
+        )
+        total_text = cursor.fetchone()[0]
 
-        <div class="input-row">
+        cursor.execute(
+            """
+            SELECT COUNT(*)
+            FROM usage_events
+            WHERE event_type = 'voice'
+            """
+        )
+        total_voice = cursor.fetchone()[0]
 
-            <button
-                class="action-btn voice"
-                id="voiceBtn"
-                title="Voice"
-            >
-                🎤
-            </button>
+        cursor.execute(
+            """
+            SELECT COUNT(*)
+            FROM usage_events
+            WHERE created_at >= %s
+            """,
+            (today_start,),
+        )
+        messages_today = cursor.fetchone()[0]
 
-            <textarea
-                id="messageInput"
-                placeholder="Ask AskOra anything..."
-                rows="1"
-            ></textarea>
+        cursor.execute(
+            """
+            SELECT COUNT(*)
+            FROM conversations
+            """
+        )
+        total_saved_messages = cursor.fetchone()[0]
 
-            <button
-                class="action-btn send"
-                id="sendBtn"
-                title="Send"
-            >
-                ➤
-            </button>
+        average_messages = 0
 
-        </div>
+        if total_users > 0:
+            average_messages = round(
+                total_saved_messages / total_users,
+                1,
+            )
 
-        <div class="notice">
-            AskOra • Free AI assistant
-        </div>
-
-    </div>
-
-</div>
-
-<script>
-    const tg = window.Telegram.WebApp;
-
-    tg.ready();
-    tg.expand();
-
-    const chat = document.getElementById("chat");
-    const welcome = document.getElementById("welcome");
-    const input = document.getElementById("messageInput");
-    const sendBtn = document.getElementById("sendBtn");
-    const voiceBtn = document.getElementById("voiceBtn");
-    const resetBtn = document.getElementById("resetBtn");
-    const inviteBtn = document.getElementById("inviteBtn");
-
-    const BOT_LINK = "https://t.me/askora_official_bot";
-
-    let mediaRecorder = null;
-    let audioChunks = [];
-    let audioStream = null;
-
-    function authHeaders() {
         return {
-            "X-Telegram-Init-Data": tg.initData
-        };
-    }
-
-    function scrollBottom() {
-        chat.scrollTop = chat.scrollHeight;
-    }
-
-    function hideWelcome() {
-        if (welcome) {
-            welcome.style.display = "none";
-        }
-    }
-
-    function addMessage(role, text) {
-        hideWelcome();
-
-        const wrapper = document.createElement("div");
-        wrapper.className = "message " + role;
-
-        const bubble = document.createElement("div");
-        bubble.className = "bubble";
-        bubble.textContent = text;
-
-        wrapper.appendChild(bubble);
-        chat.appendChild(wrapper);
-
-        scrollBottom();
-
-        return wrapper;
-    }
-
-    function addTyping() {
-        hideWelcome();
-
-        const wrapper = document.createElement("div");
-        wrapper.className = "message assistant";
-        wrapper.id = "typingMessage";
-
-        const bubble = document.createElement("div");
-        bubble.className = "bubble";
-
-        bubble.innerHTML = `
-            <div class="typing">
-                <span></span>
-                <span></span>
-                <span></span>
-            </div>
-        `;
-
-        wrapper.appendChild(bubble);
-        chat.appendChild(wrapper);
-
-        scrollBottom();
-    }
-
-    function removeTyping() {
-        const typing = document.getElementById("typingMessage");
-
-        if (typing) {
-            typing.remove();
-        }
-    }
-
-    function showError(message) {
-        removeTyping();
-        addMessage("assistant", "⚠️ " + message);
-    }
-
-    async function loadHistory() {
-        if (!tg.initData) {
-            addMessage(
-                "assistant",
-                "Please open AskOra from Telegram using the Open App button."
-            );
-            return;
+            "total_users": total_users,
+            "active_today": active_today,
+            "active_week": active_week,
+            "active_month": active_month,
+            "new_today": new_today,
+            "new_month": new_month,
+            "total_text": total_text,
+            "total_voice": total_voice,
+            "messages_today": messages_today,
+            "total_saved_messages": total_saved_messages,
+            "average_messages": average_messages,
         }
 
-        try {
-            const response = await fetch("/api/history", {
-                headers: authHeaders()
-            });
+    finally:
+        connection.close()
 
-            if (!response.ok) {
-                return;
+
+# ============================================================
+# INVITE BUTTON
+# ============================================================
+
+def invite_button():
+    share_url = (
+        "https://t.me/share/url?"
+        + urlencode(
+            {
+                "url": BOT_LINK,
+                "text": (
+                    "Try AskOra 🤖 — "
+                    "a free AI assistant on Telegram!"
+                ),
             }
+        )
+    )
 
-            const data = await response.json();
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "✨ Invite a Friend",
+                url=share_url,
+            )
+        ]
+    ]
 
-            if (data.messages && data.messages.length > 0) {
-                hideWelcome();
+    return InlineKeyboardMarkup(keyboard)
 
-                data.messages.forEach(message => {
-                    addMessage(message.role, message.content);
-                });
+
+# ============================================================
+# LONG MESSAGE SENDER
+# ============================================================
+
+async def send_long_message(
+    bot,
+    chat_id,
+    text,
+    reply_markup=None,
+):
+    max_length = 4000
+
+    if len(text) <= max_length:
+        await bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            reply_markup=reply_markup,
+        )
+        return
+
+    chunks = [
+        text[i:i + max_length]
+        for i in range(0, len(text), max_length)
+    ]
+
+    for index, chunk in enumerate(chunks):
+        if index == len(chunks) - 1:
+            await bot.send_message(
+                chat_id=chat_id,
+                text=chunk,
+                reply_markup=reply_markup,
+            )
+        else:
+            await bot.send_message(
+                chat_id=chat_id,
+                text=chunk,
+            )
+
+
+# ============================================================
+# AI RESPONSE
+# ============================================================
+
+def generate_answer(user_id):
+    history = get_history(user_id, limit=10)
+
+    messages = [
+        {
+            "role": "system",
+            "content": SYSTEM_INSTRUCTION,
+        }
+    ]
+
+    messages.extend(history)
+
+    response = groq_client.chat.completions.create(
+        model=TEXT_MODEL,
+        messages=messages,
+        temperature=0.7,
+        max_tokens=700,
+    )
+
+    answer = response.choices[0].message.content
+
+    if not answer:
+        return "Sorry, I couldn't generate a response."
+
+    return answer.strip()
+
+
+# ============================================================
+# VOICE TRANSCRIPTION
+# ============================================================
+
+def transcribe_audio(audio_file):
+    result = groq_client.audio.transcriptions.create(
+        model=VOICE_MODEL,
+        file=audio_file,
+        response_format="json",
+    )
+
+    return result.text.strip()
+
+
+# ============================================================
+# MINI APP SECURITY
+# ============================================================
+
+def validate_init_data(init_data, max_age=86400):
+    if not init_data:
+        return None
+
+    try:
+        data = dict(
+            parse_qsl(
+                init_data,
+                keep_blank_values=True,
+            )
+        )
+
+        received_hash = data.pop("hash", None)
+
+        if not received_hash:
+            return None
+
+        auth_date = int(
+            data.get(
+                "auth_date",
+                "0",
+            )
+        )
+
+        if not auth_date:
+            return None
+
+        current_time = int(time.time())
+
+        if abs(current_time - auth_date) > max_age:
+            return None
+
+        data_check_string = "\n".join(
+            f"{key}={value}"
+            for key, value in sorted(data.items())
+        )
+
+        secret_key = hmac.new(
+            b"WebAppData",
+            TELEGRAM_BOT_TOKEN.encode(),
+            hashlib.sha256,
+        ).digest()
+
+        calculated_hash = hmac.new(
+            secret_key,
+            data_check_string.encode(),
+            hashlib.sha256,
+        ).hexdigest()
+
+        if not hmac.compare_digest(
+            calculated_hash,
+            received_hash,
+        ):
+            return None
+
+        user_data = json.loads(
+            data.get(
+                "user",
+                "{}",
+            )
+        )
+
+        user_id = user_data.get("id")
+
+        if not user_id:
+            return None
+
+        return int(user_id)
+
+    except Exception:
+        logger.exception(
+            "Mini App initData validation failed."
+        )
+        return None
+
+
+def get_mini_app_user_id():
+    init_data = request.headers.get(
+        "X-Telegram-Init-Data",
+        "",
+    )
+
+    return validate_init_data(init_data)
+
+
+# ============================================================
+# TELEGRAM COMMANDS
+# ============================================================
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+
+    record_user(user_id)
+
+    await update.message.reply_text(
+        "👋 Welcome to AskOra!\n\n"
+        "🤖 Your simple AI assistant.\n"
+        "Ask me anything — by text or voice. 🎤",
+        reply_markup=invite_button(),
+    )
+
+
+async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+
+    record_user(user_id)
+
+    deleted = clear_history(user_id)
+
+    logger.info(
+        "User %s cleared %s saved messages.",
+        user_id,
+        deleted,
+    )
+
+    await update.message.reply_text(
+        "🧹 Your AskOra chat has been cleared."
+    )
+
+
+async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+
+    stats = get_statistics()
+
+    message = (
+        "📊 ASKORA ADMIN DASHBOARD\n\n"
+
+        f"👥 Total users: {stats['total_users']}\n"
+        f"🆕 New today: {stats['new_today']}\n"
+        f"🆕 New this month: {stats['new_month']}\n\n"
+
+        f"🟢 Active today: {stats['active_today']}\n"
+        f"📅 Active this week: {stats['active_week']}\n"
+        f"📆 Active this month: {stats['active_month']}\n\n"
+
+        f"💬 Text messages: {stats['total_text']}\n"
+        f"🎤 Voice messages: {stats['total_voice']}\n"
+        f"📨 Messages today: {stats['messages_today']}\n\n"
+
+        f"💾 Saved conversation messages: "
+        f"{stats['total_saved_messages']}\n"
+
+        f"📈 Avg messages/user: "
+        f"{stats['average_messages']}"
+    )
+
+    await update.message.reply_text(message)
+
+
+# ============================================================
+# TELEGRAM VOICE
+# ============================================================
+
+async def voice_handler(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+):
+    user_id = update.effective_user.id
+
+    record_user(user_id)
+    record_usage(user_id, "voice")
+
+    await context.bot.send_chat_action(
+        chat_id=update.effective_chat.id,
+        action="typing",
+    )
+
+    try:
+        telegram_file = await context.bot.get_file(
+            update.message.voice.file_id
+        )
+
+        audio_file = BytesIO()
+
+        await telegram_file.download_to_memory(
+            audio_file
+        )
+
+        audio_file.seek(0)
+        audio_file.name = "voice.ogg"
+
+        transcript = transcribe_audio(
+            audio_file
+        )
+
+        if not transcript:
+            await update.message.reply_text(
+                "⚠️ I couldn't understand that voice note."
+            )
+            return
+
+        save_message(
+            user_id,
+            "user",
+            transcript,
+        )
+
+        answer = generate_answer(user_id)
+
+        save_message(
+            user_id,
+            "assistant",
+            answer,
+        )
+
+        await send_long_message(
+            context.bot,
+            update.effective_chat.id,
+            answer,
+            reply_markup=invite_button(),
+        )
+
+    except Exception as error:
+        logger.exception(
+            "Telegram voice error: %s",
+            error,
+        )
+
+        await update.message.reply_text(
+            "⚠️ Sorry, something went wrong while "
+            "processing your voice note."
+        )
+
+
+# ============================================================
+# TELEGRAM TEXT CHAT
+# ============================================================
+
+async def chat_handler(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+):
+    user_id = update.effective_user.id
+
+    message = update.message.text
+
+    if not message:
+        return
+
+    record_user(user_id)
+    record_usage(user_id, "text")
+
+    await context.bot.send_chat_action(
+        chat_id=update.effective_chat.id,
+        action="typing",
+    )
+
+    try:
+        save_message(
+            user_id,
+            "user",
+            message,
+        )
+
+        answer = generate_answer(user_id)
+
+        save_message(
+            user_id,
+            "assistant",
+            answer,
+        )
+
+        await send_long_message(
+            context.bot,
+            update.effective_chat.id,
+            answer,
+            reply_markup=invite_button(),
+        )
+
+    except Exception as error:
+        logger.exception(
+            "Telegram text error: %s",
+            error,
+        )
+
+        await update.message.reply_text(
+            "⚠️ Sorry, something went wrong "
+            "while generating the response."
+        )
+
+
+# ============================================================
+# FLASK MINI APP
+# ============================================================
+
+web_app = Flask(
+    __name__,
+    template_folder="templates",
+)
+
+web_app.config["MAX_CONTENT_LENGTH"] = (
+    15 * 1024 * 1024
+)
+
+
+@web_app.route("/")
+def home():
+    return render_template("index.html")
+
+
+@web_app.route("/health")
+def health():
+    return jsonify(
+        {
+            "status": "online",
+            "bot": "AskOra",
+            "ai": "Groq",
+        }
+    )
+
+
+# ============================================================
+# MINI APP HISTORY
+# ============================================================
+
+@web_app.route("/api/history", methods=["GET"])
+def api_history():
+    user_id = get_mini_app_user_id()
+
+    if not user_id:
+        return jsonify(
+            {
+                "error": "Unauthorized",
             }
+        ), 401
 
-        } catch (error) {
-            console.log("History error:", error);
-        }
-    }
+    try:
+        record_user(user_id)
 
-    async function sendMessage() {
-        const message = input.value.trim();
+        history = get_history(
+            user_id,
+            limit=50,
+        )
 
-        if (!message) {
-            return;
-        }
-
-        if (!tg.initData) {
-            showError("Please open AskOra from Telegram.");
-            return;
-        }
-
-        input.value = "";
-        input.style.height = "46px";
-
-        addMessage("user", message);
-
-        sendBtn.disabled = true;
-        voiceBtn.disabled = true;
-
-        addTyping();
-
-        try {
-            const response = await fetch("/api/chat", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    ...authHeaders()
-                },
-                body: JSON.stringify({
-                    message: message
-                })
-            });
-
-            const data = await response.json();
-
-            removeTyping();
-
-            if (!response.ok) {
-                showError(data.error || "Something went wrong.");
-                return;
+        return jsonify(
+            {
+                "history": history,
             }
+        )
 
-            addMessage("assistant", data.answer);
+    except Exception as error:
+        logger.exception(
+            "History API error: %s",
+            error,
+        )
 
-        } catch (error) {
-            showError("Unable to connect to AskOra right now.");
-        }
+        return jsonify(
+            {
+                "error": "Could not load history.",
+            }
+        ), 500
 
-        sendBtn.disabled = false;
-        voiceBtn.disabled = false;
 
-        input.focus();
-    }
+# ============================================================
+# MINI APP TEXT CHAT
+# ============================================================
 
-    async function startRecording() {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            showError("Voice recording is not supported on this device.");
-            return;
-        }
+@web_app.route("/api/chat", methods=["POST"])
+def api_chat():
+    user_id = get_mini_app_user_id()
 
-        try {
-            audioStream = await navigator.mediaDevices.getUserMedia({
-                audio: true
-            });
+    if not user_id:
+        return jsonify(
+            {
+                "error": "Unauthorized",
+            }
+        ), 401
 
-            audioChunks = [];
+    try:
+        data = request.get_json(
+            silent=True
+        ) or {}
 
-            let mimeType = "";
+        message = str(
+            data.get(
+                "message",
+                "",
+            )
+        ).strip()
 
-            const types = [
-                "audio/webm;codecs=opus",
-                "audio/webm",
-                "audio/ogg;codecs=opus"
-            ];
-
-            for (const type of types) {
-                if (MediaRecorder.isTypeSupported(type)) {
-                    mimeType = type;
-                    break;
+        if not message:
+            return jsonify(
+                {
+                    "error": "Message is empty.",
                 }
-            }
+            ), 400
 
-            if (mimeType) {
-                mediaRecorder = new MediaRecorder(
-                    audioStream,
-                    { mimeType: mimeType }
-                );
-            } else {
-                mediaRecorder = new MediaRecorder(audioStream);
-            }
-
-            mediaRecorder.ondataavailable = event => {
-                if (event.data.size > 0) {
-                    audioChunks.push(event.data);
+        if len(message) > 10000:
+            return jsonify(
+                {
+                    "error": "Message is too long.",
                 }
-            };
+            ), 400
 
-            mediaRecorder.onstop = uploadVoice;
+        record_user(user_id)
+        record_usage(user_id, "text")
 
-            mediaRecorder.start();
+        save_message(
+            user_id,
+            "user",
+            message,
+        )
 
-            voiceBtn.classList.add("recording");
-            voiceBtn.textContent = "⏹️";
+        answer = generate_answer(user_id)
 
-            sendBtn.disabled = true;
-            input.disabled = true;
+        save_message(
+            user_id,
+            "assistant",
+            answer,
+        )
 
-        } catch (error) {
-            showError("Microphone permission was not granted.");
-        }
-    }
-
-    function stopRecording() {
-        if (mediaRecorder && mediaRecorder.state !== "inactive") {
-            mediaRecorder.stop();
-        }
-    }
-
-    async function uploadVoice() {
-        if (audioStream) {
-            audioStream.getTracks().forEach(track => track.stop());
-            audioStream = null;
-        }
-
-        voiceBtn.classList.remove("recording");
-        voiceBtn.textContent = "🎤";
-
-        input.disabled = false;
-
-        const blobType =
-            audioChunks.length > 0
-                ? audioChunks[0].type
-                : "audio/webm";
-
-        const blob = new Blob(audioChunks, {
-            type: blobType
-        });
-
-        const extension =
-            blobType.includes("ogg")
-                ? "ogg"
-                : "webm";
-
-        const formData = new FormData();
-
-        formData.append(
-            "audio",
-            blob,
-            "askora_voice." + extension
-        );
-
-        addMessage("user", "🎤 Voice message");
-        addTyping();
-
-        try {
-            const response = await fetch("/api/voice", {
-                method: "POST",
-                headers: authHeaders(),
-                body: formData
-            });
-
-            const data = await response.json();
-
-            removeTyping();
-
-            if (!response.ok) {
-                showError(data.error || "Voice processing failed.");
-                return;
+        return jsonify(
+            {
+                "answer": answer,
             }
+        )
 
-            addMessage("assistant", data.answer);
+    except Exception as error:
+        logger.exception(
+            "Mini App text error: %s",
+            error,
+        )
 
-        } catch (error) {
-            showError("Unable to process the voice message.");
-        }
-
-        sendBtn.disabled = false;
-        voiceBtn.disabled = false;
-
-        mediaRecorder = null;
-        audioChunks = [];
-
-        input.focus();
-    }
-
-    async function resetChat() {
-        if (!tg.initData) {
-            return;
-        }
-
-        const confirmed = confirm(
-            "Clear your AskOra conversation?"
-        );
-
-        if (!confirmed) {
-            return;
-        }
-
-        try {
-            const response = await fetch("/api/reset", {
-                method: "POST",
-                headers: authHeaders()
-            });
-
-            if (!response.ok) {
-                showError("Could not clear the conversation.");
-                return;
+        return jsonify(
+            {
+                "error": (
+                    "Sorry, something went wrong "
+                    "while generating the response."
+                ),
             }
+        ), 500
 
-            chat.innerHTML = "";
 
-            chat.appendChild(welcome);
+# ============================================================
+# MINI APP VOICE
+# ============================================================
 
-            welcome.style.display = "block";
+@web_app.route("/api/voice", methods=["POST"])
+def api_voice():
+    user_id = get_mini_app_user_id()
 
-        } catch (error) {
-            showError("Could not clear the conversation.");
-        }
-    }
+    if not user_id:
+        return jsonify(
+            {
+                "error": "Unauthorized",
+            }
+        ), 401
 
-    function inviteFriend() {
-        const shareUrl =
-            "https://t.me/share/url?" +
-            "url=" +
-            encodeURIComponent(BOT_LINK) +
-            "&text=" +
-            encodeURIComponent(
-                "Try AskOra 🤖 — a free AI assistant on Telegram!"
-            );
+    audio = request.files.get("audio")
 
-        tg.openTelegramLink(shareUrl);
-    }
+    if not audio:
+        return jsonify(
+            {
+                "error": "No audio received.",
+            }
+        ), 400
 
-    sendBtn.addEventListener("click", sendMessage);
+    try:
+        audio_bytes = audio.read()
 
-    voiceBtn.addEventListener("click", () => {
-        if (
-            mediaRecorder &&
-            mediaRecorder.state === "recording"
-        ) {
-            stopRecording();
-        } else {
-            startRecording();
-        }
-    });
+        if not audio_bytes:
+            return jsonify(
+                {
+                    "error": "Audio file is empty.",
+                }
+            ), 400
 
-    resetBtn.addEventListener("click", resetChat);
+        audio_file = BytesIO(
+            audio_bytes
+        )
 
-    inviteBtn.addEventListener("click", inviteFriend);
+        audio_file.name = (
+            audio.filename
+            or "askora_voice.webm"
+        )
 
-    input.addEventListener("keydown", event => {
-        if (event.key === "Enter" && !event.shiftKey) {
-            event.preventDefault();
-            sendMessage();
-        }
-    });
+        record_user(user_id)
+        record_usage(user_id, "voice")
 
-    input.addEventListener("input", () => {
-        input.style.height = "46px";
+        transcript = transcribe_audio(
+            audio_file
+        )
 
-        input.style.height =
-            Math.min(input.scrollHeight, 120) + "px";
-    });
+        if not transcript:
+            return jsonify(
+                {
+                    "error": (
+                        "I couldn't understand "
+                        "that voice note."
+                    )
+                }
+            ), 400
 
-    loadHistory();
-</script>
+        save_message(
+            user_id,
+            "user",
+            transcript,
+        )
 
-</body>
-</html>
+        answer = generate_answer(user_id)
+
+        save_message(
+            user_id,
+            "assistant",
+            answer,
+        )
+
+        return jsonify(
+            {
+                "transcript": transcript,
+                "answer": answer,
+            }
+        )
+
+    except Exception as error:
+        logger.exception(
+            "Mini App voice error: %s",
+            error,
+        )
+
+        return jsonify(
+            {
+                "error": (
+                    "Sorry, something went wrong "
+                    "while processing your voice."
+                ),
+            }
+        ), 500
+
+
+# ============================================================
+# MINI APP CLEAR CHAT
+# ============================================================
+
+@web_app.route("/api/reset", methods=["POST"])
+def api_reset():
+    user_id = get_mini_app_user_id()
+
+    if not user_id:
+        return jsonify(
+            {
+                "error": "Unauthorized",
+            }
+        ), 401
+
+    try:
+        record_user(user_id)
+
+        deleted = clear_history(
+            user_id
+        )
+
+        logger.info(
+            "Mini App user %s cleared %s messages.",
+            user_id,
+            deleted,
+        )
+
+        return jsonify(
+            {
+                "success": True,
+                "deleted": deleted,
+            }
+        )
+
+    except Exception as error:
+        logger.exception(
+            "Mini App reset error: %s",
+            error,
+        )
+
+        return jsonify(
+            {
+                "error": "Could not clear chat.",
+            }
+        ), 500
+
+
+# ============================================================
+# TELEGRAM WEBHOOK
+# ============================================================
+
+@web_app.route("/webhook", methods=["POST"])
+def webhook():
+    try:
+        update_data = request.get_json(
+            force=True
+        )
+
+        update = Update.de_json(
+            update_data,
+            telegram_application.bot,
+        )
+
+        asyncio.run_coroutine_threadsafe(
+            telegram_application.process_update(
+                update
+            ),
+            BOT_LOOP,
+        )
+
+        return jsonify(
+            {
+                "ok": True,
+            }
+        )
+
+    except Exception as error:
+        logger.exception(
+            "Webhook error: %s",
+            error,
+        )
+
+        return jsonify(
+            {
+                "ok": False,
+            }
+        ), 500
+
+
+# ============================================================
+# TELEGRAM APPLICATION
+# ============================================================
+
+telegram_application = (
+    Application.builder()
+    .token(TELEGRAM_BOT_TOKEN)
+    .build()
+)
+
+
+telegram_application.add_handler(
+    CommandHandler(
+        "start",
+        start,
+    )
+)
+
+telegram_application.add_handler(
+    CommandHandler(
+        "admin",
+        admin,
+    )
+)
+
+telegram_application.add_handler(
+    CommandHandler(
+        "reset",
+        reset,
+    )
+)
+
+telegram_application.add_handler(
+    MessageHandler(
+        filters.VOICE,
+        voice_handler,
+    )
+)
+
+telegram_application.add_handler(
+    MessageHandler(
+        filters.TEXT & ~filters.COMMAND,
+        chat_handler,
+    )
+)
+
+
+# ============================================================
+# ASYNCIO LOOP
+# ============================================================
+
+BOT_LOOP = asyncio.new_event_loop()
+
+bot_ready = threading.Event()
+
+
+def bot_loop_worker():
+    asyncio.set_event_loop(
+        BOT_LOOP
+    )
+
+    try:
+        BOT_LOOP.run_until_complete(
+            telegram_application.initialize()
+        )
+
+        webhook_url = (
+            RENDER_EXTERNAL_URL.rstrip("/")
+            + "/webhook"
+        )
+
+        BOT_LOOP.run_until_complete(
+            telegram_application.bot.set_webhook(
+                url=webhook_url
+            )
+        )
+
+        BOT_LOOP.run_until_complete(
+            telegram_application.start()
+        )
+
+        logger.info(
+            "Telegram webhook set to %s",
+            webhook_url,
+        )
+
+        bot_ready.set()
+
+        BOT_LOOP.run_forever()
+
+    except Exception:
+        logger.exception(
+            "Telegram bot loop failed."
+        )
+
+        bot_ready.set()
+
+
+# ============================================================
+# MAIN
+# ============================================================
+
+def main():
+    logger.info(
+        "Starting AskOra..."
+    )
+
+    init_database()
+
+    bot_thread = threading.Thread(
+        target=bot_loop_worker,
+        daemon=True,
+    )
+
+    bot_thread.start()
+
+    if not bot_ready.wait(
+        timeout=30
+    ):
+        raise RuntimeError(
+            "Telegram bot failed to start."
+        )
+
+    logger.info(
+        "AskOra is ready."
+    )
+
+    web_app.run(
+        host="0.0.0.0",
+        port=PORT,
+        debug=False,
+        use_reloader=False,
+    )
+
+
+if __name__ == "__main__":
+    main()
