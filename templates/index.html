@@ -1,1 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    >
 
+    <title>AskOra</title>
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+            background:
+                radial-gradient(circle at top, #18204a 0%, #0b1024 45%, #080b18 100%);
+            color: #f5f7ff;
+        }
+
+        .app {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            max-width: 700px;
+            margin: auto;
+        }
+
+        .header {
+            padding: 18px 16px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            background: rgba(8,11,24,0.75);
+            backdrop-filter: blur(12px);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+        }
+
+        .logo {
+            width: 42px;
+            height: 42px;
+            border-radius: 13px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #3b82f6, #7c3aed);
+            box-shadow: 0 0 25px rgba(59,130,246,0.25);
+        }
+
+        .brand-name {
+            font-size: 19px;
+            font-weight: 700;
+        }
+
+        .tagline {
+            font-size: 12px;
+            color: #9ca3af;
+            margin-top: 2px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 7px;
+        }
+
+        .small-btn {
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.06);
+            color: #f5f7ff;
+            border-radius: 10px;
+            padding: 8px 10px;
+            font-size: 12px;
+        }
+
+        .chat {
+            flex: 1;
+            padding: 20px 14px 130px;
+            overflow-y: auto;
+        }
+
+        .welcome {
+            text-align: center;
+            padding: 55px 20px 30px;
+        }
+
+        .welcome-icon {
+            font-size: 50px;
+            margin-bottom: 15px;
+        }
+
+        .welcome h1 {
+            margin: 0 0 8px;
+            font-size: 27px;
+        }
+
+        .welcome p {
+            margin: 0;
+            color: #aeb5c7;
+            line-height: 1.5;
+        }
+
+        .message {
+            display: flex;
+            margin-bottom: 14px;
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .bubble {
+            max-width: 85%;
+            padding: 12px 14px;
+            border-radius: 17px;
+            line-height: 1.5;
+            font-size: 15px;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
+        .message.user .bubble {
+            background: linear-gradient(135deg, #2563eb, #4f46e5);
+            border-bottom-right-radius: 5px;
+        }
+
+        .message.assistant .bubble {
+            background: rgba(255,255,255,0.075);
+            border: 1px solid rgba(255,255,255,0.07);
+            border-bottom-left-radius: 5px;
+        }
+
+        .typing {
+            display: inline-flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .typing span {
+            width: 6px;
+            height: 6px;
+            background: #aeb5c7;
+            border-radius: 50%;
+            animation: bounce 1.2s infinite;
+        }
+
+        .typing span:nth-child(2) {
+            animation-delay: 0.15s;
+        }
+
+        .typing span:nth-child(3) {
+            animation-delay: 0.3s;
+        }
+
+        @keyframes bounce {
+            0%, 60%, 100% {
+                transform: translateY(0);
+            }
+
+            30% {
+                transform: translateY(-5px);
+            }
+        }
+
+        .bottom {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+            background: rgba(8,11,24,0.9);
+            backdrop-filter: blur(15px);
+            border-top: 1px solid rgba(255,255,255,0.08);
+            z-index: 20;
+        }
+
+        .input-row {
+            max-width: 700px;
+            margin: auto;
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+        }
+
+        textarea {
+            flex: 1;
+            resize: none;
+            min-height: 46px;
+            max-height: 120px;
+            padding: 13px 14px;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 15px;
+            outline: none;
+            background: rgba(255,255,255,0.07);
+            color: #fff;
+            font-size: 15px;
+            font-family: inherit;
+        }
+
+        textarea::placeholder {
+            color: #8d95aa;
+        }
+
+        .action-btn {
+            width: 46px;
+            height: 46px;
+            border: none;
+            border-radius: 14px;
+            color: white;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .voice {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .voice.recording {
+            background: #dc2626;
+            animation: pulse 1.2s infinite;
+        }
+
+        .send {
+            background: linear-gradient(135deg, #3b82f6, #7c3aed);
+        }
+
+        .action-btn:disabled {
+            opacity: 0.45;
+        }
+
+        @keyframes pulse {
+            50% {
+                transform: scale(1.06);
+            }
+        }
+
+        .notice {
+            text-align: center;
+            font-size: 12px;
+            color: #8d95aa;
+            padding: 8px 0 2px;
+        }
+
+        .error {
+            text-align: center;
+            color: #fca5a5;
+            padding: 20px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="app">
+
+    <header class="header">
+        <div class="brand">
+            <div class="logo">A</div>
+
+            <div>
+                <div class="brand-name">AskOra</div>
+                <div class="tagline">Ask. Get answers.</div>
+            </div>
+        </div>
+
+        <div class="header-actions">
+            <button class="small-btn" id="inviteBtn">✨ Invite</button>
+            <button class="small-btn" id="resetBtn">Clear</button>
+        </div>
+    </header>
+
+    <main class="chat" id="chat">
+
+        <div class="welcome" id="welcome">
+            <div class="welcome-icon">🤖</div>
+
+            <h1>Welcome to AskOra</h1>
+
+            <p>
+                Your simple AI assistant.<br>
+                Ask anything by text or voice.
+            </p>
+        </div>
+
+    </main>
+
+    <div class="bottom">
+
+        <div class="input-row">
+
+            <button
+                class="action-btn voice"
+                id="voiceBtn"
+                title="Voice"
+            >
+                🎤
+            </button>
+
+            <textarea
+                id="messageInput"
+                placeholder="Ask AskOra anything..."
+                rows="1"
+            ></textarea>
+
+            <button
+                class="action-btn send"
+                id="sendBtn"
+                title="Send"
+            >
+                ➤
+            </button>
+
+        </div>
+
+        <div class="notice">
+            AskOra • Free AI assistant
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    const tg = window.Telegram.WebApp;
+
+    tg.ready();
+    tg.expand();
+
+    const chat = document.getElementById("chat");
+    const welcome = document.getElementById("welcome");
+    const input = document.getElementById("messageInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const voiceBtn = document.getElementById("voiceBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const inviteBtn = document.getElementById("inviteBtn");
+
+    const BOT_LINK = "https://t.me/askora_official_bot";
+
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let audioStream = null;
+
+    function authHeaders() {
+        return {
+            "X-Telegram-Init-Data": tg.initData
+        };
+    }
+
+    function scrollBottom() {
+        chat.scrollTop = chat.scrollHeight;
+    }
+
+    function hideWelcome() {
+        if (welcome) {
+            welcome.style.display = "none";
+        }
+    }
+
+    function addMessage(role, text) {
+        hideWelcome();
+
+        const wrapper = document.createElement("div");
+        wrapper.className = "message " + role;
+
+        const bubble = document.createElement("div");
+        bubble.className = "bubble";
+        bubble.textContent = text;
+
+        wrapper.appendChild(bubble);
+        chat.appendChild(wrapper);
+
+        scrollBottom();
+
+        return wrapper;
+    }
+
+    function addTyping() {
+        hideWelcome();
+
+        const wrapper = document.createElement("div");
+        wrapper.className = "message assistant";
+        wrapper.id = "typingMessage";
+
+        const bubble = document.createElement("div");
+        bubble.className = "bubble";
+
+        bubble.innerHTML = `
+            <div class="typing">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        `;
+
+        wrapper.appendChild(bubble);
+        chat.appendChild(wrapper);
+
+        scrollBottom();
+    }
+
+    function removeTyping() {
+        const typing = document.getElementById("typingMessage");
+
+        if (typing) {
+            typing.remove();
+        }
+    }
+
+    function showError(message) {
+        removeTyping();
+        addMessage("assistant", "⚠️ " + message);
+    }
+
+    async function loadHistory() {
+        if (!tg.initData) {
+            addMessage(
+                "assistant",
+                "Please open AskOra from Telegram using the Open App button."
+            );
+            return;
+        }
+
+        try {
+            const response = await fetch("/api/history", {
+                headers: authHeaders()
+            });
+
+            if (!response.ok) {
+                return;
+            }
+
+            const data = await response.json();
+
+            if (data.messages && data.messages.length > 0) {
+                hideWelcome();
+
+                data.messages.forEach(message => {
+                    addMessage(message.role, message.content);
+                });
+            }
+
+        } catch (error) {
+            console.log("History error:", error);
+        }
+    }
+
+    async function sendMessage() {
+        const message = input.value.trim();
+
+        if (!message) {
+            return;
+        }
+
+        if (!tg.initData) {
+            showError("Please open AskOra from Telegram.");
+            return;
+        }
+
+        input.value = "";
+        input.style.height = "46px";
+
+        addMessage("user", message);
+
+        sendBtn.disabled = true;
+        voiceBtn.disabled = true;
+
+        addTyping();
+
+        try {
+            const response = await fetch("/api/chat", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...authHeaders()
+                },
+                body: JSON.stringify({
+                    message: message
+                })
+            });
+
+            const data = await response.json();
+
+            removeTyping();
+
+            if (!response.ok) {
+                showError(data.error || "Something went wrong.");
+                return;
+            }
+
+            addMessage("assistant", data.answer);
+
+        } catch (error) {
+            showError("Unable to connect to AskOra right now.");
+        }
+
+        sendBtn.disabled = false;
+        voiceBtn.disabled = false;
+
+        input.focus();
+    }
+
+    async function startRecording() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            showError("Voice recording is not supported on this device.");
+            return;
+        }
+
+        try {
+            audioStream = await navigator.mediaDevices.getUserMedia({
+                audio: true
+            });
+
+            audioChunks = [];
+
+            let mimeType = "";
+
+            const types = [
+                "audio/webm;codecs=opus",
+                "audio/webm",
+                "audio/ogg;codecs=opus"
+            ];
+
+            for (const type of types) {
+                if (MediaRecorder.isTypeSupported(type)) {
+                    mimeType = type;
+                    break;
+                }
+            }
+
+            if (mimeType) {
+                mediaRecorder = new MediaRecorder(
+                    audioStream,
+                    { mimeType: mimeType }
+                );
+            } else {
+                mediaRecorder = new MediaRecorder(audioStream);
+            }
+
+            mediaRecorder.ondataavailable = event => {
+                if (event.data.size > 0) {
+                    audioChunks.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = uploadVoice;
+
+            mediaRecorder.start();
+
+            voiceBtn.classList.add("recording");
+            voiceBtn.textContent = "⏹️";
+
+            sendBtn.disabled = true;
+            input.disabled = true;
+
+        } catch (error) {
+            showError("Microphone permission was not granted.");
+        }
+    }
+
+    function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state !== "inactive") {
+            mediaRecorder.stop();
+        }
+    }
+
+    async function uploadVoice() {
+        if (audioStream) {
+            audioStream.getTracks().forEach(track => track.stop());
+            audioStream = null;
+        }
+
+        voiceBtn.classList.remove("recording");
+        voiceBtn.textContent = "🎤";
+
+        input.disabled = false;
+
+        const blobType =
+            audioChunks.length > 0
+                ? audioChunks[0].type
+                : "audio/webm";
+
+        const blob = new Blob(audioChunks, {
+            type: blobType
+        });
+
+        const extension =
+            blobType.includes("ogg")
+                ? "ogg"
+                : "webm";
+
+        const formData = new FormData();
+
+        formData.append(
+            "audio",
+            blob,
+            "askora_voice." + extension
+        );
+
+        addMessage("user", "🎤 Voice message");
+        addTyping();
+
+        try {
+            const response = await fetch("/api/voice", {
+                method: "POST",
+                headers: authHeaders(),
+                body: formData
+            });
+
+            const data = await response.json();
+
+            removeTyping();
+
+            if (!response.ok) {
+                showError(data.error || "Voice processing failed.");
+                return;
+            }
+
+            addMessage("assistant", data.answer);
+
+        } catch (error) {
+            showError("Unable to process the voice message.");
+        }
+
+        sendBtn.disabled = false;
+        voiceBtn.disabled = false;
+
+        mediaRecorder = null;
+        audioChunks = [];
+
+        input.focus();
+    }
+
+    async function resetChat() {
+        if (!tg.initData) {
+            return;
+        }
+
+        const confirmed = confirm(
+            "Clear your AskOra conversation?"
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            const response = await fetch("/api/reset", {
+                method: "POST",
+                headers: authHeaders()
+            });
+
+            if (!response.ok) {
+                showError("Could not clear the conversation.");
+                return;
+            }
+
+            chat.innerHTML = "";
+
+            chat.appendChild(welcome);
+
+            welcome.style.display = "block";
+
+        } catch (error) {
+            showError("Could not clear the conversation.");
+        }
+    }
+
+    function inviteFriend() {
+        const shareUrl =
+            "https://t.me/share/url?" +
+            "url=" +
+            encodeURIComponent(BOT_LINK) +
+            "&text=" +
+            encodeURIComponent(
+                "Try AskOra 🤖 — a free AI assistant on Telegram!"
+            );
+
+        tg.openTelegramLink(shareUrl);
+    }
+
+    sendBtn.addEventListener("click", sendMessage);
+
+    voiceBtn.addEventListener("click", () => {
+        if (
+            mediaRecorder &&
+            mediaRecorder.state === "recording"
+        ) {
+            stopRecording();
+        } else {
+            startRecording();
+        }
+    });
+
+    resetBtn.addEventListener("click", resetChat);
+
+    inviteBtn.addEventListener("click", inviteFriend);
+
+    input.addEventListener("keydown", event => {
+        if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault();
+            sendMessage();
+        }
+    });
+
+    input.addEventListener("input", () => {
+        input.style.height = "46px";
+
+        input.style.height =
+            Math.min(input.scrollHeight, 120) + "px";
+    });
+
+    loadHistory();
+</script>
+
+</body>
+</html>
