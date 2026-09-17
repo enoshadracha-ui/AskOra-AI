@@ -26,6 +26,7 @@ from telegram.ext import (
     filters,
 )
 
+
 # =========================
 # SETTINGS
 # =========================
@@ -45,7 +46,11 @@ ADMIN_ID = 7721346673
 BOT_USERNAME = "askora_official_bot"
 BOT_LINK = f"https://t.me/{BOT_USERNAME}"
 
-groq_client = Groq(api_key=GROQ_API_KEY)
+
+groq_client = Groq(
+    api_key=GROQ_API_KEY
+)
+
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -62,34 +67,52 @@ app = Flask(__name__)
 # =========================
 
 SYSTEM_INSTRUCTION = """
-You are AskOra, a simple and friendly AI assistant.
+You are AskOra, a smart, friendly and concise AI assistant.
 
-Give clear, useful and accurate answers.
+Answer the user's question directly.
 
-Keep answers reasonably short and easy to understand.
+Keep normal answers SHORT.
 
-Do not unnecessarily repeat the user's question.
+Rules:
+- Simple questions: 1 to 3 sentences.
+- Normal questions: usually 40 to 100 words.
+- Use short paragraphs.
+- Use short bullet points when useful.
+- Avoid unnecessary introductions.
+- Avoid repeating the user's question.
+- Avoid unnecessary conclusions.
+- Do not write essays unless the user specifically asks for detail.
+- Keep explanations easy to understand.
+- Use Markdown formatting when helpful.
 
-Use simple formatting when helpful.
+If the user specifically asks for a detailed explanation,
+you may provide a longer answer.
 """
 
 
 # =========================
-# DATABASE
+# DATABASE CONNECTION
 # =========================
 
 def get_connection():
-    return psycopg2.connect(DATABASE_URL)
+    return psycopg2.connect(
+        DATABASE_URL
+    )
 
+
+# =========================
+# DATABASE INITIALIZATION
+# =========================
 
 def init_database():
+
     connection = get_connection()
 
     try:
         cursor = connection.cursor()
 
         # =========================
-        # USERS TABLE
+        # USERS
         # =========================
 
         cursor.execute(
@@ -100,7 +123,6 @@ def init_database():
             """
         )
 
-        # Current AskOra columns
         cursor.execute(
             """
             ALTER TABLE users
@@ -125,6 +147,14 @@ def init_database():
         cursor.execute(
             """
             ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS first_seen TIMESTAMPTZ
+            DEFAULT NOW()
+            """
+        )
+
+        cursor.execute(
+            """
+            ALTER TABLE users
             ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ
             DEFAULT NOW()
             """
@@ -138,44 +168,20 @@ def init_database():
             """
         )
 
-        # =========================
-        # OLD DATABASE COMPATIBILITY
-        # =========================
+        # Repair old NULL values.
 
-        # Your existing Render database has a required
-        # first_seen column. Keep it and make sure it
-        # has a safe default.
-        cursor.execute(
-            """
-            ALTER TABLE users
-            ADD COLUMN IF NOT EXISTS first_seen TIMESTAMPTZ
-            DEFAULT NOW()
-            """
-        )
-
-        # If any old records somehow have NULL first_seen,
-        # repair them before enforcing the default.
         cursor.execute(
             """
             UPDATE users
-            SET first_seen = COALESCE(first_seen, NOW())
+            SET first_seen = NOW()
             WHERE first_seen IS NULL
             """
         )
 
         cursor.execute(
             """
-            ALTER TABLE users
-            ALTER COLUMN first_seen SET DEFAULT NOW()
-            """
-        )
-
-        # Make sure created_at and last_seen also have
-        # usable defaults on older databases.
-        cursor.execute(
-            """
             UPDATE users
-            SET created_at = COALESCE(created_at, NOW())
+            SET created_at = NOW()
             WHERE created_at IS NULL
             """
         )
@@ -183,8 +189,15 @@ def init_database():
         cursor.execute(
             """
             UPDATE users
-            SET last_seen = COALESCE(last_seen, NOW())
+            SET last_seen = NOW()
             WHERE last_seen IS NULL
+            """
+        )
+
+        cursor.execute(
+            """
+            ALTER TABLE users
+            ALTER COLUMN first_seen SET DEFAULT NOW()
             """
         )
 
@@ -217,6 +230,29 @@ def init_database():
             """
         )
 
+        cursor.execute(
+            """
+            ALTER TABLE usage_events
+            ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ
+            DEFAULT NOW()
+            """
+        )
+
+        cursor.execute(
+            """
+            UPDATE usage_events
+            SET created_at = NOW()
+            WHERE created_at IS NULL
+            """
+        )
+
+        cursor.execute(
+            """
+            ALTER TABLE usage_events
+            ALTER COLUMN created_at SET DEFAULT NOW()
+            """
+        )
+
         # =========================
         # CONVERSATIONS
         # =========================
@@ -233,7 +269,6 @@ def init_database():
             """
         )
 
-        # Upgrade old conversations table
         cursor.execute(
             """
             ALTER TABLE conversations
@@ -256,6 +291,21 @@ def init_database():
             """
         )
 
+        cursor.execute(
+            """
+            UPDATE conversations
+            SET created_at = NOW()
+            WHERE created_at IS NULL
+            """
+        )
+
+        cursor.execute(
+            """
+            ALTER TABLE conversations
+            ALTER COLUMN created_at SET DEFAULT NOW()
+            """
+        )
+
         connection.commit()
 
         logger.info(
@@ -264,9 +314,11 @@ def init_database():
 
     except Exception:
         connection.rollback()
+
         logger.exception(
             "Database initialization failed."
         )
+
         raise
 
     finally:
@@ -283,6 +335,7 @@ def record_user(
     first_name=None,
     last_name=None,
 ):
+
     connection = get_connection()
 
     try:
@@ -308,7 +361,9 @@ def record_user(
                 NOW(),
                 NOW()
             )
+
             ON CONFLICT (user_id)
+
             DO UPDATE SET
                 username = EXCLUDED.username,
                 first_name = EXCLUDED.first_name,
@@ -334,10 +389,14 @@ def record_user(
 
 
 # =========================
-# USAGE
+# RECORD USAGE
 # =========================
 
-def record_usage(user_id, event_type):
+def record_usage(
+    user_id,
+    event_type,
+):
+
     connection = get_connection()
 
     try:
@@ -373,10 +432,15 @@ def record_usage(user_id, event_type):
 
 
 # =========================
-# CONVERSATION
+# SAVE MESSAGE
 # =========================
 
-def save_message(user_id, role, content):
+def save_message(
+    user_id,
+    role,
+    content,
+):
+
     connection = get_connection()
 
     try:
@@ -406,11 +470,23 @@ def save_message(user_id, role, content):
 
         connection.commit()
 
+    except Exception:
+        connection.rollback()
+        raise
+
     finally:
         connection.close()
 
 
-def get_history(user_id, limit=20):
+# =========================
+# GET HISTORY
+# =========================
+
+def get_history(
+    user_id,
+    limit=20,
+):
+
     connection = get_connection()
 
     try:
@@ -446,7 +522,12 @@ def get_history(user_id, limit=20):
         connection.close()
 
 
+# =========================
+# CLEAR HISTORY
+# =========================
+
 def clear_history(user_id):
+
     connection = get_connection()
 
     try:
@@ -457,10 +538,16 @@ def clear_history(user_id):
             DELETE FROM conversations
             WHERE user_id = %s
             """,
-            (user_id,),
+            (
+                user_id,
+            ),
         )
 
         connection.commit()
+
+    except Exception:
+        connection.rollback()
+        raise
 
     finally:
         connection.close()
@@ -471,6 +558,7 @@ def clear_history(user_id):
 # =========================
 
 def get_statistics():
+
     connection = get_connection()
 
     try:
@@ -482,6 +570,7 @@ def get_statistics():
             FROM users
             """
         )
+
         total_users = cursor.fetchone()[0]
 
         cursor.execute(
@@ -490,6 +579,7 @@ def get_statistics():
             FROM conversations
             """
         )
+
         total_messages = cursor.fetchone()[0]
 
         cursor.execute(
@@ -498,6 +588,7 @@ def get_statistics():
             FROM usage_events
             """
         )
+
         total_events = cursor.fetchone()[0]
 
         return {
@@ -515,6 +606,7 @@ def get_statistics():
 # =========================
 
 def invite_button():
+
     share_url = (
         "https://t.me/share/url?"
         + urlencode(
@@ -537,7 +629,9 @@ def invite_button():
         ]
     ]
 
-    return InlineKeyboardMarkup(keyboard)
+    return InlineKeyboardMarkup(
+        keyboard
+    )
 
 
 # =========================
@@ -550,14 +644,17 @@ async def send_long_message(
     text,
     reply_markup=None,
 ):
+
     max_length = 4000
 
     if len(text) <= max_length:
+
         await bot.send_message(
             chat_id=chat_id,
             text=text,
             reply_markup=reply_markup,
         )
+
         return
 
     chunks = [
@@ -570,13 +667,17 @@ async def send_long_message(
     ]
 
     for index, chunk in enumerate(chunks):
+
         if index == len(chunks) - 1:
+
             await bot.send_message(
                 chat_id=chat_id,
                 text=chunk,
                 reply_markup=reply_markup,
             )
+
         else:
+
             await bot.send_message(
                 chat_id=chat_id,
                 text=chunk,
@@ -584,24 +685,36 @@ async def send_long_message(
 
 
 # =========================
-# AI
+# AI RESPONSE
 # =========================
 
 def generate_answer(messages):
+
     response = groq_client.chat.completions.create(
         model=TEXT_MODEL,
         messages=messages,
-        temperature=0.7,
-        max_tokens=1000,
+        temperature=0.5,
+        max_tokens=450,
     )
 
-    return response.choices[0].message.content.strip()
+    return (
+        response
+        .choices[0]
+        .message
+        .content
+        .strip()
+    )
 
+
+# =========================
+# VOICE TRANSCRIPTION
+# =========================
 
 def transcribe_audio(
     audio_bytes,
     filename="voice.ogg",
 ):
+
     response = groq_client.audio.transcriptions.create(
         file=(
             filename,
@@ -618,10 +731,12 @@ def transcribe_audio(
 # =========================
 
 def validate_init_data(init_data):
+
     if not init_data:
         return None
 
     try:
+
         parsed = dict(
             parse_qsl(
                 init_data,
@@ -662,9 +777,12 @@ def validate_init_data(init_data):
         ):
             return None
 
-        auth_date = parsed.get("auth_date")
+        auth_date = parsed.get(
+            "auth_date"
+        )
 
         if auth_date:
+
             if (
                 time.time()
                 - int(auth_date)
@@ -672,22 +790,29 @@ def validate_init_data(init_data):
             ):
                 return None
 
-        user_data = parsed.get("user")
+        user_data = parsed.get(
+            "user"
+        )
 
         if not user_data:
             return None
 
-        return json.loads(user_data)
+        return json.loads(
+            user_data
+        )
 
     except Exception as error:
+
         logger.error(
             "Mini App validation error: %s",
             error,
         )
+
         return None
 
 
 def get_mini_app_user_id():
+
     init_data = request.headers.get(
         "X-Telegram-Init-Data",
         "",
@@ -700,7 +825,9 @@ def get_mini_app_user_id():
     if not user_data:
         return None
 
-    return int(user_data["id"])
+    return int(
+        user_data["id"]
+    )
 
 
 # =========================
@@ -711,6 +838,7 @@ async def start(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ):
+
     user = update.effective_user
 
     record_user(
@@ -728,16 +856,19 @@ async def start(
 
 
 # =========================
-# RESET
+# TELEGRAM RESET
 # =========================
 
 async def reset(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ):
+
     user_id = update.effective_user.id
 
-    clear_history(user_id)
+    clear_history(
+        user_id
+    )
 
     await update.message.reply_text(
         "🧹 Your AskOra conversation has been cleared."
@@ -752,6 +883,7 @@ async def admin(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ):
+
     if update.effective_user.id != ADMIN_ID:
         return
 
@@ -773,6 +905,7 @@ async def handle_voice(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ):
+
     user = update.effective_user
     user_id = user.id
 
@@ -789,6 +922,7 @@ async def handle_voice(
     )
 
     try:
+
         voice = update.message.voice
 
         telegram_file = await context.bot.get_file(
@@ -806,9 +940,11 @@ async def handle_voice(
         )
 
         if not text:
+
             await update.message.reply_text(
                 "⚠️ I couldn't understand that voice note."
             )
+
             return
 
         save_message(
@@ -860,6 +996,7 @@ async def handle_voice(
         )
 
     except Exception as error:
+
         logger.exception(
             "Voice error: %s",
             error,
@@ -872,13 +1009,14 @@ async def handle_voice(
 
 
 # =========================
-# TELEGRAM TEXT CHAT
+# TELEGRAM TEXT
 # =========================
 
 async def handle_text(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ):
+
     user = update.effective_user
     user_id = user.id
 
@@ -900,6 +1038,7 @@ async def handle_text(
     )
 
     try:
+
         save_message(
             user_id,
             "user",
@@ -944,6 +1083,7 @@ async def handle_text(
         )
 
     except Exception as error:
+
         logger.exception(
             "Chat error: %s",
             error,
@@ -961,6 +1101,7 @@ async def handle_text(
 
 @app.route("/")
 def home():
+
     return render_template(
         "index.html"
     )
@@ -972,6 +1113,7 @@ def home():
 
 @app.route("/health")
 def health():
+
     return jsonify(
         {
             "status": "online",
@@ -990,9 +1132,11 @@ def health():
     methods=["GET"],
 )
 def api_history():
+
     user_id = get_mini_app_user_id()
 
     if not user_id:
+
         return jsonify(
             {
                 "error": "Unauthorized"
@@ -1020,9 +1164,11 @@ def api_history():
     methods=["POST"],
 )
 def api_chat():
+
     user_id = get_mini_app_user_id()
 
     if not user_id:
+
         return jsonify(
             {
                 "error": "Unauthorized"
@@ -1041,6 +1187,7 @@ def api_chat():
     ).strip()
 
     if not message:
+
         return jsonify(
             {
                 "error": "Message is required"
@@ -1048,9 +1195,10 @@ def api_chat():
         ), 400
 
     try:
-        # This now works with the old database schema
-        # because record_user() supplies first_seen.
-        record_user(user_id)
+
+        record_user(
+            user_id
+        )
 
         save_message(
             user_id,
@@ -1072,7 +1220,7 @@ def api_chat():
 
         messages.extend(history)
 
-        answer = await_generate_answer_sync(
+        answer = generate_answer(
             messages
         )
 
@@ -1094,6 +1242,7 @@ def api_chat():
         )
 
     except Exception as error:
+
         logger.exception(
             "Mini App chat error: %s",
             error,
@@ -1106,10 +1255,6 @@ def api_chat():
         ), 500
 
 
-def await_generate_answer_sync(messages):
-    return generate_answer(messages)
-
-
 # =========================
 # MINI APP VOICE
 # =========================
@@ -1119,9 +1264,11 @@ def await_generate_answer_sync(messages):
     methods=["POST"],
 )
 def api_voice():
+
     user_id = get_mini_app_user_id()
 
     if not user_id:
+
         return jsonify(
             {
                 "error": "Unauthorized"
@@ -1133,6 +1280,7 @@ def api_voice():
     )
 
     if not audio:
+
         return jsonify(
             {
                 "error": "Audio is required"
@@ -1140,6 +1288,7 @@ def api_voice():
         ), 400
 
     try:
+
         audio_bytes = audio.read()
 
         text = transcribe_audio(
@@ -1148,13 +1297,16 @@ def api_voice():
         )
 
         if not text:
+
             return jsonify(
                 {
                     "error": "Could not understand the voice"
                 }
             ), 400
 
-        record_user(user_id)
+        record_user(
+            user_id
+        )
 
         save_message(
             user_id,
@@ -1199,6 +1351,7 @@ def api_voice():
         )
 
     except Exception as error:
+
         logger.exception(
             "Mini App voice error: %s",
             error,
@@ -1220,16 +1373,20 @@ def api_voice():
     methods=["POST"],
 )
 def api_reset():
+
     user_id = get_mini_app_user_id()
 
     if not user_id:
+
         return jsonify(
             {
                 "error": "Unauthorized"
             }
         ), 401
 
-    clear_history(user_id)
+    clear_history(
+        user_id
+    )
 
     return jsonify(
         {
@@ -1243,7 +1400,9 @@ def api_reset():
 # =========================
 
 async def setup_bot(application):
+
     await application.initialize()
+
     await application.start()
 
     webhook_url = (
@@ -1262,11 +1421,14 @@ async def setup_bot(application):
 
 
 def start_async_loop(application):
+
     global bot_loop
 
     bot_loop = asyncio.new_event_loop()
 
-    asyncio.set_event_loop(bot_loop)
+    asyncio.set_event_loop(
+        bot_loop
+    )
 
     bot_loop.run_until_complete(
         setup_bot(application)
@@ -1275,12 +1437,18 @@ def start_async_loop(application):
     bot_loop.run_forever()
 
 
+# =========================
+# WEBHOOK
+# =========================
+
 @app.route(
     "/webhook",
     methods=["POST"],
 )
 def webhook():
+
     try:
+
         update_data = request.get_json(
             force=True
         )
@@ -1306,6 +1474,7 @@ def webhook():
         return "OK", 200
 
     except Exception as error:
+
         logger.exception(
             "Webhook error: %s",
             error,
@@ -1324,12 +1493,14 @@ telegram_application = (
     .build()
 )
 
+
 telegram_application.add_handler(
     CommandHandler(
         "start",
         start,
     )
 )
+
 
 telegram_application.add_handler(
     CommandHandler(
@@ -1338,6 +1509,7 @@ telegram_application.add_handler(
     )
 )
 
+
 telegram_application.add_handler(
     CommandHandler(
         "admin",
@@ -1345,12 +1517,14 @@ telegram_application.add_handler(
     )
 )
 
+
 telegram_application.add_handler(
     MessageHandler(
         filters.VOICE,
         handle_voice,
     )
 )
+
 
 telegram_application.add_handler(
     MessageHandler(
@@ -1365,6 +1539,7 @@ telegram_application.add_handler(
 # =========================
 
 def main():
+
     logger.info(
         "Initializing database..."
     )
