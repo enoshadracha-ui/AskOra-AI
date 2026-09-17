@@ -76,7 +76,7 @@ flask_app = Flask(__name__)
 
 
 # ============================================================
-# AI SYSTEM PROMPT
+# AI SYSTEM INSTRUCTION
 # ============================================================
 
 SYSTEM_INSTRUCTION = """
@@ -112,7 +112,7 @@ you may provide a longer answer.
 
 
 # ============================================================
-# DATABASE CONNECTION
+# DATABASE
 # ============================================================
 
 def get_db():
@@ -122,11 +122,15 @@ def get_db():
     )
 
 
-# ============================================================
-# DATABASE INITIALIZATION / MIGRATION
-# ============================================================
-
 def init_database():
+    """
+    Repairs/extends the existing AskOra database.
+
+    IMPORTANT:
+    This code intentionally does NOT depend on users.id.
+
+    It also supports the older usage_events.user_id column.
+    """
 
     conn = get_db()
 
@@ -134,9 +138,9 @@ def init_database():
 
         with conn.cursor() as cur:
 
-            # ------------------------------------------------
-            # USERS TABLE
-            # ------------------------------------------------
+            # =================================================
+            # USERS
+            # =================================================
 
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS users (
@@ -144,7 +148,6 @@ def init_database():
                 )
             """)
 
-            # Get existing columns.
             cur.execute("""
                 SELECT column_name
                 FROM information_schema.columns
@@ -152,20 +155,20 @@ def init_database():
                 AND table_name = 'users'
             """)
 
-            columns = {
+            user_columns = {
                 row[0]
                 for row in cur.fetchall()
             }
 
-            # ------------------------------------------------
-            # FIND OLD TELEGRAM ID COLUMN
-            # ------------------------------------------------
+            # -----------------------------------------------
+            # TELEGRAM ID
+            # -----------------------------------------------
 
-            if "telegram_id" not in columns:
+            if "telegram_id" not in user_columns:
 
-                old_column = None
+                old_id_column = None
 
-                possible_columns = [
+                possible_old_columns = [
                     "user_id",
                     "telegram_user_id",
                     "telegramid",
@@ -173,10 +176,10 @@ def init_database():
                     "chat_id",
                 ]
 
-                for candidate in possible_columns:
+                for column in possible_old_columns:
 
-                    if candidate in columns:
-                        old_column = candidate
+                    if column in user_columns:
+                        old_id_column = column
                         break
 
                 cur.execute("""
@@ -184,19 +187,19 @@ def init_database():
                     ADD COLUMN telegram_id BIGINT
                 """)
 
-                if old_column:
+                if old_id_column:
 
                     cur.execute(
                         f"""
                         UPDATE users
-                        SET telegram_id = "{old_column}"
+                        SET telegram_id = "{old_id_column}"
                         WHERE telegram_id IS NULL
                         """
                     )
 
-            # ------------------------------------------------
-            # USER PROFILE COLUMNS
-            # ------------------------------------------------
+            # -----------------------------------------------
+            # PROFILE COLUMNS
+            # -----------------------------------------------
 
             cur.execute("""
                 ALTER TABLE users
@@ -223,9 +226,9 @@ def init_database():
                 ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ
             """)
 
-            # ------------------------------------------------
-            # REPAIR NULL DATES
-            # ------------------------------------------------
+            # -----------------------------------------------
+            # REPAIR DATES
+            # -----------------------------------------------
 
             cur.execute("""
                 UPDATE users
@@ -239,9 +242,9 @@ def init_database():
                 WHERE last_seen IS NULL
             """)
 
-            # ------------------------------------------------
-            # MESSAGES TABLE
-            # ------------------------------------------------
+            # =================================================
+            # MESSAGES
+            # =================================================
 
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS messages (
@@ -253,9 +256,44 @@ def init_database():
             """)
 
             cur.execute("""
-                ALTER TABLE messages
-                ADD COLUMN IF NOT EXISTS telegram_id BIGINT
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                AND table_name = 'messages'
             """)
+
+            message_columns = {
+                row[0]
+                for row in cur.fetchall()
+            }
+
+            if "telegram_id" not in message_columns:
+
+                cur.execute("""
+                    ALTER TABLE messages
+                    ADD COLUMN telegram_id BIGINT
+                """)
+
+                possible_old_columns = [
+                    "user_id",
+                    "telegram_user_id",
+                    "telegramid",
+                    "chat_id",
+                ]
+
+                for column in possible_old_columns:
+
+                    if column in message_columns:
+
+                        cur.execute(
+                            f"""
+                            UPDATE messages
+                            SET telegram_id = "{column}"
+                            WHERE telegram_id IS NULL
+                            """
+                        )
+
+                        break
 
             cur.execute("""
                 ALTER TABLE messages
@@ -278,21 +316,68 @@ def init_database():
                 WHERE created_at IS NULL
             """)
 
-            # ------------------------------------------------
+            # =================================================
             # USAGE EVENTS
-            # ------------------------------------------------
+            # =================================================
 
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS usage_events (
-                    telegram_id BIGINT,
+                    user_id BIGINT,
                     event_type TEXT,
                     created_at TIMESTAMPTZ
                 )
             """)
 
             cur.execute("""
-                ALTER TABLE usage_events
-                ADD COLUMN IF NOT EXISTS telegram_id BIGINT
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                AND table_name = 'usage_events'
+            """)
+
+            usage_columns = {
+                row[0]
+                for row in cur.fetchall()
+            }
+
+            # -----------------------------------------------
+            # OLD user_id COLUMN
+            # -----------------------------------------------
+
+            if "user_id" not in usage_columns:
+
+                cur.execute("""
+                    ALTER TABLE usage_events
+                    ADD COLUMN user_id BIGINT
+                """)
+
+            # -----------------------------------------------
+            # NEW telegram_id COLUMN
+            # -----------------------------------------------
+
+            if "telegram_id" not in usage_columns:
+
+                cur.execute("""
+                    ALTER TABLE usage_events
+                    ADD COLUMN telegram_id BIGINT
+                """)
+
+            # -----------------------------------------------
+            # Keep old and new IDs synchronized
+            # -----------------------------------------------
+
+            cur.execute("""
+                UPDATE usage_events
+                SET telegram_id = user_id
+                WHERE telegram_id IS NULL
+                AND user_id IS NOT NULL
+            """)
+
+            cur.execute("""
+                UPDATE usage_events
+                SET user_id = telegram_id
+                WHERE user_id IS NULL
+                AND telegram_id IS NOT NULL
             """)
 
             cur.execute("""
@@ -311,9 +396,9 @@ def init_database():
                 WHERE created_at IS NULL
             """)
 
-            # ------------------------------------------------
+            # =================================================
             # INDEXES
-            # ------------------------------------------------
+            # =================================================
 
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS
@@ -331,6 +416,12 @@ def init_database():
                 CREATE INDEX IF NOT EXISTS
                 idx_messages_created_at
                 ON messages(created_at)
+            """)
+
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS
+                idx_usage_user_id
+                ON usage_events(user_id)
             """)
 
             cur.execute("""
@@ -367,7 +458,7 @@ def init_database():
 
 
 # ============================================================
-# USER FUNCTIONS
+# USER RECORDING
 # ============================================================
 
 def record_user(
@@ -384,8 +475,8 @@ def record_user(
         with conn.cursor() as cur:
 
             # IMPORTANT:
-            # Do NOT use SELECT id.
-            # Your existing table does not have an id column.
+            # Never use users.id here.
+            # Your database doesn't have that column.
 
             cur.execute("""
                 SELECT telegram_id
@@ -466,7 +557,7 @@ def record_user(
 
 
 # ============================================================
-# USAGE
+# RECORD USAGE
 # ============================================================
 
 def record_usage(
@@ -480,8 +571,16 @@ def record_usage(
 
         with conn.cursor() as cur:
 
+            # IMPORTANT:
+            # Your old table requires user_id NOT NULL.
+            #
+            # Therefore we deliberately write BOTH:
+            # user_id      = Telegram ID
+            # telegram_id  = Telegram ID
+
             cur.execute("""
                 INSERT INTO usage_events (
+                    user_id,
                     telegram_id,
                     event_type,
                     created_at
@@ -489,9 +588,11 @@ def record_usage(
                 VALUES (
                     %s,
                     %s,
+                    %s,
                     NOW()
                 )
             """, (
+                telegram_id,
                 telegram_id,
                 event_type,
             ))
@@ -566,7 +667,7 @@ def save_message(
 
 
 # ============================================================
-# GET CONVERSATION
+# GET HISTORY
 # ============================================================
 
 def get_history(
@@ -613,7 +714,7 @@ def get_history(
 
 
 # ============================================================
-# CLEAR CONVERSATION
+# CLEAR HISTORY
 # ============================================================
 
 def clear_history(
@@ -664,11 +765,7 @@ def build_ai_messages(
         limit=30,
     )
 
-    # The current user message may already have
-    # been saved in PostgreSQL.
-    #
-    # Remove that copy so we don't send it twice.
-
+    # Avoid sending the current message twice.
     if (
         history
         and history[-1]["role"] == "user"
@@ -683,9 +780,7 @@ def build_ai_messages(
         }
     ]
 
-    messages.extend(
-        history
-    )
+    messages.extend(history)
 
     messages.append({
         "role": "user",
@@ -696,7 +791,7 @@ def build_ai_messages(
 
 
 # ============================================================
-# GENERATE AI ANSWER
+# GENERATE ANSWER
 # ============================================================
 
 def generate_answer(
@@ -710,9 +805,8 @@ def generate_answer(
     )
 
     logger.info(
-        "Generating AI answer. user=%s history=%s",
+        "Generating answer for user %s",
         telegram_id,
-        len(messages) - 2,
     )
 
     response = groq_client.chat.completions.create(
@@ -734,7 +828,7 @@ def generate_answer(
 
 
 # ============================================================
-# VOICE TRANSCRIPTION
+# TRANSCRIBE VOICE
 # ============================================================
 
 def transcribe_audio(
@@ -747,26 +841,26 @@ def transcribe_audio(
 
     audio_file.name = "voice.ogg"
 
-    transcription = (
+    result = (
         groq_client.audio.transcriptions.create(
             file=audio_file,
             model=VOICE_MODEL,
         )
     )
 
-    text = transcription.text
+    text = result.text
 
     if not text:
 
         raise RuntimeError(
-            "Voice transcription returned no text."
+            "No transcription returned."
         )
 
     return text.strip()
 
 
 # ============================================================
-# TELEGRAM /START
+# TELEGRAM START
 # ============================================================
 
 async def start(
@@ -825,7 +919,7 @@ async def start(
 
 
 # ============================================================
-# TELEGRAM /RESET
+# TELEGRAM RESET
 # ============================================================
 
 async def reset(
@@ -846,7 +940,7 @@ async def reset(
 
 
 # ============================================================
-# TELEGRAM /ADMIN
+# ADMIN DASHBOARD
 # ============================================================
 
 async def admin(
@@ -868,7 +962,10 @@ async def admin(
 
         with conn.cursor() as cur:
 
-            # Total users
+            # -----------------------------------------------
+            # TOTAL USERS
+            # -----------------------------------------------
+
             cur.execute("""
                 SELECT COUNT(DISTINCT telegram_id)
                 FROM users
@@ -877,7 +974,10 @@ async def admin(
 
             total_users = cur.fetchone()[0]
 
-            # New today
+            # -----------------------------------------------
+            # NEW USERS TODAY
+            # -----------------------------------------------
+
             cur.execute("""
                 SELECT COUNT(*)
                 FROM users
@@ -886,7 +986,10 @@ async def admin(
 
             new_today = cur.fetchone()[0]
 
-            # New this week
+            # -----------------------------------------------
+            # NEW USERS THIS WEEK
+            # -----------------------------------------------
+
             cur.execute("""
                 SELECT COUNT(*)
                 FROM users
@@ -896,17 +999,24 @@ async def admin(
 
             new_week = cur.fetchone()[0]
 
-            # Active today
+            # -----------------------------------------------
+            # ACTIVE USERS TODAY
+            # -----------------------------------------------
+
             cur.execute("""
-                SELECT COUNT(DISTINCT telegram_id)
+                SELECT COUNT(DISTINCT user_id)
                 FROM usage_events
                 WHERE created_at >= CURRENT_DATE
                 AND event_type IN ('text', 'voice')
+                AND user_id IS NOT NULL
             """)
 
             active_today = cur.fetchone()[0]
 
-            # Total messages
+            # -----------------------------------------------
+            # TOTAL MESSAGES
+            # -----------------------------------------------
+
             cur.execute("""
                 SELECT COUNT(*)
                 FROM messages
@@ -914,7 +1024,10 @@ async def admin(
 
             total_messages = cur.fetchone()[0]
 
-            # Messages today
+            # -----------------------------------------------
+            # MESSAGES TODAY
+            # -----------------------------------------------
+
             cur.execute("""
                 SELECT COUNT(*)
                 FROM messages
@@ -924,7 +1037,10 @@ async def admin(
 
             messages_today = cur.fetchone()[0]
 
-            # Text requests
+            # -----------------------------------------------
+            # TEXT REQUESTS
+            # -----------------------------------------------
+
             cur.execute("""
                 SELECT COUNT(*)
                 FROM usage_events
@@ -933,7 +1049,10 @@ async def admin(
 
             text_requests = cur.fetchone()[0]
 
-            # Voice requests
+            # -----------------------------------------------
+            # VOICE REQUESTS
+            # -----------------------------------------------
+
             cur.execute("""
                 SELECT COUNT(*)
                 FROM usage_events
@@ -942,7 +1061,10 @@ async def admin(
 
             voice_requests = cur.fetchone()[0]
 
-            # Total events
+            # -----------------------------------------------
+            # TOTAL EVENTS
+            # -----------------------------------------------
+
             cur.execute("""
                 SELECT COUNT(*)
                 FROM usage_events
@@ -1204,7 +1326,7 @@ telegram_application.add_handler(
 
 
 # ============================================================
-# ASYNCIO LOOP
+# TELEGRAM ASYNC LOOP
 # ============================================================
 
 telegram_loop = asyncio.new_event_loop()
@@ -1305,7 +1427,7 @@ def telegram_webhook():
 
 
 # ============================================================
-# MINI APP AUTH
+# MINI APP AUTHENTICATION
 # ============================================================
 
 def validate_telegram_init_data(
@@ -1339,7 +1461,6 @@ def validate_telegram_init_data(
         if not auth_date:
             return None
 
-        # Init data expires after 24 hours.
         if (
             time.time()
             - int(auth_date)
@@ -1683,7 +1804,7 @@ def api_reset():
 
 
 # ============================================================
-# HEALTH
+# HEALTH CHECK
 # ============================================================
 
 @flask_app.get("/health")
@@ -1701,8 +1822,6 @@ def health():
 
 if __name__ == "__main__":
 
-    # Make absolutely sure the database is ready
-    # before Flask starts accepting requests.
     init_database()
 
     logger.info(
@@ -1710,7 +1829,7 @@ if __name__ == "__main__":
     )
 
     logger.info(
-        "Mini App: %s",
+        "Mini App URL: %s",
         RENDER_EXTERNAL_URL,
     )
 
