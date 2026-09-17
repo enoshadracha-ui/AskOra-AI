@@ -347,11 +347,13 @@ def record_usage(user_id, event_type):
             """
             INSERT INTO usage_events (
                 user_id,
-                event_type
+                event_type,
+                created_at
             )
             VALUES (
                 %s,
-                %s
+                %s,
+                NOW()
             )
             """,
             (
@@ -361,6 +363,10 @@ def record_usage(user_id, event_type):
         )
 
         connection.commit()
+
+    except Exception:
+        connection.rollback()
+        raise
 
     finally:
         connection.close()
