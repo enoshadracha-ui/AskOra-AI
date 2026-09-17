@@ -56,6 +56,7 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
+
 # =========================
 # AI INSTRUCTION
 # =========================
@@ -72,6 +73,7 @@ Do not unnecessarily repeat the user's question.
 Use simple formatting when helpful.
 """
 
+
 # =========================
 # DATABASE
 # =========================
@@ -87,7 +89,7 @@ def init_database():
         cursor = connection.cursor()
 
         # =========================
-        # USERS
+        # USERS TABLE
         # =========================
 
         cursor.execute(
@@ -98,7 +100,7 @@ def init_database():
             """
         )
 
-        # Upgrade old users table
+        # Current AskOra columns
         cursor.execute(
             """
             ALTER TABLE users
@@ -133,6 +135,70 @@ def init_database():
             ALTER TABLE users
             ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ
             DEFAULT NOW()
+            """
+        )
+
+        # =========================
+        # OLD DATABASE COMPATIBILITY
+        # =========================
+
+        # Your existing Render database has a required
+        # first_seen column. Keep it and make sure it
+        # has a safe default.
+        cursor.execute(
+            """
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS first_seen TIMESTAMPTZ
+            DEFAULT NOW()
+            """
+        )
+
+        # If any old records somehow have NULL first_seen,
+        # repair them before enforcing the default.
+        cursor.execute(
+            """
+            UPDATE users
+            SET first_seen = COALESCE(first_seen, NOW())
+            WHERE first_seen IS NULL
+            """
+        )
+
+        cursor.execute(
+            """
+            ALTER TABLE users
+            ALTER COLUMN first_seen SET DEFAULT NOW()
+            """
+        )
+
+        # Make sure created_at and last_seen also have
+        # usable defaults on older databases.
+        cursor.execute(
+            """
+            UPDATE users
+            SET created_at = COALESCE(created_at, NOW())
+            WHERE created_at IS NULL
+            """
+        )
+
+        cursor.execute(
+            """
+            UPDATE users
+            SET last_seen = COALESCE(last_seen, NOW())
+            WHERE last_seen IS NULL
+            """
+        )
+
+        cursor.execute(
+            """
+            ALTER TABLE users
+            ALTER COLUMN created_at SET DEFAULT NOW()
+            """
+        )
+
+        cursor.execute(
+            """
+            ALTER TABLE users
+            ALTER COLUMN last_seen SET DEFAULT NOW()
             """
         )
 
@@ -196,9 +262,20 @@ def init_database():
             "Database initialized and upgraded successfully."
         )
 
+    except Exception:
+        connection.rollback()
+        logger.exception(
+            "Database initialization failed."
+        )
+        raise
+
     finally:
         connection.close()
 
+
+# =========================
+# RECORD USER
+# =========================
 
 def record_user(
     user_id,
@@ -218,6 +295,7 @@ def record_user(
                 username,
                 first_name,
                 last_name,
+                first_seen,
                 created_at,
                 last_seen
             )
@@ -226,6 +304,7 @@ def record_user(
                 %s,
                 %s,
                 %s,
+                NOW(),
                 NOW(),
                 NOW()
             )
@@ -246,9 +325,17 @@ def record_user(
 
         connection.commit()
 
+    except Exception:
+        connection.rollback()
+        raise
+
     finally:
         connection.close()
 
+
+# =========================
+# USAGE
+# =========================
 
 def record_usage(user_id, event_type):
     connection = get_connection()
@@ -262,7 +349,10 @@ def record_usage(user_id, event_type):
                 user_id,
                 event_type
             )
-            VALUES (%s, %s)
+            VALUES (
+                %s,
+                %s
+            )
             """,
             (
                 user_id,
@@ -275,6 +365,10 @@ def record_usage(user_id, event_type):
     finally:
         connection.close()
 
+
+# =========================
+# CONVERSATION
+# =========================
 
 def save_message(user_id, role, content):
     connection = get_connection()
@@ -366,6 +460,10 @@ def clear_history(user_id):
         connection.close()
 
 
+# =========================
+# STATISTICS
+# =========================
+
 def get_statistics():
     connection = get_connection()
 
@@ -373,17 +471,26 @@ def get_statistics():
         cursor = connection.cursor()
 
         cursor.execute(
-            "SELECT COUNT(*) FROM users"
+            """
+            SELECT COUNT(*)
+            FROM users
+            """
         )
         total_users = cursor.fetchone()[0]
 
         cursor.execute(
-            "SELECT COUNT(*) FROM conversations"
+            """
+            SELECT COUNT(*)
+            FROM conversations
+            """
         )
         total_messages = cursor.fetchone()[0]
 
         cursor.execute(
-            "SELECT COUNT(*) FROM usage_events"
+            """
+            SELECT COUNT(*)
+            FROM usage_events
+            """
         )
         total_events = cursor.fetchone()[0]
 
@@ -457,7 +564,6 @@ async def send_long_message(
     ]
 
     for index, chunk in enumerate(chunks):
-
         if index == len(chunks) - 1:
             await bot.send_message(
                 chat_id=chat_id,
@@ -550,9 +656,7 @@ def validate_init_data(init_data):
         ):
             return None
 
-        auth_date = parsed.get(
-            "auth_date"
-        )
+        auth_date = parsed.get("auth_date")
 
         if auth_date:
             if (
@@ -594,7 +698,7 @@ def get_mini_app_user_id():
 
 
 # =========================
-# TELEGRAM COMMANDS
+# TELEGRAM START
 # =========================
 
 async def start(
@@ -617,6 +721,10 @@ async def start(
     )
 
 
+# =========================
+# RESET
+# =========================
+
 async def reset(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
@@ -629,6 +737,10 @@ async def reset(
         "🧹 Your AskOra conversation has been cleared."
     )
 
+
+# =========================
+# ADMIN
+# =========================
 
 async def admin(
     update: Update,
@@ -838,7 +950,7 @@ async def handle_text(
 
 
 # =========================
-# FLASK — MINI APP
+# MINI APP HOME
 # =========================
 
 @app.route("/")
@@ -847,6 +959,10 @@ def home():
         "index.html"
     )
 
+
+# =========================
+# HEALTH
+# =========================
 
 @app.route("/health")
 def health():
@@ -858,6 +974,10 @@ def health():
         }
     )
 
+
+# =========================
+# MINI APP HISTORY
+# =========================
 
 @app.route(
     "/api/history",
@@ -884,6 +1004,10 @@ def api_history():
         }
     )
 
+
+# =========================
+# MINI APP CHAT
+# =========================
 
 @app.route(
     "/api/chat",
@@ -918,6 +1042,8 @@ def api_chat():
         ), 400
 
     try:
+        # This now works with the old database schema
+        # because record_user() supplies first_seen.
         record_user(user_id)
 
         save_message(
@@ -940,7 +1066,7 @@ def api_chat():
 
         messages.extend(history)
 
-        answer = generate_answer(
+        answer = await_generate_answer_sync(
             messages
         )
 
@@ -973,6 +1099,14 @@ def api_chat():
             }
         ), 500
 
+
+def await_generate_answer_sync(messages):
+    return generate_answer(messages)
+
+
+# =========================
+# MINI APP VOICE
+# =========================
 
 @app.route(
     "/api/voice",
@@ -1070,6 +1204,10 @@ def api_voice():
             }
         ), 500
 
+
+# =========================
+# MINI APP CLEAR
+# =========================
 
 @app.route(
     "/api/reset",
