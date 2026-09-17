@@ -2,9 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+
     <meta
         name="viewport"
-        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+        content="width=device-width,
+                 initial-scale=1.0,
+                 maximum-scale=1.0,
+                 user-scalable=no"
     >
 
     <title>AskOra</title>
@@ -24,82 +28,73 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
+            font-family:
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                Roboto,
+                Arial,
+                sans-serif;
+            background: #080B18;
+            color: #F5F7FF;
         }
 
         body {
-            font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI",
-                Roboto, Arial, sans-serif;
-            color: #f5f7ff;
-            background:
-                radial-gradient(
-                    circle at 15% 15%,
-                    rgba(59, 130, 246, 0.22),
-                    transparent 30%
-                ),
-                radial-gradient(
-                    circle at 85% 80%,
-                    rgba(124, 58, 237, 0.20),
-                    transparent 32%
-                ),
-                linear-gradient(
-                    135deg,
-                    #060914 0%,
-                    #0b1020 45%,
-                    #10152b 70%,
-                    #070a15 100%
-                );
+            position: relative;
         }
 
         /* =========================
-           BACKGROUND EFFECT
+           BACKGROUND
         ========================= */
 
-        .background-glow {
+        .background {
             position: fixed;
             inset: 0;
-            pointer-events: none;
             overflow: hidden;
-            z-index: 0;
+            pointer-events: none;
+            background:
+                radial-gradient(
+                    circle at 20% 10%,
+                    rgba(59, 130, 246, 0.18),
+                    transparent 32%
+                ),
+                radial-gradient(
+                    circle at 85% 25%,
+                    rgba(124, 58, 237, 0.18),
+                    transparent 30%
+                ),
+                #080B18;
         }
 
         .orb {
             position: absolute;
-            width: 220px;
-            height: 220px;
             border-radius: 50%;
             filter: blur(70px);
-            opacity: 0.15;
-            animation: floatOrb 12s ease-in-out infinite alternate;
+            opacity: 0.28;
         }
 
         .orb.one {
-            top: -80px;
-            left: -70px;
-            background: #3b82f6;
+            width: 180px;
+            height: 180px;
+            background: #3B82F6;
+            top: -70px;
+            left: -50px;
         }
 
         .orb.two {
-            right: -90px;
-            bottom: 10%;
-            background: #7c3aed;
-            animation-delay: 2s;
+            width: 220px;
+            height: 220px;
+            background: #7C3AED;
+            right: -80px;
+            top: 180px;
         }
 
         .orb.three {
-            left: 40%;
-            bottom: -120px;
-            background: #2563eb;
-            animation-delay: 4s;
-        }
-
-        @keyframes floatOrb {
-            from {
-                transform: translate3d(0, 0, 0) scale(1);
-            }
-
-            to {
-                transform: translate3d(20px, -20px, 0) scale(1.12);
-            }
+            width: 180px;
+            height: 180px;
+            background: #2563EB;
+            bottom: -80px;
+            left: 20%;
         }
 
         /* =========================
@@ -108,13 +103,13 @@
 
         .app {
             position: relative;
-            z-index: 1;
+            z-index: 2;
+
+            width: 100%;
+            height: 100%;
+
             display: flex;
             flex-direction: column;
-            width: 100%;
-            height: 100dvh;
-            max-width: 900px;
-            margin: 0 auto;
         }
 
         /* =========================
@@ -123,14 +118,24 @@
 
         .header {
             flex-shrink: 0;
+
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 14px 16px 12px;
-            background: rgba(8, 11, 24, 0.72);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+
+            padding:
+                calc(12px + env(safe-area-inset-top))
+                16px
+                12px;
+
+            border-bottom:
+                1px solid
+                rgba(255, 255, 255, 0.07);
+
+            background:
+                rgba(8, 11, 24, 0.78);
+
             backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
         }
 
         .brand {
@@ -140,176 +145,205 @@
         }
 
         .logo {
-            width: 42px;
-            height: 42px;
+            width: 43px;
+            height: 43px;
+            border-radius: 13px;
+
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 14px;
-            font-size: 21px;
-            font-weight: 800;
-            color: white;
+
+            font-size: 24px;
+            font-weight: 900;
+
             background:
                 linear-gradient(
-                    135deg,
+                    145deg,
                     rgba(59, 130, 246, 0.95),
                     rgba(124, 58, 237, 0.95)
                 );
-            box-shadow:
-                0 0 22px rgba(59, 130, 246, 0.25),
-                inset 0 1px 1px rgba(255, 255, 255, 0.25);
-        }
 
-        .brand-text {
-            display: flex;
-            flex-direction: column;
-            gap: 1px;
+            box-shadow:
+                0 8px 30px
+                rgba(59, 130, 246, 0.25);
         }
 
         .brand-name {
-            font-size: 17px;
-            font-weight: 750;
-            letter-spacing: -0.2px;
+            font-size: 18px;
+            font-weight: 800;
         }
 
-        .brand-status {
+        .brand-tagline {
+            margin-top: 2px;
+            color: #9CA3AF;
+            font-size: 11px;
+        }
+
+        .status {
             display: flex;
             align-items: center;
-            gap: 5px;
-            color: #9ca3af;
+            gap: 6px;
+
+            color: #9CA3AF;
             font-size: 11px;
         }
 
         .status-dot {
-            width: 6px;
-            height: 6px;
+            width: 7px;
+            height: 7px;
             border-radius: 50%;
-            background: #22c55e;
-            box-shadow: 0 0 8px rgba(34, 197, 94, 0.8);
-        }
+            background: #22C55E;
 
-        .header-actions {
-            display: flex;
-            align-items: center;
-            gap: 7px;
-        }
-
-        .header-button {
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            color: #dce3ff;
-            background: rgba(255, 255, 255, 0.055);
-            padding: 9px 11px;
-            border-radius: 11px;
-            font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: 0.2s ease;
-        }
-
-        .header-button:active {
-            transform: scale(0.95);
-            background: rgba(255, 255, 255, 0.10);
+            box-shadow:
+                0 0 10px
+                rgba(34, 197, 94, 0.7);
         }
 
         /* =========================
-           CHAT AREA
+           BUTTONS
+        ========================= */
+
+        .header-actions {
+            display: flex;
+            gap: 7px;
+        }
+
+        .icon-btn {
+            width: 38px;
+            height: 38px;
+            border: 0;
+            border-radius: 12px;
+
+            color: #F5F7FF;
+            background:
+                rgba(255, 255, 255, 0.07);
+
+            font-size: 17px;
+            cursor: pointer;
+        }
+
+        .icon-btn:active {
+            transform: scale(0.94);
+        }
+
+        /* =========================
+           CHAT
         ========================= */
 
         .chat {
             flex: 1;
             overflow-y: auto;
-            padding: 24px 15px 125px;
+
+            padding:
+                20px
+                15px
+                18px;
+
             scroll-behavior: smooth;
         }
 
         .chat::-webkit-scrollbar {
-            width: 4px;
+            width: 0;
         }
-
-        .chat::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.12);
-            border-radius: 20px;
-        }
-
-        /* =========================
-           WELCOME
-        ========================= */
 
         .welcome {
-            min-height: 70%;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
+            max-width: 430px;
+            margin: 28px auto 25px;
             text-align: center;
-            padding: 30px 20px;
         }
 
         .welcome-logo {
-            width: 74px;
-            height: 74px;
+            width: 70px;
+            height: 70px;
+            margin: 0 auto 17px;
+
+            border-radius: 22px;
+
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 24px;
-            margin-bottom: 18px;
-            font-size: 34px;
-            font-weight: 800;
+
+            font-size: 39px;
+            font-weight: 900;
+
             background:
                 linear-gradient(
-                    135deg,
-                    #3b82f6,
-                    #7c3aed
+                    145deg,
+                    #3B82F6,
+                    #7C3AED
                 );
+
             box-shadow:
-                0 0 40px rgba(59, 130, 246, 0.25),
-                0 0 80px rgba(124, 58, 237, 0.12);
+                0 18px 50px
+                rgba(59, 130, 246, 0.22);
         }
 
         .welcome h1 {
             margin: 0;
-            font-size: 28px;
-            letter-spacing: -0.8px;
+            font-size: 27px;
+            letter-spacing: -0.7px;
         }
 
         .welcome p {
-            max-width: 300px;
-            margin: 9px 0 0;
-            color: #9ca3af;
+            margin: 9px auto 0;
+            max-width: 320px;
+
+            color: #9CA3AF;
+            line-height: 1.55;
             font-size: 14px;
-            line-height: 1.6;
         }
 
-        .welcome-badge {
-            margin-top: 18px;
-            padding: 7px 11px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 999px;
-            color: #b8c2e8;
-            background: rgba(255, 255, 255, 0.045);
-            font-size: 11px;
+        .welcome-card {
+            margin-top: 20px;
+            padding: 15px;
+
+            border:
+                1px solid
+                rgba(255, 255, 255, 0.07);
+
+            border-radius: 17px;
+
+            background:
+                rgba(255, 255, 255, 0.045);
+
+            text-align: left;
+        }
+
+        .welcome-card-title {
+            font-weight: 700;
+            margin-bottom: 10px;
+            font-size: 13px;
+        }
+
+        .suggestions {
+            display: grid;
+            gap: 8px;
+        }
+
+        .suggestion {
+            border: 0;
+            border-radius: 11px;
+            padding: 11px;
+
+            color: #DDE4FF;
+            text-align: left;
+            background:
+                rgba(255, 255, 255, 0.055);
+
+            cursor: pointer;
+        }
+
+        .suggestion:active {
+            transform: scale(0.98);
         }
 
         /* =========================
-           MESSAGE
+           MESSAGES
         ========================= */
 
         .message-row {
             display: flex;
-            margin: 10px 0;
-            animation: messageIn 0.25s ease;
-        }
-
-        @keyframes messageIn {
-            from {
-                opacity: 0;
-                transform: translateY(8px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            margin: 9px 0;
         }
 
         .message-row.user {
@@ -320,277 +354,324 @@
             justify-content: flex-start;
         }
 
-        .bubble {
-            max-width: min(86%, 680px);
-            padding: 11px 14px;
-            border-radius: 17px;
-            font-size: 14px;
+        .message {
+            max-width: 87%;
+
+            padding:
+                11px 13px;
+
+            border-radius: 16px;
+
             line-height: 1.55;
-            word-wrap: break-word;
+            font-size: 14px;
+
             overflow-wrap: anywhere;
         }
 
-        .message-row.user .bubble {
-            color: #ffffff;
+        .message.user {
             background:
                 linear-gradient(
                     135deg,
-                    rgba(59, 130, 246, 0.95),
-                    rgba(79, 70, 229, 0.95)
+                    #2563EB,
+                    #4F46E5
                 );
+
             border-bottom-right-radius: 5px;
-            box-shadow: 0 7px 22px rgba(37, 99, 235, 0.16);
         }
 
-        .message-row.assistant .bubble {
-            color: #e8ecff;
-            background: rgba(255, 255, 255, 0.065);
-            border: 1px solid rgba(255, 255, 255, 0.07);
+        .message.assistant {
+            background:
+                rgba(255, 255, 255, 0.065);
+
+            border:
+                1px solid
+                rgba(255, 255, 255, 0.065);
+
             border-bottom-left-radius: 5px;
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
         }
 
-        .bubble p {
-            margin: 0 0 7px;
+        .message p {
+            margin: 0 0 8px;
         }
 
-        .bubble p:last-child {
+        .message p:last-child {
             margin-bottom: 0;
         }
 
-        .bubble strong {
-            color: #ffffff;
-            font-weight: 700;
+        .message ul,
+        .message ol {
+            margin:
+                7px 0
+                7px 20px;
+
+            padding: 0;
         }
 
-        .bubble h1,
-        .bubble h2,
-        .bubble h3 {
-            margin: 8px 0 5px;
-            color: #ffffff;
-            font-size: 15px;
+        .message li {
+            margin: 4px 0;
         }
 
-        .bubble ul,
-        .bubble ol {
-            margin: 6px 0;
-            padding-left: 20px;
+        .message strong {
+            color: #FFFFFF;
         }
 
-        .bubble li {
-            margin: 3px 0;
-        }
-
-        .bubble code {
+        .message code {
             padding: 2px 5px;
             border-radius: 5px;
-            background: rgba(0, 0, 0, 0.25);
-            font-size: 12px;
+            background:
+                rgba(0, 0, 0, 0.28);
+            font-family: monospace;
+        }
+
+        .message pre {
+            overflow-x: auto;
+            padding: 11px;
+            border-radius: 10px;
+            background: #070A13;
         }
 
         /* =========================
-           PROCESSING
+           THINKING
         ========================= */
 
-        .typing {
+        .thinking {
             display: none;
             align-items: center;
-            gap: 6px;
+            gap: 9px;
+
             width: fit-content;
+
             margin: 10px 0;
-            padding: 12px 15px;
-            border: 1px solid rgba(255, 255, 255, 0.07);
-            border-radius: 17px;
-            border-bottom-left-radius: 5px;
-            background: rgba(255, 255, 255, 0.055);
-        }
 
-        .typing.active {
-            display: flex;
-        }
+            padding: 10px 13px;
 
-        .typing-label {
-            margin-right: 3px;
-            color: #9ca3af;
+            border-radius: 14px;
+
+            background:
+                rgba(255, 255, 255, 0.055);
+
+            color: #9CA3AF;
             font-size: 12px;
         }
 
-        .dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: #aab5dc;
-            animation: typingDot 1.2s infinite ease-in-out;
+        .thinking.show {
+            display: flex;
         }
 
-        .dot:nth-child(2) {
+        .dots {
+            display: flex;
+            gap: 3px;
+        }
+
+        .dots span {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: #9CA3AF;
+
+            animation:
+                bounce 1.2s infinite;
+        }
+
+        .dots span:nth-child(2) {
             animation-delay: 0.15s;
         }
 
-        .dot:nth-child(3) {
+        .dots span:nth-child(3) {
             animation-delay: 0.3s;
         }
 
-        @keyframes typingDot {
+        @keyframes bounce {
             0%,
             60%,
             100% {
-                opacity: 0.3;
                 transform: translateY(0);
             }
 
             30% {
-                opacity: 1;
-                transform: translateY(-3px);
+                transform: translateY(-4px);
             }
         }
 
         /* =========================
-           INPUT AREA
+           COMPOSER
         ========================= */
 
-        .input-area {
-            position: absolute;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+        .composer-area {
+            flex-shrink: 0;
+
+            padding:
+                9px 12px
+                calc(9px + env(safe-area-inset-bottom));
+
             background:
                 linear-gradient(
                     to top,
-                    rgba(6, 9, 20, 0.98),
-                    rgba(6, 9, 20, 0.82),
-                    transparent
+                    rgba(8, 11, 24, 0.98),
+                    rgba(8, 11, 24, 0.82)
                 );
-            pointer-events: none;
+
+            border-top:
+                1px solid
+                rgba(255, 255, 255, 0.06);
         }
 
-        .input-wrapper {
-            pointer-events: auto;
+        .composer {
             display: flex;
             align-items: flex-end;
             gap: 7px;
-            padding: 7px;
-            border: 1px solid rgba(255, 255, 255, 0.09);
-            border-radius: 19px;
-            background: rgba(16, 21, 43, 0.88);
-            box-shadow:
-                0 10px 35px rgba(0, 0, 0, 0.35),
-                inset 0 1px rgba(255, 255, 255, 0.03);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
+
+            max-width: 800px;
+            margin: auto;
         }
 
-        #messageInput {
+        .input-wrap {
             flex: 1;
-            min-width: 0;
-            max-height: 110px;
-            padding: 10px 10px;
-            border: 0;
-            outline: 0;
+
+            display: flex;
+            align-items: flex-end;
+
+            min-height: 48px;
+
+            padding:
+                5px 6px 5px 13px;
+
+            border:
+                1px solid
+                rgba(255, 255, 255, 0.08);
+
+            border-radius: 17px;
+
+            background:
+                rgba(255, 255, 255, 0.055);
+        }
+
+        textarea {
+            flex: 1;
+
+            width: 100%;
+            max-height: 120px;
+
             resize: none;
-            color: #f5f7ff;
+            border: 0;
+            outline: none;
+
+            padding:
+                8px 4px;
+
             background: transparent;
+            color: #F5F7FF;
+
             font-family: inherit;
             font-size: 14px;
-            line-height: 1.45;
+            line-height: 1.4;
         }
 
-        #messageInput::placeholder {
-            color: #737b99;
+        textarea::placeholder {
+            color: #71788D;
         }
 
-        .icon-button {
+        .send-btn,
+        .mic-btn {
+            width: 39px;
+            height: 39px;
+
             flex-shrink: 0;
-            width: 40px;
-            height: 40px;
+
+            border: 0;
+            border-radius: 12px;
+
+            cursor: pointer;
+
             display: flex;
             align-items: center;
             justify-content: center;
-            border: 0;
-            border-radius: 13px;
-            color: #dce4ff;
-            background: rgba(255, 255, 255, 0.065);
-            font-size: 18px;
-            cursor: pointer;
-            transition: 0.2s ease;
+
+            font-size: 17px;
         }
 
-        .icon-button:active {
-            transform: scale(0.91);
-        }
+        .send-btn {
+            color: white;
 
-        .send-button {
             background:
                 linear-gradient(
                     135deg,
-                    #3b82f6,
-                    #7c3aed
+                    #3B82F6,
+                    #7C3AED
                 );
-            box-shadow:
-                0 5px 18px rgba(59, 130, 246, 0.22);
         }
 
-        .send-button:disabled {
-            opacity: 0.45;
-            box-shadow: none;
+        .mic-btn {
+            color: #D8DEEF;
+            background:
+                rgba(255, 255, 255, 0.06);
         }
 
-        .mic-button.recording {
-            background: rgba(239, 68, 68, 0.20);
-            color: #fca5a5;
-            animation: recordPulse 1.2s infinite;
+        .send-btn:active,
+        .mic-btn:active {
+            transform: scale(0.93);
         }
 
-        @keyframes recordPulse {
-            0% {
-                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.25);
-            }
+        .mic-btn.recording {
+            background:
+                rgba(239, 68, 68, 0.2);
 
-            70% {
-                box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
-            }
-
-            100% {
-                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
-            }
+            color: #F87171;
         }
 
-        .footer-note {
+        .footer {
             text-align: center;
-            margin-top: 6px;
-            color: #59617d;
+            color: #555D73;
             font-size: 9px;
+            margin-top: 5px;
         }
 
         /* =========================
-           MOBILE
+           INVITE POPUP
         ========================= */
 
-        @media (max-width: 480px) {
-            .header {
-                padding-left: 13px;
-                padding-right: 13px;
-            }
+        .toast {
+            position: fixed;
+            z-index: 20;
 
-            .header-button {
-                padding: 8px 9px;
-                font-size: 11px;
-            }
+            left: 50%;
+            bottom: 95px;
 
+            transform:
+                translate(-50%, 20px);
+
+            opacity: 0;
+            pointer-events: none;
+
+            padding: 10px 15px;
+
+            border-radius: 12px;
+
+            background:
+                rgba(25, 30, 50, 0.95);
+
+            border:
+                1px solid
+                rgba(255, 255, 255, 0.08);
+
+            color: #F5F7FF;
+            font-size: 12px;
+
+            transition:
+                opacity 0.2s,
+                transform 0.2s;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform:
+                translate(-50%, 0);
+        }
+
+        @media (min-width: 700px) {
             .chat {
-                padding-left: 11px;
-                padding-right: 11px;
-            }
-
-            .bubble {
-                max-width: 89%;
-                font-size: 14px;
-            }
-
-            .welcome h1 {
-                font-size: 26px;
+                padding-left: 25%;
+                padding-right: 25%;
             }
         }
     </style>
@@ -598,323 +679,442 @@
 
 <body>
 
-    <!-- Background -->
-    <div class="background-glow">
-        <div class="orb one"></div>
-        <div class="orb two"></div>
-        <div class="orb three"></div>
-    </div>
+<div class="background">
+    <div class="orb one"></div>
+    <div class="orb two"></div>
+    <div class="orb three"></div>
+</div>
 
-    <div class="app">
+<div class="app">
 
-        <!-- Header -->
-        <header class="header">
+    <!-- HEADER -->
+    <header class="header">
 
-            <div class="brand">
-                <div class="logo">A</div>
+        <div class="brand">
 
-                <div class="brand-text">
-                    <div class="brand-name">AskOra</div>
+            <div class="logo">
+                A
+            </div>
 
-                    <div class="brand-status">
-                        <span class="status-dot"></span>
-                        AI assistant
-                    </div>
+            <div>
+                <div class="brand-name">
+                    AskOra
+                </div>
+
+                <div class="brand-tagline">
+                    Ask. Get answers.
                 </div>
             </div>
 
-            <div class="header-actions">
+        </div>
 
-                <button
-                    class="header-button"
-                    id="inviteButton"
-                    type="button"
-                >
-                    ✨ Invite
-                </button>
+        <div class="header-actions">
 
-                <button
-                    class="header-button"
-                    id="clearButton"
-                    type="button"
-                >
-                    Clear
-                </button>
+            <button
+                class="icon-btn"
+                id="inviteBtn"
+                title="Invite"
+            >
+                ✨
+            </button>
 
-            </div>
+            <button
+                class="icon-btn"
+                id="clearBtn"
+                title="Clear"
+            >
+                ↻
+            </button>
 
-        </header>
+        </div>
 
-        <!-- Chat -->
-        <main
-            class="chat"
-            id="chat"
+    </header>
+
+
+    <!-- CHAT -->
+    <main
+        class="chat"
+        id="chat"
+    >
+
+        <section
+            class="welcome"
+            id="welcome"
         >
 
-            <!-- Welcome -->
-            <section
-                class="welcome"
-                id="welcome"
-            >
-
-                <div class="welcome-logo">
-                    A
-                </div>
-
-                <h1>Welcome to AskOra</h1>
-
-                <p>
-                    Your simple AI assistant.
-                    Ask anything by text or voice.
-                </p>
-
-                <div class="welcome-badge">
-                    ⚡ Ask. Get answers.
-                </div>
-
-            </section>
-
-            <!-- Processing -->
-            <div
-                class="typing"
-                id="typing"
-            >
-                <span class="typing-label">AskOra is thinking</span>
-                <span class="dot"></span>
-                <span class="dot"></span>
-                <span class="dot"></span>
+            <div class="welcome-logo">
+                A
             </div>
 
-        </main>
+            <h1>
+                Welcome to AskOra
+            </h1>
 
-        <!-- Input -->
-        <div class="input-area">
+            <p>
+                Your simple AI assistant on Telegram.
+                Ask anything and get a clear answer.
+            </p>
 
-            <div class="input-wrapper">
+            <div class="welcome-card">
+
+                <div class="welcome-card-title">
+                    Try asking
+                </div>
+
+                <div class="suggestions">
+
+                    <button
+                        class="suggestion"
+                        data-question="Explain artificial intelligence in simple terms."
+                    >
+                        🤖 Explain AI simply
+                    </button>
+
+                    <button
+                        class="suggestion"
+                        data-question="Help me understand something I'm learning."
+                    >
+                        📚 Help me learn
+                    </button>
+
+                    <button
+                        class="suggestion"
+                        data-question="Give me an interesting fact."
+                    >
+                        💡 Give me an interesting fact
+                    </button>
+
+                </div>
+
+            </div>
+
+        </section>
+
+        <div id="messages"></div>
+
+        <div
+            class="thinking"
+            id="thinking"
+        >
+
+            <div class="dots">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+
+            AskOra is thinking
+
+        </div>
+
+    </main>
+
+
+    <!-- COMPOSER -->
+    <section class="composer-area">
+
+        <div class="composer">
+
+            <div class="input-wrap">
 
                 <textarea
                     id="messageInput"
                     rows="1"
                     placeholder="Ask AskOra anything..."
-                    autocomplete="off"
                 ></textarea>
 
                 <button
-                    class="icon-button mic-button"
-                    id="micButton"
-                    type="button"
-                    aria-label="Voice message"
+                    class="mic-btn"
+                    id="micBtn"
+                    title="Voice"
                 >
                     🎤
                 </button>
 
-                <button
-                    class="icon-button send-button"
-                    id="sendButton"
-                    type="button"
-                    aria-label="Send message"
-                >
-                    ➤
-                </button>
-
             </div>
 
-            <div class="footer-note">
-                AskOra • Advanced AI, made simple.
-            </div>
+            <button
+                class="send-btn"
+                id="sendBtn"
+                title="Send"
+            >
+                ➤
+            </button>
 
         </div>
 
-    </div>
+        <div class="footer">
+            AskOra • Advanced AI, made simple.
+        </div>
 
-    <script>
-        const tg = window.Telegram.WebApp;
+    </section>
 
-        tg.ready();
-        tg.expand();
+</div>
 
-        const chat = document.getElementById("chat");
-        const welcome = document.getElementById("welcome");
-        const typing = document.getElementById("typing");
 
-        const input = document.getElementById("messageInput");
-        const sendButton = document.getElementById("sendButton");
-        const micButton = document.getElementById("micButton");
-        const clearButton = document.getElementById("clearButton");
-        const inviteButton = document.getElementById("inviteButton");
+<div
+    class="toast"
+    id="toast"
+>
+    Copied!
+</div>
 
-        let mediaRecorder = null;
-        let audioChunks = [];
-        let isRecording = false;
 
-        /* =========================
-           MARKDOWN RENDERER
-        ========================= */
+<script>
+    // ========================================================
+    // TELEGRAM
+    // ========================================================
 
-        function escapeHtml(text) {
-            return text
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;");
+    const tg = window.Telegram.WebApp;
+
+    tg.ready();
+    tg.expand();
+
+
+    // ========================================================
+    // ELEMENTS
+    // ========================================================
+
+    const chat = document.getElementById("chat");
+    const messages = document.getElementById("messages");
+    const welcome = document.getElementById("welcome");
+    const thinking = document.getElementById("thinking");
+
+    const input = document.getElementById("messageInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const micBtn = document.getElementById("micBtn");
+
+    const inviteBtn = document.getElementById("inviteBtn");
+    const clearBtn = document.getElementById("clearBtn");
+
+    const toast = document.getElementById("toast");
+
+
+    // ========================================================
+    // HELPERS
+    // ========================================================
+
+    function escapeHtml(text) {
+
+        return text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+    }
+
+
+    function markdown(text) {
+
+        let html = escapeHtml(text);
+
+        // Code blocks
+        html = html.replace(
+            /```([\s\S]*?)```/g,
+            "<pre><code>$1</code></pre>"
+        );
+
+        // Inline code
+        html = html.replace(
+            /`([^`]+)`/g,
+            "<code>$1</code>"
+        );
+
+        // Bold
+        html = html.replace(
+            /\*\*(.*?)\*\*/g,
+            "<strong>$1</strong>"
+        );
+
+        // Italic
+        html = html.replace(
+            /(^|[^*])\*([^*]+)\*/g,
+            "$1<em>$2</em>"
+        );
+
+        // Headings
+        html = html.replace(
+            /^### (.*)$/gm,
+            "<strong>$1</strong>"
+        );
+
+        html = html.replace(
+            /^## (.*)$/gm,
+            "<strong>$1</strong>"
+        );
+
+        html = html.replace(
+            /^# (.*)$/gm,
+            "<strong>$1</strong>"
+        );
+
+        // Unordered lists
+        html = html.replace(
+            /(?:^|\n)[-*] (.*)(?=\n|$)/g,
+            "\n<li>$1</li>"
+        );
+
+        html = html.replace(
+            /(<li>.*<\/li>)/gs,
+            "<ul>$1</ul>"
+        );
+
+        // Paragraphs
+        html = html
+            .split(/\n\n+/)
+            .map(block => {
+
+                if (
+                    block.startsWith("<pre>") ||
+                    block.startsWith("<ul>")
+                ) {
+                    return block;
+                }
+
+                return "<p>" +
+                    block.replace(/\n/g, "<br>") +
+                    "</p>";
+            })
+            .join("");
+
+        return html;
+    }
+
+
+    function scrollBottom() {
+
+        setTimeout(() => {
+
+            chat.scrollTo({
+                top: chat.scrollHeight,
+                behavior: "smooth"
+            });
+
+        }, 50);
+    }
+
+
+    function showToast(text) {
+
+        toast.textContent = text;
+
+        toast.classList.add("show");
+
+        setTimeout(() => {
+            toast.classList.remove("show");
+        }, 1800);
+    }
+
+
+    function setThinking(value) {
+
+        if (value) {
+            thinking.classList.add("show");
+        } else {
+            thinking.classList.remove("show");
         }
 
-        function renderMarkdown(text) {
-            let html = escapeHtml(text);
+        scrollBottom();
+    }
 
-            html = html.replace(
-                /^### (.*)$/gm,
-                "<h3>$1</h3>"
-            );
 
-            html = html.replace(
-                /^## (.*)$/gm,
-                "<h2>$1</h2>"
-            );
+    function addMessage(
+        role,
+        text
+    ) {
 
-            html = html.replace(
-                /^# (.*)$/gm,
-                "<h1>$1</h1>"
-            );
+        welcome.style.display = "none";
 
-            html = html.replace(
-                /\*\*(.*?)\*\*/g,
-                "<strong>$1</strong>"
-            );
+        const row =
+            document.createElement("div");
 
-            html = html.replace(
-                /`([^`]+)`/g,
-                "<code>$1</code>"
-            );
+        row.className =
+            "message-row " + role;
 
-            html = html.replace(
-                /^\- (.*)$/gm,
-                "<li>$1</li>"
-            );
+        const bubble =
+            document.createElement("div");
 
-            html = html.replace(
-                /(<li>.*<\/li>)/gs,
-                "<ul>$1</ul>"
-            );
+        bubble.className =
+            "message " + role;
 
-            html = html
-                .split(/\n\n+/)
-                .map(block => {
-                    if (
-                        block.startsWith("<h1>") ||
-                        block.startsWith("<h2>") ||
-                        block.startsWith("<h3>") ||
-                        block.startsWith("<ul>")
-                    ) {
-                        return block;
-                    }
-
-                    return `<p>${block.replace(/\n/g, "<br>")}</p>`;
-                })
-                .join("");
-
-            return html;
+        if (role === "assistant") {
+            bubble.innerHTML =
+                markdown(text);
+        } else {
+            bubble.textContent = text;
         }
 
-        /* =========================
-           MESSAGE UI
-        ========================= */
+        row.appendChild(bubble);
 
-        function addMessage(role, text) {
-            welcome.style.display = "none";
+        messages.appendChild(row);
 
-            const row = document.createElement("div");
+        scrollBottom();
+    }
 
-            row.className =
-                "message-row " +
-                (role === "user" ? "user" : "assistant");
 
-            const bubble = document.createElement("div");
+    // ========================================================
+    // API
+    // ========================================================
 
-            bubble.className = "bubble";
+    async function api(
+        url,
+        options = {}
+    ) {
 
-            if (role === "assistant") {
-                bubble.innerHTML = renderMarkdown(text);
-            } else {
-                bubble.textContent = text;
+        const headers = {
+            ...(options.headers || {}),
+            "X-Telegram-Init-Data":
+                tg.initData || ""
+        };
+
+        return fetch(
+            url,
+            {
+                ...options,
+                headers
             }
+        );
+    }
 
-            row.appendChild(bubble);
 
-            chat.insertBefore(row, typing);
+    // ========================================================
+    // SEND MESSAGE
+    // ========================================================
 
-            scrollToBottom();
+    async function sendMessage(
+        customText = null
+    ) {
+
+        const text =
+            customText !== null
+                ? customText.trim()
+                : input.value.trim();
+
+        if (!text) {
+            return;
         }
 
-        function scrollToBottom() {
-            setTimeout(() => {
-                chat.scrollTop = chat.scrollHeight;
-            }, 50);
-        }
+        input.value = "";
+        input.style.height = "auto";
 
-        function showTyping() {
-            typing.classList.add("active");
-            scrollToBottom();
-        }
+        addMessage(
+            "user",
+            text
+        );
 
-        function hideTyping() {
-            typing.classList.remove("active");
-        }
+        setThinking(true);
 
-        /* =========================
-           AUTO RESIZE
-        ========================= */
+        sendBtn.disabled = true;
 
-        input.addEventListener("input", () => {
-            input.style.height = "auto";
-            input.style.height =
-                Math.min(input.scrollHeight, 110) + "px";
-        });
+        try {
 
-        /* =========================
-           API
-        ========================= */
-
-        async function apiRequest(url, options = {}) {
-            options.headers = {
-                ...(options.headers || {}),
-                "X-Telegram-Init-Data": tg.initData || ""
-            };
-
-            const response = await fetch(url, options);
-
-            if (!response.ok) {
-                throw new Error("Request failed");
-            }
-
-            return response.json();
-        }
-
-        /* =========================
-           SEND TEXT
-        ========================= */
-
-        async function sendMessage() {
-            const text = input.value.trim();
-
-            if (!text || sendButton.disabled) {
-                return;
-            }
-
-            input.value = "";
-            input.style.height = "auto";
-
-            addMessage("user", text);
-
-            sendButton.disabled = true;
-            showTyping();
-
-            try {
-                const data = await apiRequest(
+            const response =
+                await api(
                     "/api/chat",
                     {
                         method: "POST",
                         headers: {
-                            "Content-Type": "application/json"
+                            "Content-Type":
+                                "application/json"
                         },
                         body: JSON.stringify({
                             message: text
@@ -922,302 +1122,456 @@
                     }
                 );
 
-                hideTyping();
+            const data =
+                await response.json();
 
-                addMessage(
-                    "assistant",
-                    data.answer || "Sorry, I couldn't generate an answer."
-                );
+            if (!response.ok || !data.ok) {
 
-            } catch (error) {
-                hideTyping();
-
-                addMessage(
-                    "assistant",
-                    "⚠️ Sorry, something went wrong. Please try again."
+                throw new Error(
+                    data.error ||
+                    "Request failed."
                 );
             }
 
-            sendButton.disabled = false;
+            addMessage(
+                "assistant",
+                data.answer
+            );
+
+        } catch (error) {
+
+            console.error(error);
+
+            addMessage(
+                "assistant",
+                "⚠️ Sorry, something went wrong. Please try again."
+            );
+
+        } finally {
+
+            setThinking(false);
+            sendBtn.disabled = false;
+
             input.focus();
         }
+    }
 
-        sendButton.addEventListener(
-            "click",
-            sendMessage
-        );
 
-        input.addEventListener(
-            "keydown",
-            event => {
-                if (
-                    event.key === "Enter" &&
-                    !event.shiftKey
-                ) {
-                    event.preventDefault();
-                    sendMessage();
-                }
+    // ========================================================
+    // LOAD HISTORY
+    // ========================================================
+
+    async function loadHistory() {
+
+        try {
+
+            const response =
+                await api(
+                    "/api/history"
+                );
+
+            const data =
+                await response.json();
+
+            if (
+                !response.ok ||
+                !data.ok
+            ) {
+                return;
             }
-        );
 
-        /* =========================
-           INVITE
-        ========================= */
+            if (
+                data.history &&
+                data.history.length
+            ) {
 
-        inviteButton.addEventListener(
-            "click",
-            () => {
-                const botLink =
-                    "https://t.me/askora_official_bot";
+                welcome.style.display =
+                    "none";
 
-                const shareText =
-                    "Try AskOra 🤖 — a free AI assistant on Telegram!";
+                data.history.forEach(
+                    item => {
 
-                const shareUrl =
-                    "https://t.me/share/url" +
-                    "?url=" +
-                    encodeURIComponent(botLink) +
-                    "&text=" +
-                    encodeURIComponent(shareText);
-
-                tg.openTelegramLink(shareUrl);
-            }
-        );
-
-        /* =========================
-           CLEAR CHAT
-        ========================= */
-
-        clearButton.addEventListener(
-            "click",
-            async () => {
-
-                try {
-                    clearButton.disabled = true;
-
-                    await apiRequest(
-                        "/api/reset",
-                        {
-                            method: "POST"
-                        }
-                    );
-
-                    document
-                        .querySelectorAll(".message-row")
-                        .forEach(element => {
-                            element.remove();
-                        });
-
-                    welcome.style.display = "flex";
-
-                    hideTyping();
-
-                    scrollToBottom();
-
-                } catch (error) {
-                    tg.showAlert(
-                        "Unable to clear the conversation. Please try again."
-                    );
-                }
-
-                clearButton.disabled = false;
-            }
-        );
-
-        /* =========================
-           LOAD HISTORY
-        ========================= */
-
-        async function loadHistory() {
-            try {
-                const data =
-                    await apiRequest("/api/history");
-
-                if (
-                    data.history &&
-                    data.history.length > 0
-                ) {
-                    welcome.style.display = "none";
-
-                    data.history.forEach(item => {
                         addMessage(
-                            item.role,
+                            item.role === "user"
+                                ? "user"
+                                : "assistant",
                             item.content
                         );
-                    });
-                }
 
-            } catch (error) {
-                console.log(
-                    "History unavailable."
+                    }
                 );
             }
+
+        } catch (error) {
+
+            console.error(
+                "History error:",
+                error
+            );
         }
+    }
 
-        /* =========================
-           VOICE RECORDING
-        ========================= */
 
-        micButton.addEventListener(
-            "click",
-            async () => {
+    // ========================================================
+    // CLEAR
+    // ========================================================
 
-                if (isRecording) {
-                    stopRecording();
-                    return;
-                }
+    async function clearConversation() {
 
-                try {
-                    const stream =
-                        await navigator.mediaDevices.getUserMedia({
-                            audio: true
-                        });
+        try {
 
-                    audioChunks = [];
+            const response =
+                await api(
+                    "/api/reset",
+                    {
+                        method: "POST"
+                    }
+                );
 
-                    mediaRecorder =
-                        new MediaRecorder(stream);
+            const data =
+                await response.json();
 
-                    mediaRecorder.ondataavailable =
-                        event => {
-                            if (event.data.size > 0) {
-                                audioChunks.push(
-                                    event.data
-                                );
-                            }
-                        };
-
-                    mediaRecorder.onstop =
-                        async () => {
-
-                            stream
-                                .getTracks()
-                                .forEach(track =>
-                                    track.stop()
-                                );
-
-                            const audioBlob =
-                                new Blob(
-                                    audioChunks,
-                                    {
-                                        type:
-                                            mediaRecorder.mimeType ||
-                                            "audio/webm"
-                                    }
-                                );
-
-                            await sendVoice(
-                                audioBlob
-                            );
-                        };
-
-                    mediaRecorder.start();
-
-                    isRecording = true;
-
-                    micButton.classList.add(
-                        "recording"
-                    );
-
-                    micButton.textContent = "⏹";
-
-                } catch (error) {
-
-                    tg.showAlert(
-                        "Microphone permission is required for voice messages."
-                    );
-                }
-            }
-        );
-
-        function stopRecording() {
             if (
-                mediaRecorder &&
-                mediaRecorder.state !== "inactive"
+                !response.ok ||
+                !data.ok
             ) {
-                mediaRecorder.stop();
+                throw new Error(
+                    data.error ||
+                    "Could not clear conversation."
+                );
             }
 
-            isRecording = false;
+            messages.innerHTML = "";
 
-            micButton.classList.remove(
+            welcome.style.display =
+                "block";
+
+            showToast(
+                "Conversation cleared"
+            );
+
+        } catch (error) {
+
+            console.error(error);
+
+            showToast(
+                "Could not clear conversation"
+            );
+        }
+    }
+
+
+    // ========================================================
+    // INVITE
+    // ========================================================
+
+    function inviteFriend() {
+
+        const url =
+            "https://t.me/share/url" +
+            "?url=" +
+            encodeURIComponent(
+                "https://t.me/askora_official_bot"
+            ) +
+            "&text=" +
+            encodeURIComponent(
+                "Try AskOra 🤖 — a free AI assistant on Telegram!"
+            );
+
+        if (
+            tg.openTelegramLink
+        ) {
+
+            tg.openTelegramLink(
+                url
+            );
+
+        } else {
+
+            window.open(
+                url,
+                "_blank"
+            );
+        }
+    }
+
+
+    // ========================================================
+    // TEXTAREA
+    // ========================================================
+
+    input.addEventListener(
+        "input",
+        () => {
+
+            input.style.height =
+                "auto";
+
+            input.style.height =
+                Math.min(
+                    input.scrollHeight,
+                    120
+                ) + "px";
+        }
+    );
+
+
+    input.addEventListener(
+        "keydown",
+        event => {
+
+            if (
+                event.key === "Enter" &&
+                !event.shiftKey
+            ) {
+
+                event.preventDefault();
+
+                sendMessage();
+            }
+        }
+    );
+
+
+    sendBtn.addEventListener(
+        "click",
+        () => sendMessage()
+    );
+
+
+    clearBtn.addEventListener(
+        "click",
+        clearConversation
+    );
+
+
+    inviteBtn.addEventListener(
+        "click",
+        inviteFriend
+    );
+
+
+    // ========================================================
+    // SUGGESTIONS
+    // ========================================================
+
+    document
+        .querySelectorAll(".suggestion")
+        .forEach(button => {
+
+            button.addEventListener(
+                "click",
+                () => {
+
+                    sendMessage(
+                        button.dataset.question
+                    );
+                }
+            );
+
+        });
+
+
+    // ========================================================
+    // VOICE RECORDING
+    // ========================================================
+
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let recording = false;
+
+
+    async function startRecording() {
+
+        try {
+
+            const stream =
+                await navigator.mediaDevices.getUserMedia({
+                    audio: true
+                });
+
+            audioChunks = [];
+
+            mediaRecorder =
+                new MediaRecorder(
+                    stream
+                );
+
+            mediaRecorder.ondataavailable =
+                event => {
+
+                    if (
+                        event.data.size > 0
+                    ) {
+
+                        audioChunks.push(
+                            event.data
+                        );
+                    }
+                };
+
+            mediaRecorder.onstop =
+                async () => {
+
+                    stream
+                        .getTracks()
+                        .forEach(
+                            track =>
+                                track.stop()
+                        );
+
+                    const blob =
+                        new Blob(
+                            audioChunks,
+                            {
+                                type:
+                                    "audio/webm"
+                            }
+                        );
+
+                    await sendVoice(
+                        blob
+                    );
+                };
+
+            mediaRecorder.start();
+
+            recording = true;
+
+            micBtn.classList.add(
                 "recording"
             );
 
-            micButton.textContent = "🎤";
+            micBtn.textContent =
+                "⏹";
+
+            showToast(
+                "Recording..."
+            );
+
+        } catch (error) {
+
+            console.error(error);
+
+            showToast(
+                "Microphone permission is needed"
+            );
         }
+    }
 
-        async function sendVoice(audioBlob) {
 
-            showTyping();
+    function stopRecording() {
 
-            try {
+        if (
+            mediaRecorder &&
+            recording
+        ) {
 
-                const formData =
-                    new FormData();
+            mediaRecorder.stop();
 
-                formData.append(
-                    "audio",
-                    audioBlob,
-                    "voice.webm"
+            recording = false;
+
+            micBtn.classList.remove(
+                "recording"
+            );
+
+            micBtn.textContent =
+                "🎤";
+
+            showToast(
+                "Processing voice..."
+            );
+        }
+    }
+
+
+    async function sendVoice(blob) {
+
+        addMessage(
+            "user",
+            "🎤 Voice message"
+        );
+
+        setThinking(true);
+
+        try {
+
+            const formData =
+                new FormData();
+
+            formData.append(
+                "audio",
+                blob,
+                "voice.webm"
+            );
+
+            const response =
+                await api(
+                    "/api/voice",
+                    {
+                        method: "POST",
+                        body: formData
+                    }
                 );
 
-                const response =
-                    await fetch(
-                        "/api/voice",
-                        {
-                            method: "POST",
-                            headers: {
-                                "X-Telegram-Init-Data":
-                                    tg.initData || ""
-                            },
-                            body: formData
-                        }
-                    );
+            const data =
+                await response.json();
 
-                if (!response.ok) {
-                    throw new Error(
-                        "Voice request failed"
-                    );
-                }
+            if (
+                !response.ok ||
+                !data.ok
+            ) {
 
-                const data =
-                    await response.json();
-
-                hideTyping();
-
-                if (data.transcription) {
-                    addMessage(
-                        "user",
-                        data.transcription
-                    );
-                }
-
-                addMessage(
-                    "assistant",
-                    data.answer ||
-                    "Sorry, I couldn't process the voice message."
-                );
-
-            } catch (error) {
-
-                hideTyping();
-
-                addMessage(
-                    "assistant",
-                    "⚠️ Sorry, I couldn't process your voice message."
+                throw new Error(
+                    data.error ||
+                    "Voice request failed."
                 );
             }
+
+            addMessage(
+                "assistant",
+                data.answer
+            );
+
+        } catch (error) {
+
+            console.error(error);
+
+            addMessage(
+                "assistant",
+                "⚠️ Sorry, I couldn't process that voice message."
+            );
+
+        } finally {
+
+            setThinking(false);
         }
+    }
 
-        /* =========================
-           START
-        ========================= */
 
-        loadHistory();
+    micBtn.addEventListener(
+        "click",
+        () => {
 
-        input.focus();
-    </script>
+            if (recording) {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+
+        }
+    );
+
+
+    // ========================================================
+    // START
+    // ========================================================
+
+    loadHistory();
+
+    input.focus();
+
+</script>
 
 </body>
 </html>
