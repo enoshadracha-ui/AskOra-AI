@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta
         name="viewport"
-        content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     >
 
     <title>AskOra</title>
@@ -14,6 +14,7 @@
     <style>
         * {
             box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
         }
 
         html,
@@ -23,153 +24,292 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI",
-                Roboto, Arial, sans-serif;
-            background: #080B18;
-            color: #F5F7FF;
         }
 
         body {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .app {
-            width: 100%;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
+            font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI",
+                Roboto, Arial, sans-serif;
+            color: #f5f7ff;
             background:
                 radial-gradient(
-                    circle at top right,
-                    rgba(124, 58, 237, 0.18),
-                    transparent 35%
-                ),
-                radial-gradient(
-                    circle at top left,
-                    rgba(59, 130, 246, 0.14),
+                    circle at 15% 15%,
+                    rgba(59, 130, 246, 0.22),
                     transparent 30%
                 ),
-                #080B18;
+                radial-gradient(
+                    circle at 85% 80%,
+                    rgba(124, 58, 237, 0.20),
+                    transparent 32%
+                ),
+                linear-gradient(
+                    135deg,
+                    #060914 0%,
+                    #0b1020 45%,
+                    #10152b 70%,
+                    #070a15 100%
+                );
         }
 
+        /* =========================
+           BACKGROUND EFFECT
+        ========================= */
+
+        .background-glow {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            overflow: hidden;
+            z-index: 0;
+        }
+
+        .orb {
+            position: absolute;
+            width: 220px;
+            height: 220px;
+            border-radius: 50%;
+            filter: blur(70px);
+            opacity: 0.15;
+            animation: floatOrb 12s ease-in-out infinite alternate;
+        }
+
+        .orb.one {
+            top: -80px;
+            left: -70px;
+            background: #3b82f6;
+        }
+
+        .orb.two {
+            right: -90px;
+            bottom: 10%;
+            background: #7c3aed;
+            animation-delay: 2s;
+        }
+
+        .orb.three {
+            left: 40%;
+            bottom: -120px;
+            background: #2563eb;
+            animation-delay: 4s;
+        }
+
+        @keyframes floatOrb {
+            from {
+                transform: translate3d(0, 0, 0) scale(1);
+            }
+
+            to {
+                transform: translate3d(20px, -20px, 0) scale(1.12);
+            }
+        }
+
+        /* =========================
+           APP
+        ========================= */
+
+        .app {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100dvh;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        /* =========================
+           HEADER
+        ========================= */
+
         .header {
-            min-height: 70px;
-            padding: 12px 14px;
+            flex-shrink: 0;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-            background: rgba(16, 21, 43, 0.88);
-            backdrop-filter: blur(14px);
+            padding: 14px 16px 12px;
+            background: rgba(8, 11, 24, 0.72);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
         }
 
         .brand {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 11px;
         }
 
         .logo {
-            width: 40px;
-            height: 40px;
-            border-radius: 13px;
+            width: 42px;
+            height: 42px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 22px;
+            border-radius: 14px;
+            font-size: 21px;
             font-weight: 800;
-            background: linear-gradient(
-                135deg,
-                #3B82F6,
-                #7C3AED
-            );
+            color: white;
+            background:
+                linear-gradient(
+                    135deg,
+                    rgba(59, 130, 246, 0.95),
+                    rgba(124, 58, 237, 0.95)
+                );
             box-shadow:
-                0 0 22px rgba(59, 130, 246, 0.28);
+                0 0 22px rgba(59, 130, 246, 0.25),
+                inset 0 1px 1px rgba(255, 255, 255, 0.25);
+        }
+
+        .brand-text {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
         }
 
         .brand-name {
-            font-size: 20px;
+            font-size: 17px;
             font-weight: 750;
+            letter-spacing: -0.2px;
         }
 
-        .brand-subtitle {
-            margin-top: 2px;
+        .brand-status {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            color: #9ca3af;
             font-size: 11px;
-            color: #9CA3AF;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #22c55e;
+            box-shadow: 0 0 8px rgba(34, 197, 94, 0.8);
         }
 
         .header-actions {
             display: flex;
+            align-items: center;
             gap: 7px;
         }
 
-        button {
-            border: none;
-            font-family: inherit;
-            cursor: pointer;
-        }
-
-        .header-btn {
+        .header-button {
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: #dce3ff;
+            background: rgba(255, 255, 255, 0.055);
             padding: 9px 11px;
             border-radius: 11px;
-            color: #F5F7FF;
-            background: rgba(255, 255, 255, 0.07);
             font-size: 12px;
             font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s ease;
         }
 
-        .header-btn:active {
-            transform: scale(0.97);
+        .header-button:active {
+            transform: scale(0.95);
+            background: rgba(255, 255, 255, 0.10);
         }
+
+        /* =========================
+           CHAT AREA
+        ========================= */
 
         .chat {
             flex: 1;
             overflow-y: auto;
-            padding: 22px 15px 18px;
+            padding: 24px 15px 125px;
             scroll-behavior: smooth;
         }
 
+        .chat::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .chat::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.12);
+            border-radius: 20px;
+        }
+
+        /* =========================
+           WELCOME
+        ========================= */
+
         .welcome {
+            min-height: 70%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
             text-align: center;
-            margin: 55px auto 25px;
-            max-width: 330px;
+            padding: 30px 20px;
         }
 
         .welcome-logo {
-            width: 72px;
-            height: 72px;
-            margin: 0 auto 18px;
-            border-radius: 23px;
+            width: 74px;
+            height: 74px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 38px;
+            border-radius: 24px;
+            margin-bottom: 18px;
+            font-size: 34px;
             font-weight: 800;
-            background: linear-gradient(
-                135deg,
-                #3B82F6,
-                #7C3AED
-            );
+            background:
+                linear-gradient(
+                    135deg,
+                    #3b82f6,
+                    #7c3aed
+                );
             box-shadow:
-                0 0 35px rgba(59, 130, 246, 0.25);
+                0 0 40px rgba(59, 130, 246, 0.25),
+                0 0 80px rgba(124, 58, 237, 0.12);
         }
 
         .welcome h1 {
             margin: 0;
-            font-size: 27px;
+            font-size: 28px;
+            letter-spacing: -0.8px;
         }
 
         .welcome p {
+            max-width: 300px;
             margin: 9px 0 0;
-            color: #9CA3AF;
+            color: #9ca3af;
             font-size: 14px;
-            line-height: 1.5;
+            line-height: 1.6;
         }
+
+        .welcome-badge {
+            margin-top: 18px;
+            padding: 7px 11px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 999px;
+            color: #b8c2e8;
+            background: rgba(255, 255, 255, 0.045);
+            font-size: 11px;
+        }
+
+        /* =========================
+           MESSAGE
+        ========================= */
 
         .message-row {
             display: flex;
-            margin: 12px 0;
+            margin: 10px 0;
+            animation: messageIn 0.25s ease;
+        }
+
+        @keyframes messageIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .message-row.user {
@@ -180,53 +320,108 @@
             justify-content: flex-start;
         }
 
-        .message {
-            max-width: 84%;
+        .bubble {
+            max-width: min(86%, 680px);
             padding: 11px 14px;
             border-radius: 17px;
-            font-size: 15px;
-            line-height: 1.5;
-            white-space: pre-wrap;
+            font-size: 14px;
+            line-height: 1.55;
             word-wrap: break-word;
+            overflow-wrap: anywhere;
         }
 
-        .message-row.user .message {
-            background: linear-gradient(
-                135deg,
-                #2563EB,
-                #4F46E5
-            );
+        .message-row.user .bubble {
+            color: #ffffff;
+            background:
+                linear-gradient(
+                    135deg,
+                    rgba(59, 130, 246, 0.95),
+                    rgba(79, 70, 229, 0.95)
+                );
             border-bottom-right-radius: 5px;
+            box-shadow: 0 7px 22px rgba(37, 99, 235, 0.16);
         }
 
-        .message-row.assistant .message {
-            background: #10152B;
+        .message-row.assistant .bubble {
+            color: #e8ecff;
+            background: rgba(255, 255, 255, 0.065);
             border: 1px solid rgba(255, 255, 255, 0.07);
             border-bottom-left-radius: 5px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
         }
 
-        .typing-row {
-            display: none;
-            justify-content: flex-start;
-            margin: 12px 0;
+        .bubble p {
+            margin: 0 0 7px;
         }
+
+        .bubble p:last-child {
+            margin-bottom: 0;
+        }
+
+        .bubble strong {
+            color: #ffffff;
+            font-weight: 700;
+        }
+
+        .bubble h1,
+        .bubble h2,
+        .bubble h3 {
+            margin: 8px 0 5px;
+            color: #ffffff;
+            font-size: 15px;
+        }
+
+        .bubble ul,
+        .bubble ol {
+            margin: 6px 0;
+            padding-left: 20px;
+        }
+
+        .bubble li {
+            margin: 3px 0;
+        }
+
+        .bubble code {
+            padding: 2px 5px;
+            border-radius: 5px;
+            background: rgba(0, 0, 0, 0.25);
+            font-size: 12px;
+        }
+
+        /* =========================
+           PROCESSING
+        ========================= */
 
         .typing {
-            padding: 12px 15px;
-            border-radius: 17px;
-            background: #10152B;
-            border: 1px solid rgba(255, 255, 255, 0.07);
-            display: flex;
-            gap: 5px;
+            display: none;
             align-items: center;
+            gap: 6px;
+            width: fit-content;
+            margin: 10px 0;
+            padding: 12px 15px;
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-radius: 17px;
+            border-bottom-left-radius: 5px;
+            background: rgba(255, 255, 255, 0.055);
+        }
+
+        .typing.active {
+            display: flex;
+        }
+
+        .typing-label {
+            margin-right: 3px;
+            color: #9ca3af;
+            font-size: 12px;
         }
 
         .dot {
-            width: 7px;
-            height: 7px;
+            width: 6px;
+            height: 6px;
             border-radius: 50%;
-            background: #9CA3AF;
-            animation: bounce 1.2s infinite;
+            background: #aab5dc;
+            animation: typingDot 1.2s infinite ease-in-out;
         }
 
         .dot:nth-child(2) {
@@ -237,732 +432,792 @@
             animation-delay: 0.3s;
         }
 
-        @keyframes bounce {
+        @keyframes typingDot {
             0%,
             60%,
             100% {
+                opacity: 0.3;
                 transform: translateY(0);
-                opacity: 0.45;
             }
 
             30% {
-                transform: translateY(-5px);
                 opacity: 1;
+                transform: translateY(-3px);
             }
         }
 
-        .composer {
+        /* =========================
+           INPUT AREA
+        ========================= */
+
+        .input-area {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
             padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
-            border-top: 1px solid rgba(255, 255, 255, 0.08);
-            background: rgba(8, 11, 24, 0.94);
-            backdrop-filter: blur(14px);
+            background:
+                linear-gradient(
+                    to top,
+                    rgba(6, 9, 20, 0.98),
+                    rgba(6, 9, 20, 0.82),
+                    transparent
+                );
+            pointer-events: none;
         }
 
-        .composer-inner {
+        .input-wrapper {
+            pointer-events: auto;
             display: flex;
             align-items: flex-end;
-            gap: 8px;
-            max-width: 700px;
-            margin: auto;
-        }
-
-        textarea {
-            flex: 1;
-            resize: none;
-            min-height: 44px;
-            max-height: 120px;
-            padding: 12px 14px;
-            border-radius: 15px;
+            gap: 7px;
+            padding: 7px;
             border: 1px solid rgba(255, 255, 255, 0.09);
-            outline: none;
-            background: #10152B;
-            color: #F5F7FF;
+            border-radius: 19px;
+            background: rgba(16, 21, 43, 0.88);
+            box-shadow:
+                0 10px 35px rgba(0, 0, 0, 0.35),
+                inset 0 1px rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+
+        #messageInput {
+            flex: 1;
+            min-width: 0;
+            max-height: 110px;
+            padding: 10px 10px;
+            border: 0;
+            outline: 0;
+            resize: none;
+            color: #f5f7ff;
+            background: transparent;
             font-family: inherit;
-            font-size: 15px;
+            font-size: 14px;
+            line-height: 1.45;
         }
 
-        textarea::placeholder {
-            color: #7d8498;
+        #messageInput::placeholder {
+            color: #737b99;
         }
 
-        textarea:focus {
-            border-color: rgba(59, 130, 246, 0.55);
-        }
-
-        .icon-btn {
-            width: 44px;
-            height: 44px;
+        .icon-button {
             flex-shrink: 0;
-            border-radius: 14px;
+            width: 40px;
+            height: 40px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 19px;
-            color: #F5F7FF;
-            background: #10152B;
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            border: 0;
+            border-radius: 13px;
+            color: #dce4ff;
+            background: rgba(255, 255, 255, 0.065);
+            font-size: 18px;
+            cursor: pointer;
+            transition: 0.2s ease;
         }
 
-        .send-btn {
-            background: linear-gradient(
-                135deg,
-                #3B82F6,
-                #7C3AED
-            );
-            border: none;
+        .icon-button:active {
+            transform: scale(0.91);
         }
 
-        .icon-btn:active {
-            transform: scale(0.95);
+        .send-button {
+            background:
+                linear-gradient(
+                    135deg,
+                    #3b82f6,
+                    #7c3aed
+                );
+            box-shadow:
+                0 5px 18px rgba(59, 130, 246, 0.22);
         }
 
-        .recording {
-            background: #7C3AED !important;
+        .send-button:disabled {
+            opacity: 0.45;
+            box-shadow: none;
         }
 
-        .status {
+        .mic-button.recording {
+            background: rgba(239, 68, 68, 0.20);
+            color: #fca5a5;
+            animation: recordPulse 1.2s infinite;
+        }
+
+        @keyframes recordPulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.25);
+            }
+
+            70% {
+                box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+            }
+        }
+
+        .footer-note {
             text-align: center;
-            font-size: 11px;
-            color: #7d8498;
-            padding-top: 6px;
-            min-height: 18px;
+            margin-top: 6px;
+            color: #59617d;
+            font-size: 9px;
+        }
+
+        /* =========================
+           MOBILE
+        ========================= */
+
+        @media (max-width: 480px) {
+            .header {
+                padding-left: 13px;
+                padding-right: 13px;
+            }
+
+            .header-button {
+                padding: 8px 9px;
+                font-size: 11px;
+            }
+
+            .chat {
+                padding-left: 11px;
+                padding-right: 11px;
+            }
+
+            .bubble {
+                max-width: 89%;
+                font-size: 14px;
+            }
+
+            .welcome h1 {
+                font-size: 26px;
+            }
         }
     </style>
 </head>
 
 <body>
 
-<div class="app">
+    <!-- Background -->
+    <div class="background-glow">
+        <div class="orb one"></div>
+        <div class="orb two"></div>
+        <div class="orb three"></div>
+    </div>
 
-    <header class="header">
+    <div class="app">
 
-        <div class="brand">
+        <!-- Header -->
+        <header class="header">
 
-            <div class="logo">A</div>
+            <div class="brand">
+                <div class="logo">A</div>
 
-            <div>
-                <div class="brand-name">AskOra</div>
-                <div class="brand-subtitle">
-                    Ask. Get answers.
+                <div class="brand-text">
+                    <div class="brand-name">AskOra</div>
+
+                    <div class="brand-status">
+                        <span class="status-dot"></span>
+                        AI assistant
+                    </div>
                 </div>
             </div>
 
-        </div>
+            <div class="header-actions">
 
-        <div class="header-actions">
+                <button
+                    class="header-button"
+                    id="inviteButton"
+                    type="button"
+                >
+                    ✨ Invite
+                </button>
 
-            <button
-                class="header-btn"
-                onclick="inviteFriend()"
-            >
-                ✨ Invite
-            </button>
+                <button
+                    class="header-button"
+                    id="clearButton"
+                    type="button"
+                >
+                    Clear
+                </button>
 
-            <button
-                class="header-btn"
-                onclick="resetChat()"
-            >
-                Clear
-            </button>
+            </div>
 
-        </div>
+        </header>
 
-    </header>
-
-
-    <main
-        class="chat"
-        id="chat"
-    >
-
-        <div
-            class="welcome"
-            id="welcome"
+        <!-- Chat -->
+        <main
+            class="chat"
+            id="chat"
         >
 
-            <div class="welcome-logo">A</div>
+            <!-- Welcome -->
+            <section
+                class="welcome"
+                id="welcome"
+            >
 
-            <h1>Welcome to AskOra</h1>
+                <div class="welcome-logo">
+                    A
+                </div>
 
-            <p>
-                Your simple AI assistant.<br>
-                Ask anything by text or voice.
-            </p>
+                <h1>Welcome to AskOra</h1>
 
-        </div>
+                <p>
+                    Your simple AI assistant.
+                    Ask anything by text or voice.
+                </p>
 
+                <div class="welcome-badge">
+                    ⚡ Ask. Get answers.
+                </div>
 
-        <div
-            class="typing-row"
-            id="typingRow"
-        >
+            </section>
 
-            <div class="typing">
-
+            <!-- Processing -->
+            <div
+                class="typing"
+                id="typing"
+            >
+                <span class="typing-label">AskOra is thinking</span>
                 <span class="dot"></span>
                 <span class="dot"></span>
                 <span class="dot"></span>
+            </div>
 
+        </main>
+
+        <!-- Input -->
+        <div class="input-area">
+
+            <div class="input-wrapper">
+
+                <textarea
+                    id="messageInput"
+                    rows="1"
+                    placeholder="Ask AskOra anything..."
+                    autocomplete="off"
+                ></textarea>
+
+                <button
+                    class="icon-button mic-button"
+                    id="micButton"
+                    type="button"
+                    aria-label="Voice message"
+                >
+                    🎤
+                </button>
+
+                <button
+                    class="icon-button send-button"
+                    id="sendButton"
+                    type="button"
+                    aria-label="Send message"
+                >
+                    ➤
+                </button>
+
+            </div>
+
+            <div class="footer-note">
+                AskOra • Advanced AI, made simple.
             </div>
 
         </div>
 
-    </main>
+    </div>
 
+    <script>
+        const tg = window.Telegram.WebApp;
 
-    <footer class="composer">
+        tg.ready();
+        tg.expand();
 
-        <div class="composer-inner">
+        const chat = document.getElementById("chat");
+        const welcome = document.getElementById("welcome");
+        const typing = document.getElementById("typing");
 
-            <button
-                class="icon-btn"
-                id="micButton"
-                onclick="toggleRecording()"
-                title="Voice"
-            >
-                🎤
-            </button>
+        const input = document.getElementById("messageInput");
+        const sendButton = document.getElementById("sendButton");
+        const micButton = document.getElementById("micButton");
+        const clearButton = document.getElementById("clearButton");
+        const inviteButton = document.getElementById("inviteButton");
 
-            <textarea
-                id="messageInput"
-                rows="1"
-                placeholder="Ask anything..."
-                oninput="autoResize(this)"
-                onkeydown="handleKey(event)"
-            ></textarea>
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let isRecording = false;
 
-            <button
-                class="icon-btn send-btn"
-                onclick="sendMessage()"
-                title="Send"
-            >
-                ➤
-            </button>
+        /* =========================
+           MARKDOWN RENDERER
+        ========================= */
 
-        </div>
-
-        <div
-            class="status"
-            id="status"
-        ></div>
-
-    </footer>
-
-</div>
-
-
-<script>
-    const tg = window.Telegram.WebApp;
-
-    tg.ready();
-    tg.expand();
-
-    const chat = document.getElementById("chat");
-    const welcome = document.getElementById("welcome");
-    const typingRow = document.getElementById("typingRow");
-    const input = document.getElementById("messageInput");
-    const statusText = document.getElementById("status");
-    const micButton = document.getElementById("micButton");
-
-
-    // =========================
-    // TELEGRAM AUTH
-    // =========================
-
-    function authHeaders() {
-        return {
-            "Content-Type": "application/json",
-            "X-Telegram-Init-Data": tg.initData
-        };
-    }
-
-
-    // =========================
-    // CHAT UI
-    // =========================
-
-    function addMessage(role, text) {
-
-        if (welcome) {
-            welcome.style.display = "none";
+        function escapeHtml(text) {
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;");
         }
 
-        const row = document.createElement("div");
+        function renderMarkdown(text) {
+            let html = escapeHtml(text);
 
-        row.className =
-            "message-row " +
-            (role === "user" ? "user" : "assistant");
-
-        const bubble = document.createElement("div");
-
-        bubble.className = "message";
-
-        bubble.textContent = text;
-
-        row.appendChild(bubble);
-
-        chat.insertBefore(row, typingRow);
-
-        scrollToBottom();
-    }
-
-
-    function showTyping() {
-
-        typingRow.style.display = "flex";
-
-        scrollToBottom();
-    }
-
-
-    function hideTyping() {
-
-        typingRow.style.display = "none";
-    }
-
-
-    function scrollToBottom() {
-
-        chat.scrollTop = chat.scrollHeight;
-    }
-
-
-    function setStatus(text) {
-
-        statusText.textContent = text || "";
-    }
-
-
-    // =========================
-    // SEND MESSAGE
-    // =========================
-
-    async function sendMessage() {
-
-        const message = input.value.trim();
-
-        if (!message) {
-            return;
-        }
-
-        input.value = "";
-
-        autoResize(input);
-
-        addMessage("user", message);
-
-        showTyping();
-
-        setStatus("AskOra is thinking...");
-
-        try {
-
-            const response = await fetch(
-                "/api/chat",
-                {
-                    method: "POST",
-                    headers: authHeaders(),
-                    body: JSON.stringify({
-                        message: message
-                    })
-                }
+            html = html.replace(
+                /^### (.*)$/gm,
+                "<h3>$1</h3>"
             );
 
-            const data = await response.json();
+            html = html.replace(
+                /^## (.*)$/gm,
+                "<h2>$1</h2>"
+            );
 
-            hideTyping();
+            html = html.replace(
+                /^# (.*)$/gm,
+                "<h1>$1</h1>"
+            );
 
-            if (!response.ok) {
+            html = html.replace(
+                /\*\*(.*?)\*\*/g,
+                "<strong>$1</strong>"
+            );
 
-                throw new Error(
-                    data.error || "Something went wrong."
-                );
+            html = html.replace(
+                /`([^`]+)`/g,
+                "<code>$1</code>"
+            );
+
+            html = html.replace(
+                /^\- (.*)$/gm,
+                "<li>$1</li>"
+            );
+
+            html = html.replace(
+                /(<li>.*<\/li>)/gs,
+                "<ul>$1</ul>"
+            );
+
+            html = html
+                .split(/\n\n+/)
+                .map(block => {
+                    if (
+                        block.startsWith("<h1>") ||
+                        block.startsWith("<h2>") ||
+                        block.startsWith("<h3>") ||
+                        block.startsWith("<ul>")
+                    ) {
+                        return block;
+                    }
+
+                    return `<p>${block.replace(/\n/g, "<br>")}</p>`;
+                })
+                .join("");
+
+            return html;
+        }
+
+        /* =========================
+           MESSAGE UI
+        ========================= */
+
+        function addMessage(role, text) {
+            welcome.style.display = "none";
+
+            const row = document.createElement("div");
+
+            row.className =
+                "message-row " +
+                (role === "user" ? "user" : "assistant");
+
+            const bubble = document.createElement("div");
+
+            bubble.className = "bubble";
+
+            if (role === "assistant") {
+                bubble.innerHTML = renderMarkdown(text);
+            } else {
+                bubble.textContent = text;
             }
 
-            addMessage(
-                "assistant",
-                data.answer
-            );
+            row.appendChild(bubble);
 
-            setStatus("");
+            chat.insertBefore(row, typing);
 
-        } catch (error) {
-
-            hideTyping();
-
-            addMessage(
-                "assistant",
-                "⚠️ Sorry, something went wrong. Please try again."
-            );
-
-            setStatus("");
-
-            console.error(error);
+            scrollToBottom();
         }
-    }
 
-
-    // =========================
-    // ENTER KEY
-    // =========================
-
-    function handleKey(event) {
-
-        if (
-            event.key === "Enter" &&
-            !event.shiftKey
-        ) {
-
-            event.preventDefault();
-
-            sendMessage();
+        function scrollToBottom() {
+            setTimeout(() => {
+                chat.scrollTop = chat.scrollHeight;
+            }, 50);
         }
-    }
 
+        function showTyping() {
+            typing.classList.add("active");
+            scrollToBottom();
+        }
 
-    // =========================
-    // TEXTAREA
-    // =========================
+        function hideTyping() {
+            typing.classList.remove("active");
+        }
 
-    function autoResize(element) {
+        /* =========================
+           AUTO RESIZE
+        ========================= */
 
-        element.style.height = "auto";
+        input.addEventListener("input", () => {
+            input.style.height = "auto";
+            input.style.height =
+                Math.min(input.scrollHeight, 110) + "px";
+        });
 
-        element.style.height =
-            Math.min(
-                element.scrollHeight,
-                120
-            ) + "px";
-    }
+        /* =========================
+           API
+        ========================= */
 
+        async function apiRequest(url, options = {}) {
+            options.headers = {
+                ...(options.headers || {}),
+                "X-Telegram-Init-Data": tg.initData || ""
+            };
 
-    // =========================
-    // LOAD HISTORY
-    // =========================
-
-    async function loadHistory() {
-
-        try {
-
-            const response = await fetch(
-                "/api/history",
-                {
-                    method: "GET",
-                    headers: {
-                        "X-Telegram-Init-Data":
-                            tg.initData
-                    }
-                }
-            );
+            const response = await fetch(url, options);
 
             if (!response.ok) {
+                throw new Error("Request failed");
+            }
+
+            return response.json();
+        }
+
+        /* =========================
+           SEND TEXT
+        ========================= */
+
+        async function sendMessage() {
+            const text = input.value.trim();
+
+            if (!text || sendButton.disabled) {
                 return;
             }
 
-            const data = await response.json();
+            input.value = "";
+            input.style.height = "auto";
 
-            if (
-                !data.history ||
-                data.history.length === 0
-            ) {
-                return;
-            }
+            addMessage("user", text);
 
-            welcome.style.display = "none";
+            sendButton.disabled = true;
+            showTyping();
 
-            for (const message of data.history) {
-
-                addMessage(
-                    message.role,
-                    message.content
-                );
-            }
-
-        } catch (error) {
-
-            console.error(
-                "History error:",
-                error
-            );
-        }
-    }
-
-
-    // =========================
-    // CLEAR CHAT
-    // =========================
-
-    async function resetChat() {
-
-        const confirmed = confirm(
-            "Clear your AskOra conversation?"
-        );
-
-        if (!confirmed) {
-            return;
-        }
-
-        try {
-
-            const response = await fetch(
-                "/api/reset",
-                {
-                    method: "POST",
-                    headers: authHeaders()
-                }
-            );
-
-            if (!response.ok) {
-
-                throw new Error(
-                    "Unable to clear chat."
-                );
-            }
-
-            const messages =
-                chat.querySelectorAll(
-                    ".message-row"
-                );
-
-            messages.forEach(
-                message => message.remove()
-            );
-
-            welcome.style.display = "block";
-
-            hideTyping();
-
-            setStatus("");
-
-            tg.HapticFeedback?.notificationOccurred(
-                "success"
-            );
-
-        } catch (error) {
-
-            console.error(error);
-
-            setStatus(
-                "Could not clear conversation."
-            );
-        }
-    }
-
-
-    // =========================
-    // INVITE
-    // =========================
-
-    function inviteFriend() {
-
-        const url =
-            "https://t.me/share/url?" +
-            new URLSearchParams({
-                url: "https://t.me/askora_official_bot",
-                text:
-                    "Try AskOra 🤖 — a free AI assistant on Telegram!"
-            }).toString();
-
-        tg.openTelegramLink(url);
-    }
-
-
-    // =========================
-    // VOICE RECORDING
-    // =========================
-
-    let mediaRecorder = null;
-    let audioChunks = [];
-    let isRecording = false;
-
-
-    async function toggleRecording() {
-
-        if (isRecording) {
-
-            stopRecording();
-
-            return;
-        }
-
-        try {
-
-            const stream =
-                await navigator.mediaDevices.getUserMedia({
-                    audio: true
-                });
-
-            audioChunks = [];
-
-            mediaRecorder =
-                new MediaRecorder(stream);
-
-            mediaRecorder.ondataavailable =
-                function(event) {
-
-                    if (event.data.size > 0) {
-
-                        audioChunks.push(
-                            event.data
-                        );
-                    }
-                };
-
-
-            mediaRecorder.onstop =
-                async function() {
-
-                    stream
-                        .getTracks()
-                        .forEach(
-                            track =>
-                                track.stop()
-                        );
-
-                    const audioBlob =
-                        new Blob(
-                            audioChunks,
-                            {
-                                type:
-                                    mediaRecorder.mimeType ||
-                                    "audio/webm"
-                            }
-                        );
-
-                    await sendVoice(
-                        audioBlob
-                    );
-                };
-
-
-            mediaRecorder.start();
-
-            isRecording = true;
-
-            micButton.classList.add(
-                "recording"
-            );
-
-            setStatus(
-                "Listening..."
-            );
-
-        } catch (error) {
-
-            console.error(error);
-
-            setStatus(
-                "Microphone permission is required."
-            );
-        }
-    }
-
-
-    function stopRecording() {
-
-        if (
-            mediaRecorder &&
-            mediaRecorder.state !== "inactive"
-        ) {
-
-            mediaRecorder.stop();
-        }
-
-        isRecording = false;
-
-        micButton.classList.remove(
-            "recording"
-        );
-    }
-
-
-    async function sendVoice(audioBlob) {
-
-        showTyping();
-
-        setStatus(
-            "AskOra is processing your voice..."
-        );
-
-        try {
-
-            const formData =
-                new FormData();
-
-            formData.append(
-                "audio",
-                audioBlob,
-                "voice.webm"
-            );
-
-            const response =
-                await fetch(
-                    "/api/voice",
+            try {
+                const data = await apiRequest(
+                    "/api/chat",
                     {
                         method: "POST",
                         headers: {
-                            "X-Telegram-Init-Data":
-                                tg.initData
+                            "Content-Type": "application/json"
                         },
-                        body: formData
+                        body: JSON.stringify({
+                            message: text
+                        })
                     }
                 );
 
-            const data =
-                await response.json();
-
-            hideTyping();
-
-            if (!response.ok) {
-
-                throw new Error(
-                    data.error ||
-                    "Voice processing failed."
-                );
-            }
-
-            if (data.transcript) {
-
-                addMessage(
-                    "user",
-                    "🎤 " +
-                    data.transcript
-                );
-            }
-
-            if (data.answer) {
+                hideTyping();
 
                 addMessage(
                     "assistant",
-                    data.answer
+                    data.answer || "Sorry, I couldn't generate an answer."
+                );
+
+            } catch (error) {
+                hideTyping();
+
+                addMessage(
+                    "assistant",
+                    "⚠️ Sorry, something went wrong. Please try again."
                 );
             }
 
-            setStatus("");
+            sendButton.disabled = false;
+            input.focus();
+        }
 
-        } catch (error) {
+        sendButton.addEventListener(
+            "click",
+            sendMessage
+        );
 
-            hideTyping();
+        input.addEventListener(
+            "keydown",
+            event => {
+                if (
+                    event.key === "Enter" &&
+                    !event.shiftKey
+                ) {
+                    event.preventDefault();
+                    sendMessage();
+                }
+            }
+        );
 
-            console.error(error);
+        /* =========================
+           INVITE
+        ========================= */
 
-            addMessage(
-                "assistant",
-                "⚠️ Sorry, I couldn't process that voice note."
+        inviteButton.addEventListener(
+            "click",
+            () => {
+                const botLink =
+                    "https://t.me/askora_official_bot";
+
+                const shareText =
+                    "Try AskOra 🤖 — a free AI assistant on Telegram!";
+
+                const shareUrl =
+                    "https://t.me/share/url" +
+                    "?url=" +
+                    encodeURIComponent(botLink) +
+                    "&text=" +
+                    encodeURIComponent(shareText);
+
+                tg.openTelegramLink(shareUrl);
+            }
+        );
+
+        /* =========================
+           CLEAR CHAT
+        ========================= */
+
+        clearButton.addEventListener(
+            "click",
+            async () => {
+
+                try {
+                    clearButton.disabled = true;
+
+                    await apiRequest(
+                        "/api/reset",
+                        {
+                            method: "POST"
+                        }
+                    );
+
+                    document
+                        .querySelectorAll(".message-row")
+                        .forEach(element => {
+                            element.remove();
+                        });
+
+                    welcome.style.display = "flex";
+
+                    hideTyping();
+
+                    scrollToBottom();
+
+                } catch (error) {
+                    tg.showAlert(
+                        "Unable to clear the conversation. Please try again."
+                    );
+                }
+
+                clearButton.disabled = false;
+            }
+        );
+
+        /* =========================
+           LOAD HISTORY
+        ========================= */
+
+        async function loadHistory() {
+            try {
+                const data =
+                    await apiRequest("/api/history");
+
+                if (
+                    data.history &&
+                    data.history.length > 0
+                ) {
+                    welcome.style.display = "none";
+
+                    data.history.forEach(item => {
+                        addMessage(
+                            item.role,
+                            item.content
+                        );
+                    });
+                }
+
+            } catch (error) {
+                console.log(
+                    "History unavailable."
+                );
+            }
+        }
+
+        /* =========================
+           VOICE RECORDING
+        ========================= */
+
+        micButton.addEventListener(
+            "click",
+            async () => {
+
+                if (isRecording) {
+                    stopRecording();
+                    return;
+                }
+
+                try {
+                    const stream =
+                        await navigator.mediaDevices.getUserMedia({
+                            audio: true
+                        });
+
+                    audioChunks = [];
+
+                    mediaRecorder =
+                        new MediaRecorder(stream);
+
+                    mediaRecorder.ondataavailable =
+                        event => {
+                            if (event.data.size > 0) {
+                                audioChunks.push(
+                                    event.data
+                                );
+                            }
+                        };
+
+                    mediaRecorder.onstop =
+                        async () => {
+
+                            stream
+                                .getTracks()
+                                .forEach(track =>
+                                    track.stop()
+                                );
+
+                            const audioBlob =
+                                new Blob(
+                                    audioChunks,
+                                    {
+                                        type:
+                                            mediaRecorder.mimeType ||
+                                            "audio/webm"
+                                    }
+                                );
+
+                            await sendVoice(
+                                audioBlob
+                            );
+                        };
+
+                    mediaRecorder.start();
+
+                    isRecording = true;
+
+                    micButton.classList.add(
+                        "recording"
+                    );
+
+                    micButton.textContent = "⏹";
+
+                } catch (error) {
+
+                    tg.showAlert(
+                        "Microphone permission is required for voice messages."
+                    );
+                }
+            }
+        );
+
+        function stopRecording() {
+            if (
+                mediaRecorder &&
+                mediaRecorder.state !== "inactive"
+            ) {
+                mediaRecorder.stop();
+            }
+
+            isRecording = false;
+
+            micButton.classList.remove(
+                "recording"
             );
 
-            setStatus("");
+            micButton.textContent = "🎤";
         }
-    }
 
+        async function sendVoice(audioBlob) {
 
-    // =========================
-    // START
-    // =========================
+            showTyping();
 
-    loadHistory();
+            try {
 
-</script>
+                const formData =
+                    new FormData();
+
+                formData.append(
+                    "audio",
+                    audioBlob,
+                    "voice.webm"
+                );
+
+                const response =
+                    await fetch(
+                        "/api/voice",
+                        {
+                            method: "POST",
+                            headers: {
+                                "X-Telegram-Init-Data":
+                                    tg.initData || ""
+                            },
+                            body: formData
+                        }
+                    );
+
+                if (!response.ok) {
+                    throw new Error(
+                        "Voice request failed"
+                    );
+                }
+
+                const data =
+                    await response.json();
+
+                hideTyping();
+
+                if (data.transcription) {
+                    addMessage(
+                        "user",
+                        data.transcription
+                    );
+                }
+
+                addMessage(
+                    "assistant",
+                    data.answer ||
+                    "Sorry, I couldn't process the voice message."
+                );
+
+            } catch (error) {
+
+                hideTyping();
+
+                addMessage(
+                    "assistant",
+                    "⚠️ Sorry, I couldn't process your voice message."
+                );
+            }
+        }
+
+        /* =========================
+           START
+        ========================= */
+
+        loadHistory();
+
+        input.focus();
+    </script>
 
 </body>
 </html>
