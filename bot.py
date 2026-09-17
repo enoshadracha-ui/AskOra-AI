@@ -8,6 +8,7 @@ import json
 import time
 from datetime import datetime, timezone
 from io import BytesIO
+from urllib.parse import parse_qsl
 
 from flask import Flask, request, jsonify, render_template
 
@@ -60,20 +61,22 @@ logging.basicConfig(
     level=logging.INFO,
 )
 
-logger = logging.getLogger("askora")
+logger = logging.getLogger("bot")
 
 
 # ============================================================
 # CLIENTS
 # ============================================================
 
-groq_client = Groq(api_key=GROQ_API_KEY)
+groq_client = Groq(
+    api_key=GROQ_API_KEY
+)
 
 flask_app = Flask(__name__)
 
 
 # ============================================================
-# AI INSTRUCTIONS
+# AI SYSTEM PROMPT
 # ============================================================
 
 SYSTEM_INSTRUCTION = """
@@ -109,7 +112,7 @@ you may provide a longer answer.
 
 
 # ============================================================
-# DATABASE
+# DATABASE CONNECTION
 # ============================================================
 
 def get_db():
@@ -119,32 +122,34 @@ def get_db():
     )
 
 
-def init_database():
-    """
-    Creates the AskOra database structure.
+# ============================================================
+# DATABASE INITIALIZATION / MIGRATION
+# ============================================================
 
-    Also repairs common columns from older versions.
-    """
+def init_database():
 
     conn = get_db()
 
     try:
+
         with conn.cursor() as cur:
 
             # ------------------------------------------------
-            # USERS
+            # USERS TABLE
             # ------------------------------------------------
 
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS users (
-                    id SERIAL PRIMARY KEY
+                    telegram_id BIGINT
                 )
             """)
 
+            # Get existing columns.
             cur.execute("""
                 SELECT column_name
                 FROM information_schema.columns
-                WHERE table_name = 'users'
+                WHERE table_schema = 'public'
+                AND table_name = 'users'
             """)
 
             columns = {
@@ -152,12 +157,15 @@ def init_database():
                 for row in cur.fetchall()
             }
 
-            # Telegram ID
+            # ------------------------------------------------
+            # FIND OLD TELEGRAM ID COLUMN
+            # ------------------------------------------------
+
             if "telegram_id" not in columns:
 
-                old_id_column = None
+                old_column = None
 
-                possible_old_columns = [
+                possible_columns = [
                     "user_id",
                     "telegram_user_id",
                     "telegramid",
@@ -165,9 +173,10 @@ def init_database():
                     "chat_id",
                 ]
 
-                for old_column in possible_old_columns:
-                    if old_column in columns:
-                        old_id_column = old_column
+                for candidate in possible_columns:
+
+                    if candidate in columns:
+                        old_column = candidate
                         break
 
                 cur.execute("""
@@ -175,16 +184,20 @@ def init_database():
                     ADD COLUMN telegram_id BIGINT
                 """)
 
-                if old_id_column:
+                if old_column:
+
                     cur.execute(
                         f"""
                         UPDATE users
-                        SET telegram_id = "{old_id_column}"
+                        SET telegram_id = "{old_column}"
                         WHERE telegram_id IS NULL
                         """
                     )
 
-            # Profile columns
+            # ------------------------------------------------
+            # USER PROFILE COLUMNS
+            # ------------------------------------------------
+
             cur.execute("""
                 ALTER TABLE users
                 ADD COLUMN IF NOT EXISTS username TEXT
@@ -210,7 +223,10 @@ def init_database():
                 ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ
             """)
 
-            # Repair timestamps
+            # ------------------------------------------------
+            # REPAIR NULL DATES
+            # ------------------------------------------------
+
             cur.execute("""
                 UPDATE users
                 SET first_seen = NOW()
@@ -224,16 +240,15 @@ def init_database():
             """)
 
             # ------------------------------------------------
-            # MESSAGES
+            # MESSAGES TABLE
             # ------------------------------------------------
 
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS messages (
-                    id SERIAL PRIMARY KEY,
                     telegram_id BIGINT,
-                    role TEXT NOT NULL,
-                    content TEXT NOT NULL,
-                    created_at TIMESTAMPTZ DEFAULT NOW()
+                    role TEXT,
+                    content TEXT,
+                    created_at TIMESTAMPTZ
                 )
             """)
 
@@ -269,10 +284,9 @@ def init_database():
 
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS usage_events (
-                    id SERIAL PRIMARY KEY,
                     telegram_id BIGINT,
                     event_type TEXT,
-                    created_at TIMESTAMPTZ DEFAULT NOW()
+                    created_at TIMESTAMPTZ
                 )
             """)
 
@@ -303,6 +317,12 @@ def init_database():
 
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS
+                idx_users_telegram_id
+                ON users(telegram_id)
+            """)
+
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS
                 idx_messages_telegram_id
                 ON messages(telegram_id)
             """)
@@ -325,28 +345,29 @@ def init_database():
                 ON usage_events(created_at)
             """)
 
-            cur.execute("""
-                CREATE UNIQUE INDEX IF NOT EXISTS
-                idx_users_telegram_id
-                ON users(telegram_id)
-                WHERE telegram_id IS NOT NULL
-            """)
-
         conn.commit()
 
-        logger.info("Database initialized successfully.")
+        logger.info(
+            "Database initialized successfully."
+        )
 
     except Exception:
+
         conn.rollback()
-        logger.exception("Database initialization failed.")
+
+        logger.exception(
+            "Database initialization failed."
+        )
+
         raise
 
     finally:
+
         conn.close()
 
 
 # ============================================================
-# USER DATABASE FUNCTIONS
+# USER FUNCTIONS
 # ============================================================
 
 def record_user(
@@ -355,20 +376,31 @@ def record_user(
     first_name=None,
     last_name=None,
 ):
+
     conn = get_db()
 
     try:
+
         with conn.cursor() as cur:
 
+            # IMPORTANT:
+            # Do NOT use SELECT id.
+            # Your existing table does not have an id column.
+
             cur.execute("""
-                SELECT id
+                SELECT telegram_id
                 FROM users
                 WHERE telegram_id = %s
-            """, (telegram_id,))
+                LIMIT 1
+            """, (
+                telegram_id,
+            ))
 
             existing = cur.fetchone()
 
-            now = datetime.now(timezone.utc)
+            now = datetime.now(
+                timezone.utc
+            )
 
             if existing:
 
@@ -399,7 +431,14 @@ def record_user(
                         first_seen,
                         last_seen
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s)
+                    VALUES (
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s
+                    )
                 """, (
                     telegram_id,
                     username,
@@ -411,14 +450,34 @@ def record_user(
 
         conn.commit()
 
+    except Exception:
+
+        conn.rollback()
+
+        logger.exception(
+            "Could not record user."
+        )
+
+        raise
+
     finally:
+
         conn.close()
 
 
-def record_usage(telegram_id, event_type):
+# ============================================================
+# USAGE
+# ============================================================
+
+def record_usage(
+    telegram_id,
+    event_type,
+):
+
     conn = get_db()
 
     try:
+
         with conn.cursor() as cur:
 
             cur.execute("""
@@ -427,7 +486,11 @@ def record_usage(telegram_id, event_type):
                     event_type,
                     created_at
                 )
-                VALUES (%s, %s, NOW())
+                VALUES (
+                    %s,
+                    %s,
+                    NOW()
+                )
             """, (
                 telegram_id,
                 event_type,
@@ -435,14 +498,35 @@ def record_usage(telegram_id, event_type):
 
         conn.commit()
 
+    except Exception:
+
+        conn.rollback()
+
+        logger.exception(
+            "Could not record usage."
+        )
+
+        raise
+
     finally:
+
         conn.close()
 
 
-def save_message(telegram_id, role, content):
+# ============================================================
+# SAVE MESSAGE
+# ============================================================
+
+def save_message(
+    telegram_id,
+    role,
+    content,
+):
+
     conn = get_db()
 
     try:
+
         with conn.cursor() as cur:
 
             cur.execute("""
@@ -452,7 +536,12 @@ def save_message(telegram_id, role, content):
                     content,
                     created_at
                 )
-                VALUES (%s, %s, %s, NOW())
+                VALUES (
+                    %s,
+                    %s,
+                    %s,
+                    NOW()
+                )
             """, (
                 telegram_id,
                 role,
@@ -461,21 +550,45 @@ def save_message(telegram_id, role, content):
 
         conn.commit()
 
+    except Exception:
+
+        conn.rollback()
+
+        logger.exception(
+            "Could not save message."
+        )
+
+        raise
+
     finally:
+
         conn.close()
 
 
-def get_history(telegram_id, limit=30):
+# ============================================================
+# GET CONVERSATION
+# ============================================================
+
+def get_history(
+    telegram_id,
+    limit=30,
+):
+
     conn = get_db()
 
     try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+
+        with conn.cursor(
+            cursor_factory=RealDictCursor
+        ) as cur:
 
             cur.execute("""
-                SELECT role, content
+                SELECT
+                    role,
+                    content
                 FROM messages
                 WHERE telegram_id = %s
-                ORDER BY created_at DESC, id DESC
+                ORDER BY created_at DESC
                 LIMIT %s
             """, (
                 telegram_id,
@@ -495,38 +608,67 @@ def get_history(telegram_id, limit=30):
         ]
 
     finally:
+
         conn.close()
 
 
-def clear_history(telegram_id):
+# ============================================================
+# CLEAR CONVERSATION
+# ============================================================
+
+def clear_history(
+    telegram_id,
+):
+
     conn = get_db()
 
     try:
+
         with conn.cursor() as cur:
 
             cur.execute("""
                 DELETE FROM messages
                 WHERE telegram_id = %s
-            """, (telegram_id,))
+            """, (
+                telegram_id,
+            ))
 
         conn.commit()
 
+    except Exception:
+
+        conn.rollback()
+
+        logger.exception(
+            "Could not clear history."
+        )
+
+        raise
+
     finally:
+
         conn.close()
 
 
 # ============================================================
-# AI MESSAGE BUILDER
+# BUILD AI MESSAGES
 # ============================================================
 
-def build_ai_messages(telegram_id, current_message):
+def build_ai_messages(
+    telegram_id,
+    current_message,
+):
+
     history = get_history(
         telegram_id,
         limit=30,
     )
 
-    # If the current user message has already been saved,
-    # remove that copy before adding it again.
+    # The current user message may already have
+    # been saved in PostgreSQL.
+    #
+    # Remove that copy so we don't send it twice.
+
     if (
         history
         and history[-1]["role"] == "user"
@@ -541,7 +683,9 @@ def build_ai_messages(telegram_id, current_message):
         }
     ]
 
-    messages.extend(history)
+    messages.extend(
+        history
+    )
 
     messages.append({
         "role": "user",
@@ -552,10 +696,13 @@ def build_ai_messages(telegram_id, current_message):
 
 
 # ============================================================
-# AI GENERATION
+# GENERATE AI ANSWER
 # ============================================================
 
-def generate_answer(telegram_id, current_message):
+def generate_answer(
+    telegram_id,
+    current_message,
+):
 
     messages = build_ai_messages(
         telegram_id,
@@ -563,9 +710,8 @@ def generate_answer(telegram_id, current_message):
     )
 
     logger.info(
-        "Generating answer for user %s using %s. History messages: %s",
+        "Generating AI answer. user=%s history=%s",
         telegram_id,
-        TEXT_MODEL,
         len(messages) - 2,
     )
 
@@ -579,7 +725,10 @@ def generate_answer(telegram_id, current_message):
     answer = response.choices[0].message.content
 
     if not answer:
-        raise RuntimeError("Groq returned an empty response.")
+
+        raise RuntimeError(
+            "Groq returned an empty response."
+        )
 
     return answer.strip()
 
@@ -588,20 +737,27 @@ def generate_answer(telegram_id, current_message):
 # VOICE TRANSCRIPTION
 # ============================================================
 
-def transcribe_audio(audio_bytes):
+def transcribe_audio(
+    audio_bytes,
+):
 
-    audio_file = BytesIO(audio_bytes)
+    audio_file = BytesIO(
+        audio_bytes
+    )
 
     audio_file.name = "voice.ogg"
 
-    transcription = groq_client.audio.transcriptions.create(
-        file=audio_file,
-        model=VOICE_MODEL,
+    transcription = (
+        groq_client.audio.transcriptions.create(
+            file=audio_file,
+            model=VOICE_MODEL,
+        )
     )
 
     text = transcription.text
 
     if not text:
+
         raise RuntimeError(
             "Voice transcription returned no text."
         )
@@ -610,10 +766,13 @@ def transcribe_audio(audio_bytes):
 
 
 # ============================================================
-# TELEGRAM HANDLERS
+# TELEGRAM /START
 # ============================================================
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def start(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+):
 
     user = update.effective_user
 
@@ -638,8 +797,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "✨ Invite a Friend",
                 url=(
                     "https://t.me/share/url"
-                    f"?url={BOT_LINK}"
-                    "&text=Try%20AskOra%20%F0%9F%A4%96"
+                    "?url="
+                    "https%3A%2F%2Ft.me%2Faskora_official_bot"
+                    "&text="
+                    "Try%20AskOra%20%F0%9F%A4%96"
                     "%20%E2%80%94%20a%20free%20AI"
                     "%20assistant%20on%20Telegram!"
                 ),
@@ -657,15 +818,26 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "⚡ Fast answers\n"
         "🎤 Voice support\n\n"
         "Tap below to open AskOra.",
-        reply_markup=InlineKeyboardMarkup(keyboard),
+        reply_markup=InlineKeyboardMarkup(
+            keyboard
+        ),
     )
 
 
-async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ============================================================
+# TELEGRAM /RESET
+# ============================================================
+
+async def reset(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+):
 
     user_id = update.effective_user.id
 
-    clear_history(user_id)
+    clear_history(
+        user_id
+    )
 
     await update.message.reply_text(
         "🔄 Conversation cleared.\n\n"
@@ -673,35 +845,39 @@ async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ============================================================
+# TELEGRAM /ADMIN
+# ============================================================
+
+async def admin(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+):
 
     if update.effective_user.id != ADMIN_ID:
+
         await update.message.reply_text(
             "⛔ You are not authorized to use this command."
         )
+
         return
 
     conn = get_db()
 
     try:
+
         with conn.cursor() as cur:
 
-            # -----------------------------------------------
-            # TOTAL USERS
-            # -----------------------------------------------
-
+            # Total users
             cur.execute("""
-                SELECT COUNT(*)
+                SELECT COUNT(DISTINCT telegram_id)
                 FROM users
                 WHERE telegram_id IS NOT NULL
             """)
 
             total_users = cur.fetchone()[0]
 
-            # -----------------------------------------------
-            # NEW USERS TODAY
-            # -----------------------------------------------
-
+            # New today
             cur.execute("""
                 SELECT COUNT(*)
                 FROM users
@@ -710,22 +886,17 @@ async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             new_today = cur.fetchone()[0]
 
-            # -----------------------------------------------
-            # NEW USERS THIS WEEK
-            # -----------------------------------------------
-
+            # New this week
             cur.execute("""
                 SELECT COUNT(*)
                 FROM users
-                WHERE first_seen >= CURRENT_DATE - INTERVAL '6 days'
+                WHERE first_seen >=
+                    CURRENT_DATE - INTERVAL '6 days'
             """)
 
             new_week = cur.fetchone()[0]
 
-            # -----------------------------------------------
-            # ACTIVE USERS TODAY
-            # -----------------------------------------------
-
+            # Active today
             cur.execute("""
                 SELECT COUNT(DISTINCT telegram_id)
                 FROM usage_events
@@ -735,10 +906,7 @@ async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             active_today = cur.fetchone()[0]
 
-            # -----------------------------------------------
-            # TOTAL MESSAGES
-            # -----------------------------------------------
-
+            # Total messages
             cur.execute("""
                 SELECT COUNT(*)
                 FROM messages
@@ -746,10 +914,7 @@ async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             total_messages = cur.fetchone()[0]
 
-            # -----------------------------------------------
-            # MESSAGES TODAY
-            # -----------------------------------------------
-
+            # Messages today
             cur.execute("""
                 SELECT COUNT(*)
                 FROM messages
@@ -759,10 +924,7 @@ async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             messages_today = cur.fetchone()[0]
 
-            # -----------------------------------------------
-            # TEXT REQUESTS
-            # -----------------------------------------------
-
+            # Text requests
             cur.execute("""
                 SELECT COUNT(*)
                 FROM usage_events
@@ -771,10 +933,7 @@ async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             text_requests = cur.fetchone()[0]
 
-            # -----------------------------------------------
-            # VOICE REQUESTS
-            # -----------------------------------------------
-
+            # Voice requests
             cur.execute("""
                 SELECT COUNT(*)
                 FROM usage_events
@@ -783,10 +942,7 @@ async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             voice_requests = cur.fetchone()[0]
 
-            # -----------------------------------------------
-            # TOTAL EVENTS
-            # -----------------------------------------------
-
+            # Total events
             cur.execute("""
                 SELECT COUNT(*)
                 FROM usage_events
@@ -795,9 +951,10 @@ async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
             total_events = cur.fetchone()[0]
 
     finally:
+
         conn.close()
 
-    text = (
+    dashboard = (
         "🛠️ ASKORA ADMIN DASHBOARD\n\n"
 
         "━━━━━━━━━━━━━━━━━━\n"
@@ -820,45 +977,54 @@ async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📈 Total events: {total_events}"
     )
 
-    await update.message.reply_text(text)
+    await update.message.reply_text(
+        dashboard
+    )
 
+
+# ============================================================
+# TELEGRAM TEXT
+# ============================================================
 
 async def handle_text(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ):
 
-    if not update.message or not update.message.text:
+    if (
+        not update.message
+        or not update.message.text
+    ):
         return
 
     user = update.effective_user
 
     user_id = user.id
+
     text = update.message.text.strip()
 
     if not text:
         return
 
-    record_user(
-        telegram_id=user_id,
-        username=user.username,
-        first_name=user.first_name,
-        last_name=user.last_name,
-    )
-
-    record_usage(
-        user_id,
-        "text",
-    )
-
-    # Save user's message first so history is persistent.
-    save_message(
-        user_id,
-        "user",
-        text,
-    )
-
     try:
+
+        record_user(
+            telegram_id=user_id,
+            username=user.username,
+            first_name=user.first_name,
+            last_name=user.last_name,
+        )
+
+        record_usage(
+            user_id,
+            "text",
+        )
+
+        save_message(
+            user_id,
+            "user",
+            text,
+        )
 
         await context.bot.send_chat_action(
             chat_id=user_id,
@@ -884,7 +1050,7 @@ async def handle_text(
     except Exception as error:
 
         logger.exception(
-            "Text AI error: %s",
+            "Telegram text error: %s",
             error,
         )
 
@@ -894,42 +1060,53 @@ async def handle_text(
         )
 
 
+# ============================================================
+# TELEGRAM VOICE
+# ============================================================
+
 async def handle_voice(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ):
 
-    if not update.message or not update.message.voice:
+    if (
+        not update.message
+        or not update.message.voice
+    ):
         return
 
     user = update.effective_user
 
     user_id = user.id
 
-    record_user(
-        telegram_id=user_id,
-        username=user.username,
-        first_name=user.first_name,
-        last_name=user.last_name,
-    )
-
-    record_usage(
-        user_id,
-        "voice",
-    )
-
     try:
+
+        record_user(
+            telegram_id=user_id,
+            username=user.username,
+            first_name=user.first_name,
+            last_name=user.last_name,
+        )
+
+        record_usage(
+            user_id,
+            "voice",
+        )
 
         await context.bot.send_chat_action(
             chat_id=user_id,
             action="typing",
         )
 
-        telegram_file = await context.bot.get_file(
-            update.message.voice.file_id
+        telegram_file = (
+            await context.bot.get_file(
+                update.message.voice.file_id
+            )
         )
 
-        audio_bytes = await telegram_file.download_as_bytearray()
+        audio_bytes = (
+            await telegram_file.download_as_bytearray()
+        )
 
         transcript = await asyncio.to_thread(
             transcribe_audio,
@@ -937,12 +1114,13 @@ async def handle_voice(
         )
 
         if not transcript:
+
             await update.message.reply_text(
                 "🎤 I couldn't understand that voice message."
             )
+
             return
 
-        # Save the transcription as the user's message.
         save_message(
             user_id,
             "user",
@@ -968,12 +1146,13 @@ async def handle_voice(
     except Exception as error:
 
         logger.exception(
-            "Voice AI error: %s",
+            "Telegram voice error: %s",
             error,
         )
 
         await update.message.reply_text(
-            "⚠️ Sorry, I couldn't process that voice message."
+            "⚠️ Sorry, I couldn't process "
+            "that voice message."
         )
 
 
@@ -1126,17 +1305,17 @@ def telegram_webhook():
 
 
 # ============================================================
-# MINI APP AUTHENTICATION
+# MINI APP AUTH
 # ============================================================
 
-def validate_telegram_init_data(init_data):
+def validate_telegram_init_data(
+    init_data,
+):
 
     if not init_data:
         return None
 
     try:
-
-        from urllib.parse import parse_qsl
 
         parsed = dict(
             parse_qsl(
@@ -1160,7 +1339,7 @@ def validate_telegram_init_data(init_data):
         if not auth_date:
             return None
 
-        # Don't accept extremely old init data.
+        # Init data expires after 24 hours.
         if (
             time.time()
             - int(auth_date)
@@ -1225,7 +1404,7 @@ def get_webapp_user():
 
 
 # ============================================================
-# MINI APP ROUTES
+# MINI APP HOME
 # ============================================================
 
 @flask_app.get("/")
@@ -1236,12 +1415,17 @@ def home():
     )
 
 
+# ============================================================
+# MINI APP HISTORY
+# ============================================================
+
 @flask_app.get("/api/history")
 def api_history():
 
     user = get_webapp_user()
 
     if not user:
+
         return jsonify({
             "ok": False,
             "error": "Unauthorized",
@@ -1269,26 +1453,38 @@ def api_history():
     })
 
 
+# ============================================================
+# MINI APP CHAT
+# ============================================================
+
 @flask_app.post("/api/chat")
 def api_chat():
 
     user = get_webapp_user()
 
     if not user:
+
         return jsonify({
             "ok": False,
             "error": "Unauthorized",
         }), 401
 
-    data = request.get_json(
-        silent=True
-    ) or {}
+    data = (
+        request.get_json(
+            silent=True
+        )
+        or {}
+    )
 
     message = str(
-        data.get("message", "")
+        data.get(
+            "message",
+            "",
+        )
     ).strip()
 
     if not message:
+
         return jsonify({
             "ok": False,
             "error": "Please enter a message.",
@@ -1298,25 +1494,25 @@ def api_chat():
         user["id"]
     )
 
-    record_user(
-        telegram_id=telegram_id,
-        username=user.get("username"),
-        first_name=user.get("first_name"),
-        last_name=user.get("last_name"),
-    )
-
-    record_usage(
-        telegram_id,
-        "text",
-    )
-
-    save_message(
-        telegram_id,
-        "user",
-        message,
-    )
-
     try:
+
+        record_user(
+            telegram_id=telegram_id,
+            username=user.get("username"),
+            first_name=user.get("first_name"),
+            last_name=user.get("last_name"),
+        )
+
+        record_usage(
+            telegram_id,
+            "text",
+        )
+
+        save_message(
+            telegram_id,
+            "user",
+            message,
+        )
 
         answer = generate_answer(
             telegram_id,
@@ -1350,28 +1546,37 @@ def api_chat():
         }), 500
 
 
+# ============================================================
+# MINI APP VOICE
+# ============================================================
+
 @flask_app.post("/api/voice")
 def api_voice():
 
     user = get_webapp_user()
 
     if not user:
+
         return jsonify({
             "ok": False,
             "error": "Unauthorized",
         }), 401
 
     if "audio" not in request.files:
+
         return jsonify({
             "ok": False,
             "error": "No audio received.",
         }), 400
 
-    audio_file = request.files["audio"]
+    audio_file = request.files[
+        "audio"
+    ]
 
     audio_bytes = audio_file.read()
 
     if not audio_bytes:
+
         return jsonify({
             "ok": False,
             "error": "Empty audio file.",
@@ -1381,28 +1586,32 @@ def api_voice():
         user["id"]
     )
 
-    record_user(
-        telegram_id=telegram_id,
-        username=user.get("username"),
-        first_name=user.get("first_name"),
-        last_name=user.get("last_name"),
-    )
-
-    record_usage(
-        telegram_id,
-        "voice",
-    )
-
     try:
+
+        record_user(
+            telegram_id=telegram_id,
+            username=user.get("username"),
+            first_name=user.get("first_name"),
+            last_name=user.get("last_name"),
+        )
+
+        record_usage(
+            telegram_id,
+            "voice",
+        )
 
         transcript = transcribe_audio(
             audio_bytes
         )
 
         if not transcript:
+
             return jsonify({
                 "ok": False,
-                "error": "I couldn't understand the recording.",
+                "error": (
+                    "I couldn't understand "
+                    "the recording."
+                ),
             }), 400
 
         save_message(
@@ -1428,10 +1637,11 @@ def api_voice():
             "answer": answer,
         })
 
-    except Exception:
+    except Exception as error:
 
         logger.exception(
-            "Mini App voice error."
+            "Mini App voice error: %s",
+            error,
         )
 
         return jsonify({
@@ -1443,12 +1653,17 @@ def api_voice():
         }), 500
 
 
+# ============================================================
+# MINI APP RESET
+# ============================================================
+
 @flask_app.post("/api/reset")
 def api_reset():
 
     user = get_webapp_user()
 
     if not user:
+
         return jsonify({
             "ok": False,
             "error": "Unauthorized",
@@ -1468,7 +1683,7 @@ def api_reset():
 
 
 # ============================================================
-# HEALTH CHECK
+# HEALTH
 # ============================================================
 
 @flask_app.get("/health")
@@ -1481,19 +1696,21 @@ def health():
 
 
 # ============================================================
-# START
+# MAIN
 # ============================================================
 
 if __name__ == "__main__":
 
+    # Make absolutely sure the database is ready
+    # before Flask starts accepting requests.
     init_database()
 
     logger.info(
-        "AskOra is starting..."
+        "AskOra starting..."
     )
 
     logger.info(
-        "Mini App URL: %s",
+        "Mini App: %s",
         RENDER_EXTERNAL_URL,
     )
 
