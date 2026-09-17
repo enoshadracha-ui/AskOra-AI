@@ -6,7 +6,6 @@ import hashlib
 import hmac
 import json
 import time
-from datetime import datetime, timezone
 from urllib.parse import urlencode, parse_qsl
 from io import BytesIO
 
@@ -77,7 +76,6 @@ Use simple formatting when helpful.
 # DATABASE
 # =========================
 
-
 def get_connection():
     return psycopg2.connect(DATABASE_URL)
 
@@ -88,18 +86,59 @@ def init_database():
     try:
         cursor = connection.cursor()
 
+        # =========================
+        # USERS
+        # =========================
+
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS users (
-                user_id BIGINT PRIMARY KEY,
-                username TEXT,
-                first_name TEXT,
-                last_name TEXT,
-                created_at TIMESTAMPTZ DEFAULT NOW(),
-                last_seen TIMESTAMPTZ DEFAULT NOW()
+                user_id BIGINT PRIMARY KEY
             )
             """
         )
+
+        # Upgrade old users table
+        cursor.execute(
+            """
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS username TEXT
+            """
+        )
+
+        cursor.execute(
+            """
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS first_name TEXT
+            """
+        )
+
+        cursor.execute(
+            """
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS last_name TEXT
+            """
+        )
+
+        cursor.execute(
+            """
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ
+            DEFAULT NOW()
+            """
+        )
+
+        cursor.execute(
+            """
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ
+            DEFAULT NOW()
+            """
+        )
+
+        # =========================
+        # USAGE EVENTS
+        # =========================
 
         cursor.execute(
             """
@@ -111,6 +150,10 @@ def init_database():
             )
             """
         )
+
+        # =========================
+        # CONVERSATIONS
+        # =========================
 
         cursor.execute(
             """
@@ -124,13 +167,45 @@ def init_database():
             """
         )
 
+        # Upgrade old conversations table
+        cursor.execute(
+            """
+            ALTER TABLE conversations
+            ADD COLUMN IF NOT EXISTS role TEXT
+            """
+        )
+
+        cursor.execute(
+            """
+            ALTER TABLE conversations
+            ADD COLUMN IF NOT EXISTS content TEXT
+            """
+        )
+
+        cursor.execute(
+            """
+            ALTER TABLE conversations
+            ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ
+            DEFAULT NOW()
+            """
+        )
+
         connection.commit()
+
+        logger.info(
+            "Database initialized and upgraded successfully."
+        )
 
     finally:
         connection.close()
 
 
-def record_user(user_id, username=None, first_name=None, last_name=None):
+def record_user(
+    user_id,
+    username=None,
+    first_name=None,
+    last_name=None,
+):
     connection = get_connection()
 
     try:
@@ -142,9 +217,18 @@ def record_user(user_id, username=None, first_name=None, last_name=None):
                 user_id,
                 username,
                 first_name,
-                last_name
+                last_name,
+                created_at,
+                last_seen
             )
-            VALUES (%s, %s, %s, %s)
+            VALUES (
+                %s,
+                %s,
+                %s,
+                %s,
+                NOW(),
+                NOW()
+            )
             ON CONFLICT (user_id)
             DO UPDATE SET
                 username = EXCLUDED.username,
@@ -203,9 +287,15 @@ def save_message(user_id, role, content):
             INSERT INTO conversations (
                 user_id,
                 role,
-                content
+                content,
+                created_at
             )
-            VALUES (%s, %s, %s)
+            VALUES (
+                %s,
+                %s,
+                %s,
+                NOW()
+            )
             """,
             (
                 user_id,
@@ -282,13 +372,19 @@ def get_statistics():
     try:
         cursor = connection.cursor()
 
-        cursor.execute("SELECT COUNT(*) FROM users")
+        cursor.execute(
+            "SELECT COUNT(*) FROM users"
+        )
         total_users = cursor.fetchone()[0]
 
-        cursor.execute("SELECT COUNT(*) FROM conversations")
+        cursor.execute(
+            "SELECT COUNT(*) FROM conversations"
+        )
         total_messages = cursor.fetchone()[0]
 
-        cursor.execute("SELECT COUNT(*) FROM usage_events")
+        cursor.execute(
+            "SELECT COUNT(*) FROM usage_events"
+        )
         total_events = cursor.fetchone()[0]
 
         return {
@@ -305,14 +401,16 @@ def get_statistics():
 # INVITE BUTTON
 # =========================
 
-
 def invite_button():
     share_url = (
         "https://t.me/share/url?"
         + urlencode(
             {
                 "url": BOT_LINK,
-                "text": "Try AskOra 🤖 — a free AI assistant on Telegram!",
+                "text": (
+                    "Try AskOra 🤖 — "
+                    "a free AI assistant on Telegram!"
+                ),
             }
         )
     )
@@ -330,9 +428,8 @@ def invite_button():
 
 
 # =========================
-# TELEGRAM MESSAGE HELPER
+# SEND LONG MESSAGE
 # =========================
-
 
 async def send_long_message(
     bot,
@@ -352,10 +449,15 @@ async def send_long_message(
 
     chunks = [
         text[i:i + max_length]
-        for i in range(0, len(text), max_length)
+        for i in range(
+            0,
+            len(text),
+            max_length,
+        )
     ]
 
     for index, chunk in enumerate(chunks):
+
         if index == len(chunks) - 1:
             await bot.send_message(
                 chat_id=chat_id,
@@ -373,7 +475,6 @@ async def send_long_message(
 # AI
 # =========================
 
-
 def generate_answer(messages):
     response = groq_client.chat.completions.create(
         model=TEXT_MODEL,
@@ -385,9 +486,15 @@ def generate_answer(messages):
     return response.choices[0].message.content.strip()
 
 
-def transcribe_audio(audio_bytes, filename="voice.ogg"):
+def transcribe_audio(
+    audio_bytes,
+    filename="voice.ogg",
+):
     response = groq_client.audio.transcriptions.create(
-        file=(filename, BytesIO(audio_bytes)),
+        file=(
+            filename,
+            BytesIO(audio_bytes),
+        ),
         model=VOICE_MODEL,
     )
 
@@ -398,22 +505,31 @@ def transcribe_audio(audio_bytes, filename="voice.ogg"):
 # MINI APP AUTHENTICATION
 # =========================
 
-
 def validate_init_data(init_data):
     if not init_data:
         return None
 
     try:
-        parsed = dict(parse_qsl(init_data, keep_blank_values=True))
+        parsed = dict(
+            parse_qsl(
+                init_data,
+                keep_blank_values=True,
+            )
+        )
 
-        received_hash = parsed.pop("hash", None)
+        received_hash = parsed.pop(
+            "hash",
+            None,
+        )
 
         if not received_hash:
             return None
 
         data_check_string = "\n".join(
             f"{key}={value}"
-            for key, value in sorted(parsed.items())
+            for key, value in sorted(
+                parsed.items()
+            )
         )
 
         secret_key = hmac.new(
@@ -434,10 +550,16 @@ def validate_init_data(init_data):
         ):
             return None
 
-        auth_date = parsed.get("auth_date")
+        auth_date = parsed.get(
+            "auth_date"
+        )
 
         if auth_date:
-            if time.time() - int(auth_date) > 86400:
+            if (
+                time.time()
+                - int(auth_date)
+                > 86400
+            ):
                 return None
 
         user_data = parsed.get("user")
@@ -448,14 +570,22 @@ def validate_init_data(init_data):
         return json.loads(user_data)
 
     except Exception as error:
-        logger.error("Mini App validation error: %s", error)
+        logger.error(
+            "Mini App validation error: %s",
+            error,
+        )
         return None
 
 
 def get_mini_app_user_id():
-    init_data = request.headers.get("X-Telegram-Init-Data", "")
+    init_data = request.headers.get(
+        "X-Telegram-Init-Data",
+        "",
+    )
 
-    user_data = validate_init_data(init_data)
+    user_data = validate_init_data(
+        init_data
+    )
 
     if not user_data:
         return None
@@ -467,8 +597,10 @@ def get_mini_app_user_id():
 # TELEGRAM COMMANDS
 # =========================
 
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def start(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+):
     user = update.effective_user
 
     record_user(
@@ -485,7 +617,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def reset(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+):
     user_id = update.effective_user.id
 
     clear_history(user_id)
@@ -495,7 +630,10 @@ async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def admin(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+):
     if update.effective_user.id != ADMIN_ID:
         return
 
@@ -512,7 +650,6 @@ async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =========================
 # TELEGRAM VOICE
 # =========================
-
 
 async def handle_voice(
     update: Update,
@@ -611,14 +748,14 @@ async def handle_voice(
         )
 
         await update.message.reply_text(
-            "⚠️ Sorry, something went wrong while processing your voice note."
+            "⚠️ Sorry, something went wrong "
+            "while processing your voice note."
         )
 
 
 # =========================
 # TELEGRAM TEXT CHAT
 # =========================
-
 
 async def handle_text(
     update: Update,
@@ -665,11 +802,6 @@ async def handle_text(
 
         messages.extend(history)
 
-        await context.bot.send_chat_action(
-            chat_id=user_id,
-            action="typing",
-        )
-
         answer = await asyncio.to_thread(
             generate_answer,
             messages,
@@ -700,7 +832,8 @@ async def handle_text(
         )
 
         await update.message.reply_text(
-            "⚠️ Sorry, something went wrong while generating the response."
+            "⚠️ Sorry, something went wrong "
+            "while generating the response."
         )
 
 
@@ -708,10 +841,11 @@ async def handle_text(
 # FLASK — MINI APP
 # =========================
 
-
 @app.route("/")
 def home():
-    return render_template("index.html")
+    return render_template(
+        "index.html"
+    )
 
 
 @app.route("/health")
@@ -725,7 +859,10 @@ def health():
     )
 
 
-@app.route("/api/history", methods=["GET"])
+@app.route(
+    "/api/history",
+    methods=["GET"],
+)
 def api_history():
     user_id = get_mini_app_user_id()
 
@@ -748,7 +885,10 @@ def api_history():
     )
 
 
-@app.route("/api/chat", methods=["POST"])
+@app.route(
+    "/api/chat",
+    methods=["POST"],
+)
 def api_chat():
     user_id = get_mini_app_user_id()
 
@@ -759,10 +899,15 @@ def api_chat():
             }
         ), 401
 
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(
+        silent=True
+    ) or {}
 
     message = str(
-        data.get("message", "")
+        data.get(
+            "message",
+            "",
+        )
     ).strip()
 
     if not message:
@@ -772,30 +917,32 @@ def api_chat():
             }
         ), 400
 
-    record_user(user_id)
-
-    save_message(
-        user_id,
-        "user",
-        message,
-    )
-
-    history = get_history(
-        user_id,
-        limit=20,
-    )
-
-    messages = [
-        {
-            "role": "system",
-            "content": SYSTEM_INSTRUCTION,
-        }
-    ]
-
-    messages.extend(history)
-
     try:
-        answer = generate_answer(messages)
+        record_user(user_id)
+
+        save_message(
+            user_id,
+            "user",
+            message,
+        )
+
+        history = get_history(
+            user_id,
+            limit=20,
+        )
+
+        messages = [
+            {
+                "role": "system",
+                "content": SYSTEM_INSTRUCTION,
+            }
+        ]
+
+        messages.extend(history)
+
+        answer = generate_answer(
+            messages
+        )
 
         save_message(
             user_id,
@@ -827,7 +974,10 @@ def api_chat():
         ), 500
 
 
-@app.route("/api/voice", methods=["POST"])
+@app.route(
+    "/api/voice",
+    methods=["POST"],
+)
 def api_voice():
     user_id = get_mini_app_user_id()
 
@@ -838,7 +988,9 @@ def api_voice():
             }
         ), 401
 
-    audio = request.files.get("audio")
+    audio = request.files.get(
+        "audio"
+    )
 
     if not audio:
         return jsonify(
@@ -884,7 +1036,9 @@ def api_voice():
 
         messages.extend(history)
 
-        answer = generate_answer(messages)
+        answer = generate_answer(
+            messages
+        )
 
         save_message(
             user_id,
@@ -917,7 +1071,10 @@ def api_voice():
         ), 500
 
 
-@app.route("/api/reset", methods=["POST"])
+@app.route(
+    "/api/reset",
+    methods=["POST"],
+)
 def api_reset():
     user_id = get_mini_app_user_id()
 
@@ -940,7 +1097,6 @@ def api_reset():
 # =========================
 # TELEGRAM WEBHOOK
 # =========================
-
 
 async def setup_bot(application):
     await application.initialize()
@@ -975,7 +1131,10 @@ def start_async_loop(application):
     bot_loop.run_forever()
 
 
-@app.route("/webhook", methods=["POST"])
+@app.route(
+    "/webhook",
+    methods=["POST"],
+)
 def webhook():
     try:
         update_data = request.get_json(
@@ -987,12 +1146,18 @@ def webhook():
             telegram_application.bot,
         )
 
-        future = asyncio.run_coroutine_threadsafe(
-            telegram_application.process_update(update),
-            bot_loop,
+        future = (
+            asyncio.run_coroutine_threadsafe(
+                telegram_application.process_update(
+                    update
+                ),
+                bot_loop,
+            )
         )
 
-        future.result(timeout=30)
+        future.result(
+            timeout=30
+        )
 
         return "OK", 200
 
@@ -1006,9 +1171,8 @@ def webhook():
 
 
 # =========================
-# START APPLICATION
+# TELEGRAM APPLICATION
 # =========================
-
 
 telegram_application = (
     Application.builder()
@@ -1052,12 +1216,20 @@ telegram_application.add_handler(
 )
 
 
+# =========================
+# MAIN
+# =========================
+
 def main():
-    logger.info("Initializing database...")
+    logger.info(
+        "Initializing database..."
+    )
 
     init_database()
 
-    logger.info("Starting Telegram bot...")
+    logger.info(
+        "Starting Telegram bot..."
+    )
 
     loop_thread = threading.Thread(
         target=start_async_loop,
