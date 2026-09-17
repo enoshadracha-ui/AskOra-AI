@@ -13,7 +13,15 @@
 
     <title>AskOra</title>
 
+    <!-- Telegram Mini App -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <!-- Monetag In-App Interstitial -->
+    <script
+        src="//libtl.com/sdk.js"
+        data-zone="11827766"
+        data-sdk="show_11827766"
+    ></script>
 
     <style>
         * {
@@ -869,6 +877,59 @@
 
     tg.ready();
     tg.expand();
+
+
+    // ========================================================
+    // MONETAG IN-APP INTERSTITIAL
+    // ========================================================
+
+    /*
+        Monetag configuration:
+
+        frequency: 2
+        capping: 0.1 hours = 6 minutes
+        interval: 30 seconds
+        timeout: 5 seconds
+        everyPage: false
+
+        The Monetag SDK handles the ad schedule after
+        show_11827766() is called.
+    */
+
+    try {
+
+        if (
+            typeof show_11827766 === "function"
+        ) {
+
+            show_11827766({
+                type: "inApp",
+
+                inAppSettings: {
+                    frequency: 2,
+                    capping: 0.1,
+                    interval: 30,
+                    timeout: 5,
+                    everyPage: false
+                }
+            });
+
+        } else {
+
+            console.warn(
+                "Monetag SDK is not available."
+            );
+
+        }
+
+    } catch (error) {
+
+        console.error(
+            "Monetag error:",
+            error
+        );
+
+    }
 
 
     // ========================================================
