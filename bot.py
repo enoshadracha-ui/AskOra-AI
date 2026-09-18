@@ -112,7 +112,7 @@ you may provide a longer answer.
 
 
 # ============================================================
-# DATABASE
+# DATABASE CONNECTION
 # ============================================================
 
 def get_db():
@@ -122,14 +122,23 @@ def get_db():
     )
 
 
+# ============================================================
+# DATABASE INITIALIZATION / MIGRATION
+# ============================================================
+
 def init_database():
     """
-    Repairs/extends the existing AskOra database.
+    Repairs and extends the existing AskOra database.
+
+    This migration is designed to work with the older
+    AskOra database schema.
 
     IMPORTANT:
-    This code intentionally does NOT depend on users.id.
-
-    It also supports the older usage_events.user_id column.
+    - Does not depend on users.id.
+    - Preserves legacy users.user_id.
+    - Keeps users.user_id and users.telegram_id synchronized.
+    - Repairs old NULL IDs.
+    - Repairs old NULL timestamps.
     """
 
     conn = get_db()
@@ -139,7 +148,7 @@ def init_database():
         with conn.cursor() as cur:
 
             # =================================================
-            # USERS
+            # USERS TABLE
             # =================================================
 
             cur.execute("""
@@ -160,16 +169,28 @@ def init_database():
                 for row in cur.fetchall()
             }
 
-            # -----------------------------------------------
+            # -------------------------------------------------
+            # LEGACY USER ID
+            # -------------------------------------------------
+
+            if "user_id" not in user_columns:
+
+                cur.execute("""
+                    ALTER TABLE users
+                    ADD COLUMN user_id BIGINT
+                """)
+
+                user_columns.add("user_id")
+
+            # -------------------------------------------------
             # TELEGRAM ID
-            # -----------------------------------------------
+            # -------------------------------------------------
 
             if "telegram_id" not in user_columns:
 
                 old_id_column = None
 
                 possible_old_columns = [
-                    "user_id",
                     "telegram_user_id",
                     "telegramid",
                     "telegram_user",
@@ -197,9 +218,33 @@ def init_database():
                         """
                     )
 
-            # -----------------------------------------------
-            # PROFILE COLUMNS
-            # -----------------------------------------------
+                user_columns.add("telegram_id")
+
+            # -------------------------------------------------
+            # RECOVER TELEGRAM ID FROM LEGACY user_id
+            # -------------------------------------------------
+
+            cur.execute("""
+                UPDATE users
+                SET telegram_id = user_id
+                WHERE telegram_id IS NULL
+                AND user_id IS NOT NULL
+            """)
+
+            # -------------------------------------------------
+            # RECOVER user_id FROM telegram_id
+            # -------------------------------------------------
+
+            cur.execute("""
+                UPDATE users
+                SET user_id = telegram_id
+                WHERE user_id IS NULL
+                AND telegram_id IS NOT NULL
+            """)
+
+            # =================================================
+            # USER PROFILE COLUMNS
+            # =================================================
 
             cur.execute("""
                 ALTER TABLE users
@@ -226,9 +271,9 @@ def init_database():
                 ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ
             """)
 
-            # -----------------------------------------------
+            # -------------------------------------------------
             # REPAIR DATES
-            # -----------------------------------------------
+            # -------------------------------------------------
 
             cur.execute("""
                 UPDATE users
@@ -340,9 +385,9 @@ def init_database():
                 for row in cur.fetchall()
             }
 
-            # -----------------------------------------------
-            # OLD user_id COLUMN
-            # -----------------------------------------------
+            # -------------------------------------------------
+            # user_id
+            # -------------------------------------------------
 
             if "user_id" not in usage_columns:
 
@@ -351,9 +396,9 @@ def init_database():
                     ADD COLUMN user_id BIGINT
                 """)
 
-            # -----------------------------------------------
-            # NEW telegram_id COLUMN
-            # -----------------------------------------------
+            # -------------------------------------------------
+            # telegram_id
+            # -------------------------------------------------
 
             if "telegram_id" not in usage_columns:
 
@@ -362,9 +407,9 @@ def init_database():
                     ADD COLUMN telegram_id BIGINT
                 """)
 
-            # -----------------------------------------------
-            # Keep old and new IDs synchronized
-            # -----------------------------------------------
+            # -------------------------------------------------
+            # Synchronize usage IDs
+            # -------------------------------------------------
 
             cur.execute("""
                 UPDATE usage_events
@@ -408,6 +453,12 @@ def init_database():
 
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS
+                idx_users_user_id
+                ON users(user_id)
+            """)
+
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS
                 idx_messages_telegram_id
                 ON messages(telegram_id)
             """)
@@ -439,7 +490,7 @@ def init_database():
         conn.commit()
 
         logger.info(
-            "Database initialized successfully."
+            "Database initialized and legacy schema repaired successfully."
         )
 
     except Exception:
@@ -474,9 +525,9 @@ def record_user(
 
         with conn.cursor() as cur:
 
-            # IMPORTANT:
-            # Never use users.id here.
-            # Your database doesn't have that column.
+            # -------------------------------------------------
+            # Find existing user.
+            # -------------------------------------------------
 
             cur.execute("""
                 SELECT telegram_id
@@ -493,17 +544,23 @@ def record_user(
                 timezone.utc
             )
 
+            # -------------------------------------------------
+            # Existing user
+            # -------------------------------------------------
+
             if existing:
 
                 cur.execute("""
                     UPDATE users
                     SET
+                        user_id = %s,
                         username = %s,
                         first_name = %s,
                         last_name = %s,
                         last_seen = %s
                     WHERE telegram_id = %s
                 """, (
+                    telegram_id,
                     username,
                     first_name,
                     last_name,
@@ -511,10 +568,15 @@ def record_user(
                     telegram_id,
                 ))
 
+            # -------------------------------------------------
+            # New user
+            # -------------------------------------------------
+
             else:
 
                 cur.execute("""
                     INSERT INTO users (
+                        user_id,
                         telegram_id,
                         username,
                         first_name,
@@ -528,9 +590,11 @@ def record_user(
                         %s,
                         %s,
                         %s,
+                        %s,
                         %s
                     )
                 """, (
+                    telegram_id,
                     telegram_id,
                     username,
                     first_name,
@@ -571,12 +635,10 @@ def record_usage(
 
         with conn.cursor() as cur:
 
-            # IMPORTANT:
-            # Your old table requires user_id NOT NULL.
+            # Legacy database requires user_id.
+            # New database also tracks telegram_id.
             #
-            # Therefore we deliberately write BOTH:
-            # user_id      = Telegram ID
-            # telegram_id  = Telegram ID
+            # Both are intentionally set to the Telegram user ID.
 
             cur.execute("""
                 INSERT INTO usage_events (
@@ -766,11 +828,13 @@ def build_ai_messages(
     )
 
     # Avoid sending the current message twice.
+
     if (
         history
         and history[-1]["role"] == "user"
         and history[-1]["content"] == current_message
     ):
+
         history = history[:-1]
 
     messages = [
@@ -1341,13 +1405,9 @@ def run_telegram_loop():
     telegram_loop.run_forever()
 
 
-telegram_thread = threading.Thread(
-    target=run_telegram_loop,
-    daemon=True,
-)
-
-telegram_thread.start()
-
+# ============================================================
+# TELEGRAM INITIALIZATION
+# ============================================================
 
 async def initialize_telegram():
 
@@ -1376,12 +1436,6 @@ async def initialize_telegram():
         logger.exception(
             "Telegram initialization failed."
         )
-
-
-asyncio.run_coroutine_threadsafe(
-    initialize_telegram(),
-    telegram_loop,
-)
 
 
 # ============================================================
@@ -1822,6 +1876,10 @@ def health():
 
 if __name__ == "__main__":
 
+    # IMPORTANT:
+    # Database migration MUST finish before Telegram
+    # starts accepting updates from new users.
+
     init_database()
 
     logger.info(
@@ -1831,6 +1889,25 @@ if __name__ == "__main__":
     logger.info(
         "Mini App URL: %s",
         RENDER_EXTERNAL_URL,
+    )
+
+    # Start Telegram asyncio loop only after
+    # the database is ready.
+
+    telegram_thread = threading.Thread(
+        target=run_telegram_loop,
+        daemon=True,
+    )
+
+    telegram_thread.start()
+
+    # Give the event loop thread a moment to start.
+
+    time.sleep(0.5)
+
+    asyncio.run_coroutine_threadsafe(
+        initialize_telegram(),
+        telegram_loop,
     )
 
     flask_app.run(
