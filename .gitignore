@@ -1,4 +1,4 @@
-# Environment variables / secrets
+# Environment variables
 .env
 .env.*
 !.env.example
@@ -15,11 +15,11 @@ venv/
 env/
 ENV/
 
-# IDE/editor files
+# IDE
 .vscode/
 .idea/
 
-# OS files
+# OS
 .DS_Store
 Thumbs.db
 
@@ -31,7 +31,7 @@ Thumbs.db
 *.sqlite
 *.sqlite3
 
-# Test/cache files
+# Testing/cache
 .pytest_cache/
 .mypy_cache/
 .coverage
@@ -41,5 +41,5 @@ htmlcov/
 *.tmp
 *.temp
 
-# Uploaded files
+# Uploads
 uploads/
