@@ -1,202 +1,214 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-    <title>Create account • AskOra</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Create account • AskOra</title>
 
-    <style>
-        * {
-            box-sizing: border-box;
-        }
+<style>
+*{box-sizing:border-box}
 
-        body {
-            margin: 0;
-            min-height: 100vh;
-            display: grid;
-            place-items: center;
-            background: #080b18;
-            color: #f5f7ff;
-            font-family:
-                system-ui,
-                -apple-system,
-                BlinkMacSystemFont,
-                "Segoe UI",
-                sans-serif;
-            padding: 20px;
-        }
+body{
+margin:0;
+min-height:100vh;
+display:flex;
+align-items:center;
+justify-content:center;
+padding:20px;
+background:
+radial-gradient(circle at top left,rgba(59,130,246,.18),transparent 35%),
+radial-gradient(circle at bottom right,rgba(124,58,237,.18),transparent 35%),
+#080B18;
+color:#F5F7FF;
+font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif
+}
 
-        .card {
-            width: 100%;
-            max-width: 410px;
-            background: #10152b;
-            border: 1px solid rgba(255,255,255,.08);
-            border-radius: 20px;
-            padding: 30px;
-        }
+.card{
+width:100%;
+max-width:430px;
+padding:32px;
+background:rgba(16,21,43,.9);
+border:1px solid rgba(255,255,255,.09);
+border-radius:24px;
+box-shadow:0 25px 80px rgba(0,0,0,.45)
+}
 
-        .logo {
-            width: 52px;
-            height: 52px;
-            display: grid;
-            place-items: center;
-            margin-bottom: 18px;
-            border-radius: 16px;
-            background: linear-gradient(
-                135deg,
-                #3b82f6,
-                #7c3aed
-            );
-            font-weight: 800;
-            font-size: 23px;
-        }
+.logo{
+width:58px;
+height:58px;
+display:flex;
+align-items:center;
+justify-content:center;
+margin-bottom:20px;
+border-radius:17px;
+background:linear-gradient(135deg,#3B82F6,#7C3AED);
+font-size:27px;
+font-weight:800
+}
 
-        h1 {
-            margin: 0 0 7px;
-        }
+h1{
+margin:0 0 8px;
+font-size:28px
+}
 
-        .muted {
-            color: #9ca3af;
-            margin-bottom: 22px;
-        }
+.subtitle{
+margin:0 0 25px;
+color:#9CA3AF;
+line-height:1.5
+}
 
-        label {
-            display: block;
-            margin: 15px 0 7px;
-            font-size: 13px;
-        }
+label{
+display:block;
+margin:16px 0 7px;
+font-size:14px;
+font-weight:600
+}
 
-        input {
-            width: 100%;
-            padding: 13px;
-            border-radius: 10px;
-            border: 1px solid rgba(255,255,255,.1);
-            background: #080b18;
-            color: white;
-            outline: none;
-        }
+input{
+width:100%;
+height:50px;
+padding:0 15px;
+border-radius:13px;
+border:1px solid rgba(255,255,255,.1);
+background:#0B1022;
+color:#F5F7FF;
+outline:none;
+font-size:15px
+}
 
-        button {
-            width: 100%;
-            margin-top: 20px;
-            padding: 13px;
-            border: 0;
-            border-radius: 10px;
-            background: linear-gradient(
-                135deg,
-                #3b82f6,
-                #7c3aed
-            );
-            color: white;
-            font-weight: 700;
-        }
+input:focus{
+border-color:#3B82F6;
+box-shadow:0 0 0 3px rgba(59,130,246,.12)
+}
 
-        .bottom {
-            text-align: center;
-            margin-top: 20px;
-            color: #9ca3af;
-            font-size: 14px;
-        }
+button{
+width:100%;
+height:52px;
+margin-top:24px;
+border:0;
+border-radius:14px;
+background:linear-gradient(135deg,#3B82F6,#7C3AED);
+color:white;
+font-size:15px;
+font-weight:700;
+cursor:pointer
+}
 
-        a {
-            color: #60a5fa;
-            text-decoration: none;
-        }
+.error{
+padding:13px 14px;
+margin-bottom:18px;
+border-radius:12px;
+background:rgba(239,68,68,.1);
+border:1px solid rgba(239,68,68,.25);
+color:#FCA5A5;
+font-size:14px;
+line-height:1.45
+}
 
-        .hint {
-            margin-top: 7px;
-            font-size: 11px;
-            color: #737b90;
-        }
-    </style>
+.hint{
+margin-top:6px;
+color:#6B7280;
+font-size:12px
+}
+
+.bottom{
+margin-top:22px;
+text-align:center;
+color:#9CA3AF;
+font-size:14px
+}
+
+a{
+color:#60A5FA;
+text-decoration:none;
+font-weight:600
+}
+</style>
 </head>
 
 <body>
 
 <div class="card">
 
-    <div class="logo">
-        A
-    </div>
+<div class="logo">A</div>
 
-    <h1>
-        Create your AskOra account
-    </h1>
+<h1>Create your AskOra account</h1>
 
-    <div class="muted">
-        Ask questions, chat, use voice,
-        and analyze images.
-    </div>
+<p class="subtitle">
+Ask. Get answers.<br>
+Your AI assistant, made simple.
+</p>
 
-    <form
-        method="POST"
-        action="/register"
-    >
+{% if error %}
+<div class="error">{{ error }}</div>
+{% endif %}
 
-        <input
-            type="hidden"
-            name="csrf_token"
-            value="{{ csrf_token }}"
-        >
+<form method="POST" action="/register">
 
-        <label>
-            Username
-        </label>
+<input
+type="hidden"
+name="csrf_token"
+value="{{ csrf_token }}"
+>
 
-        <input
-            name="username"
-            required
-            minlength="3"
-            maxlength="32"
-            pattern="[A-Za-z0-9_]+"
-            autocomplete="username"
-            placeholder="your_username"
-        >
+<label>Username</label>
 
-        <div class="hint">
-            3–32 letters, numbers or underscores.
-        </div>
+<input
+name="username"
+type="text"
+placeholder="e.g. shadrach_01"
+minlength="3"
+maxlength="32"
+autocomplete="username"
+required
+>
 
-        <label>
-            Email
-        </label>
+<div class="hint">
+3–32 characters. Letters, numbers and underscores.
+</div>
 
-        <input
-            name="email"
-            type="email"
-            required
-            autocomplete="email"
-            placeholder="you@example.com"
-        >
+<label>Email</label>
 
-        <label>
-            Password
-        </label>
+<input
+name="email"
+type="email"
+placeholder="you@example.com"
+autocomplete="email"
+required
+>
 
-        <input
-            name="password"
-            type="password"
-            required
-            minlength="8"
-            autocomplete="new-password"
-            placeholder="At least 6 characters"
-        >
+<label>Password</label>
 
-        <button type="submit">
-            Create account
-        </button>
+<input
+name="password"
+type="password"
+placeholder="At least 8 characters"
+minlength="8"
+autocomplete="new-password"
+required
+>
 
-    </form>
+<label>Confirm password</label>
 
-    <div class="bottom">
-        Already have an account?
-        <a href="/login">
-            Log in
-        </a>
-    </div>
+<input
+name="confirm_password"
+type="password"
+placeholder="Enter password again"
+minlength="8"
+autocomplete="new-password"
+required
+>
+
+<button type="submit">
+Create account
+</button>
+
+</form>
+
+<div class="bottom">
+Already have an account?
+<a href="/login">Sign in</a>
+</div>
 
 </div>
 
