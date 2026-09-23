@@ -1,18 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-
     <meta charset="UTF-8">
-
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1.0"
     >
-
-    <title>Login — AskOra</title>
+    <title>Login • AskOra</title>
 
     <style>
-
         * {
             box-sizing: border-box;
         }
@@ -25,100 +21,86 @@
             background: #080b18;
             color: #f5f7ff;
             font-family:
-                Inter,
                 system-ui,
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
                 sans-serif;
             padding: 20px;
         }
 
-        .box {
+        .card {
             width: 100%;
-            max-width: 420px;
+            max-width: 410px;
             background: #10152b;
-            border: 1px solid rgba(255,255,255,.09);
+            border: 1px solid rgba(255,255,255,.08);
             border-radius: 20px;
             padding: 30px;
-            box-shadow:
-                0 20px 70px rgba(0,0,0,.4);
+            box-shadow: 0 25px 80px rgba(0,0,0,.35);
         }
 
         .logo {
-            width: 55px;
-            height: 55px;
-            border-radius: 17px;
+            width: 52px;
+            height: 52px;
             display: grid;
             place-items: center;
-            margin-bottom: 20px;
-            font-size: 25px;
-            font-weight: 900;
-            background:
-                linear-gradient(
-                    135deg,
-                    #3b82f6,
-                    #7c3aed
-                );
+            margin-bottom: 18px;
+            border-radius: 16px;
+            background: linear-gradient(
+                135deg,
+                #3b82f6,
+                #7c3aed
+            );
+            font-weight: 800;
+            font-size: 23px;
         }
 
         h1 {
-            margin: 0 0 8px;
+            margin: 0 0 7px;
         }
 
-        .subtitle {
+        .muted {
             color: #9ca3af;
             margin-bottom: 25px;
         }
 
         label {
             display: block;
+            margin: 15px 0 7px;
             font-size: 13px;
-            margin-bottom: 7px;
         }
 
         input {
             width: 100%;
-            border: 1px solid rgba(255,255,255,.1);
-            background: #0b0f20;
-            color: white;
+            padding: 13px;
             border-radius: 10px;
-            padding: 12px;
+            border: 1px solid rgba(255,255,255,.1);
+            background: #080b18;
+            color: white;
             outline: none;
-            margin-bottom: 16px;
-        }
-
-        input:focus {
-            border-color: #3b82f6;
         }
 
         button {
             width: 100%;
+            margin-top: 20px;
+            padding: 13px;
             border: 0;
             border-radius: 10px;
-            padding: 13px;
+            background: linear-gradient(
+                135deg,
+                #3b82f6,
+                #7c3aed
+            );
             color: white;
             font-weight: 700;
-            background:
-                linear-gradient(
-                    135deg,
-                    #3b82f6,
-                    #7c3aed
-                );
-        }
-
-        .error {
-            background: rgba(239,68,68,.1);
-            color: #fca5a5;
-            border: 1px solid rgba(239,68,68,.2);
-            padding: 10px;
-            border-radius: 9px;
-            margin-bottom: 15px;
-            font-size: 13px;
+            cursor: pointer;
         }
 
         .bottom {
-            margin-top: 20px;
             text-align: center;
+            margin-top: 20px;
             color: #9ca3af;
-            font-size: 13px;
+            font-size: 14px;
         }
 
         a {
@@ -126,13 +108,15 @@
             text-decoration: none;
         }
 
+        .csrf {
+            display: none;
+        }
     </style>
-
 </head>
 
 <body>
 
-<div class="box">
+<div class="card">
 
     <div class="logo">
         A
@@ -142,15 +126,9 @@
         Welcome back
     </h1>
 
-    <div class="subtitle">
-        Sign in to continue using AskOra.
+    <div class="muted">
+        Log in to continue with AskOra.
     </div>
-
-    {% if error %}
-    <div class="error">
-        {{ error }}
-    </div>
-    {% endif %}
 
     <form
         method="POST"
@@ -158,6 +136,7 @@
     >
 
         <input
+            class="csrf"
             type="hidden"
             name="csrf_token"
             value="{{ csrf_token }}"
@@ -168,11 +147,10 @@
         </label>
 
         <input
-            type="text"
-            name="identifier"
-            placeholder="Username or email"
-            autocomplete="username"
+            name="login"
             required
+            autocomplete="username"
+            placeholder="Username or email"
         >
 
         <label>
@@ -180,15 +158,15 @@
         </label>
 
         <input
-            type="password"
             name="password"
-            placeholder="Password"
-            autocomplete="current-password"
+            type="password"
             required
+            autocomplete="current-password"
+            placeholder="Password"
         >
 
         <button type="submit">
-            Sign in
+            Log in
         </button>
 
     </form>
