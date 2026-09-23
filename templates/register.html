@@ -1,19 +1,14 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-
     <meta charset="UTF-8">
-
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1.0"
     >
-
-    <title>Create account — AskOra</title>
+    <title>Create account • AskOra</title>
 
     <style>
-
         * {
             box-sizing: border-box;
         }
@@ -26,100 +21,84 @@
             background: #080b18;
             color: #f5f7ff;
             font-family:
-                Inter,
                 system-ui,
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
                 sans-serif;
             padding: 20px;
         }
 
-        .box {
+        .card {
             width: 100%;
-            max-width: 420px;
+            max-width: 410px;
             background: #10152b;
-            border: 1px solid rgba(255,255,255,.09);
+            border: 1px solid rgba(255,255,255,.08);
             border-radius: 20px;
             padding: 30px;
-            box-shadow:
-                0 20px 70px rgba(0,0,0,.4);
         }
 
         .logo {
-            width: 55px;
-            height: 55px;
-            border-radius: 17px;
+            width: 52px;
+            height: 52px;
             display: grid;
             place-items: center;
-            margin-bottom: 20px;
-            font-size: 25px;
-            font-weight: 900;
-            background:
-                linear-gradient(
-                    135deg,
-                    #3b82f6,
-                    #7c3aed
-                );
+            margin-bottom: 18px;
+            border-radius: 16px;
+            background: linear-gradient(
+                135deg,
+                #3b82f6,
+                #7c3aed
+            );
+            font-weight: 800;
+            font-size: 23px;
         }
 
         h1 {
-            margin: 0 0 8px;
+            margin: 0 0 7px;
         }
 
-        .subtitle {
+        .muted {
             color: #9ca3af;
-            margin-bottom: 25px;
+            margin-bottom: 22px;
         }
 
         label {
             display: block;
+            margin: 15px 0 7px;
             font-size: 13px;
-            margin-bottom: 7px;
         }
 
         input {
             width: 100%;
-            border: 1px solid rgba(255,255,255,.1);
-            background: #0b0f20;
-            color: white;
+            padding: 13px;
             border-radius: 10px;
-            padding: 12px;
+            border: 1px solid rgba(255,255,255,.1);
+            background: #080b18;
+            color: white;
             outline: none;
-            margin-bottom: 16px;
-        }
-
-        input:focus {
-            border-color: #3b82f6;
         }
 
         button {
             width: 100%;
+            margin-top: 20px;
+            padding: 13px;
             border: 0;
             border-radius: 10px;
-            padding: 13px;
+            background: linear-gradient(
+                135deg,
+                #3b82f6,
+                #7c3aed
+            );
             color: white;
             font-weight: 700;
-            background:
-                linear-gradient(
-                    135deg,
-                    #3b82f6,
-                    #7c3aed
-                );
-        }
-
-        .error {
-            background: rgba(239,68,68,.1);
-            color: #fca5a5;
-            border: 1px solid rgba(239,68,68,.2);
-            padding: 10px;
-            border-radius: 9px;
-            margin-bottom: 15px;
-            font-size: 13px;
         }
 
         .bottom {
-            margin-top: 20px;
             text-align: center;
+            margin-top: 20px;
             color: #9ca3af;
-            font-size: 13px;
+            font-size: 14px;
         }
 
         a {
@@ -128,37 +107,29 @@
         }
 
         .hint {
-            color: #6f7890;
+            margin-top: 7px;
             font-size: 11px;
-            margin-top: -10px;
-            margin-bottom: 15px;
+            color: #737b90;
         }
-
     </style>
-
 </head>
 
 <body>
 
-<div class="box">
+<div class="card">
 
     <div class="logo">
         A
     </div>
 
     <h1>
-        Create your account
+        Create your AskOra account
     </h1>
 
-    <div class="subtitle">
-        Start using AskOra for free.
+    <div class="muted">
+        Ask questions, chat, use voice,
+        and analyze images.
     </div>
-
-    {% if error %}
-    <div class="error">
-        {{ error }}
-    </div>
-    {% endif %}
 
     <form
         method="POST"
@@ -176,16 +147,17 @@
         </label>
 
         <input
-            type="text"
             name="username"
-            placeholder="your_username"
-            autocomplete="username"
-            pattern="[a-z0-9_]{3,32}"
             required
+            minlength="3"
+            maxlength="32"
+            pattern="[A-Za-z0-9_]+"
+            autocomplete="username"
+            placeholder="your_username"
         >
 
         <div class="hint">
-            3-32 lowercase letters, numbers or underscores.
+            3–32 letters, numbers or underscores.
         </div>
 
         <label>
@@ -193,11 +165,11 @@
         </label>
 
         <input
-            type="email"
             name="email"
-            placeholder="you@example.com"
-            autocomplete="email"
+            type="email"
             required
+            autocomplete="email"
+            placeholder="you@example.com"
         >
 
         <label>
@@ -205,12 +177,12 @@
         </label>
 
         <input
-            type="password"
             name="password"
-            placeholder="At least 8 characters"
-            autocomplete="new-password"
-            minlength="8"
+            type="password"
             required
+            minlength="8"
+            autocomplete="new-password"
+            placeholder="At least 8 characters"
         >
 
         <button type="submit">
@@ -222,7 +194,7 @@
     <div class="bottom">
         Already have an account?
         <a href="/login">
-            Sign in
+            Log in
         </a>
     </div>
 
