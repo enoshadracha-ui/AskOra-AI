@@ -1,364 +1,252 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+<meta charset="UTF-8">
 
-    <title>AskOra Admin</title>
+<meta
+name="viewport"
+content="width=device-width,initial-scale=1.0"
+>
 
-    <style>
-        * {
-            box-sizing: border-box;
-        }
+<title>AskOra Admin</title>
 
-        body {
-            margin: 0;
-            min-height: 100vh;
-            background: #080b18;
-            color: #f5f7ff;
-            font-family:
-                system-ui,
-                -apple-system,
-                BlinkMacSystemFont,
-                "Segoe UI",
-                sans-serif;
-        }
+<style>
 
-        header {
-            height: 64px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 25px;
-            border-bottom: 1px solid rgba(255,255,255,.08);
-            background: #0c1020;
-        }
+*{
+box-sizing:border-box
+}
 
-        header a {
-            color: #9ca3af;
-            text-decoration: none;
-        }
+body{
+margin:0;
+background:#080B18;
+color:#F5F7FF;
+font-family:Inter,system-ui,sans-serif;
+padding:25px
+}
 
-        main {
-            max-width: 1200px;
-            margin: auto;
-            padding: 30px 20px;
-        }
+.container{
+max-width:1100px;
+margin:auto
+}
 
-        h1 {
-            margin-top: 0;
-        }
+.top{
+display:flex;
+align-items:center;
+justify-content:space-between;
+gap:15px;
+margin-bottom:25px
+}
 
-        .muted {
-            color: #9ca3af;
-        }
+h1{
+margin:0
+}
 
-        .stats {
-            display: grid;
-            grid-template-columns:
-                repeat(
-                    auto-fit,
-                    minmax(170px, 1fr)
-                );
-            gap: 14px;
-            margin: 25px 0;
-        }
+a{
+color:#60A5FA;
+text-decoration:none
+}
 
-        .stat {
-            background: #10152b;
-            border: 1px solid rgba(255,255,255,.08);
-            border-radius: 14px;
-            padding: 18px;
-        }
+.grid{
+display:grid;
+grid-template-columns:repeat(5,1fr);
+gap:12px
+}
 
-        .stat-label {
-            color: #9ca3af;
-            font-size: 13px;
-        }
+.card{
+background:#10152B;
+border:1px solid rgba(255,255,255,.08);
+border-radius:16px;
+padding:20px
+}
 
-        .stat-value {
-            font-size: 28px;
-            font-weight: 800;
-            margin-top: 8px;
-        }
+.label{
+color:#9CA3AF;
+font-size:13px
+}
 
-        .table-wrap {
-            overflow-x: auto;
-            background: #10152b;
-            border: 1px solid rgba(255,255,255,.08);
-            border-radius: 14px;
-        }
+.value{
+font-size:28px;
+font-weight:800;
+margin-top:8px
+}
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
+.table-wrap{
+margin-top:20px;
+overflow:auto
+}
 
-        th,
-        td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid rgba(255,255,255,.06);
-            white-space: nowrap;
-        }
+table{
+width:100%;
+border-collapse:collapse
+}
 
-        th {
-            color: #9ca3af;
-            font-size: 12px;
-        }
-    </style>
+th,
+td{
+padding:12px;
+border-bottom:1px solid rgba(255,255,255,.08);
+text-align:left;
+white-space:nowrap
+}
+
+th{
+color:#9CA3AF;
+font-size:13px
+}
+
+@media(max-width:800px){
+
+.grid{
+grid-template-columns:repeat(2,1fr)
+}
+
+}
+</style>
+
 </head>
 
 <body>
 
-<header>
+<div class="container">
 
-    <strong>
-        AskOra Admin
-    </strong>
+<div class="top">
 
-    <a href="/">
-        ← Back to AskOra
-    </a>
+<h1>AskOra Admin</h1>
 
-</header>
+<a href="/">← Back to AskOra</a>
 
-<main>
+</div>
 
-    <h1>
-        Dashboard
-    </h1>
+<div
+class="grid"
+id="stats"
+>
+Loading...
+</div>
 
-    <div class="muted">
-        Welcome, {{ user.username }}
-    </div>
+<div class="card table-wrap">
 
-    <div class="stats">
+<h2>Users</h2>
 
-        <div class="stat">
-            <div class="stat-label">
-                Total users
-            </div>
+<table>
 
-            <div
-                class="stat-value"
-                id="totalUsers"
-            >
-                —
-            </div>
-        </div>
+<thead>
 
-        <div class="stat">
-            <div class="stat-label">
-                Users today
-            </div>
+<tr>
+<th>Username</th>
+<th>Email</th>
+<th>First seen</th>
+<th>Last seen</th>
+</tr>
 
-            <div
-                class="stat-value"
-                id="usersToday"
-            >
-                —
-            </div>
-        </div>
+</thead>
 
-        <div class="stat">
-            <div class="stat-label">
-                Active today
-            </div>
+<tbody id="users"></tbody>
 
-            <div
-                class="stat-value"
-                id="activeToday"
-            >
-                —
-            </div>
-        </div>
+</table>
 
-        <div class="stat">
-            <div class="stat-label">
-                Total chats
-            </div>
+</div>
 
-            <div
-                class="stat-value"
-                id="totalChats"
-            >
-                —
-            </div>
-        </div>
-
-        <div class="stat">
-            <div class="stat-label">
-                Total messages
-            </div>
-
-            <div
-                class="stat-value"
-                id="totalMessages"
-            >
-                —
-            </div>
-        </div>
-
-    </div>
-
-    <h2>
-        Users
-    </h2>
-
-    <div class="table-wrap">
-
-        <table>
-
-            <thead>
-
-                <tr>
-                    <th>Username</th>
-                    <th>Email</th>
-                    <th>Chats</th>
-                    <th>Messages</th>
-                    <th>Last active</th>
-                </tr>
-
-            </thead>
-
-            <tbody id="users">
-            </tbody>
-
-        </table>
-
-    </div>
-
-</main>
-
+</div>
 
 <script>
 
-const csrfToken =
-    {{ csrf_token|tojson }};
+async function loadStats(){
 
+const response =
+await fetch(
+"/api/admin/stats"
+);
 
-async function loadStats() {
+const data =
+await response.json();
 
-    const response =
-        await fetch(
-            "/api/admin/stats",
-            {
-                headers: {
-                    "X-CSRF-Token":
-                        csrfToken
-                }
-            }
-        );
+if(!data.ok){
 
-    const data =
-        await response.json();
+document.getElementById(
+"stats"
+).textContent =
+data.error;
 
-    if (!response.ok) {
+return;
 
-        document.body.innerHTML =
-            "<h2 style='padding:30px'>Access denied.</h2>";
-
-        return;
-    }
-
-    document.getElementById(
-        "totalUsers"
-    ).textContent =
-        data.stats.total_users;
-
-    document.getElementById(
-        "usersToday"
-    ).textContent =
-        data.stats.users_today;
-
-    document.getElementById(
-        "activeToday"
-    ).textContent =
-        data.stats.active_today;
-
-    document.getElementById(
-        "totalChats"
-    ).textContent =
-        data.stats.total_chats;
-
-    document.getElementById(
-        "totalMessages"
-    ).textContent =
-        data.stats.total_messages;
-
-    const users =
-        document.getElementById(
-            "users"
-        );
-
-    users.innerHTML = "";
-
-    data.users.forEach(
-        user => {
-
-            const row =
-                document.createElement(
-                    "tr"
-                );
-
-            row.innerHTML = `
-                <td>
-                    ${escapeHtml(user.username)}
-                </td>
-
-                <td>
-                    ${escapeHtml(user.email || "")}
-                </td>
-
-                <td>
-                    ${user.chat_count}
-                </td>
-
-                <td>
-                    ${user.message_count}
-                </td>
-
-                <td>
-                    ${user.last_seen || ""}
-                </td>
-            `;
-
-            users.appendChild(row);
-        }
-    );
 }
 
+const s =
+data.stats;
 
-function escapeHtml(value) {
+document.getElementById(
+"stats"
+).innerHTML = `
 
-    return String(value)
-        .replace(
-            /&/g,
-            "&amp;"
-        )
-        .replace(
-            /</g,
-            "&lt;"
-        )
-        .replace(
-            />/g,
-            "&gt;"
-        )
-        .replace(
-            /"/g,
-            "&quot;"
-        )
-        .replace(
-            /'/g,
-            "&#039;"
-        );
+<div class="card">
+<div class="label">Total users</div>
+<div class="value">${s.total_users}</div>
+</div>
+
+<div class="card">
+<div class="label">Users today</div>
+<div class="value">${s.users_today}</div>
+</div>
+
+<div class="card">
+<div class="label">Active today</div>
+<div class="value">${s.active_today}</div>
+</div>
+
+<div class="card">
+<div class="label">Total chats</div>
+<div class="value">${s.total_chats}</div>
+</div>
+
+<div class="card">
+<div class="label">Messages</div>
+<div class="value">${s.total_messages}</div>
+</div>
+
+`;
+
+const users =
+document.getElementById(
+"users"
+);
+
+users.innerHTML = "";
+
+s.users.forEach(user => {
+
+const row =
+document.createElement("tr");
+
+row.innerHTML = `
+
+<td>${escapeHtml(user.username)}</td>
+
+<td>${escapeHtml(user.email || "")}</td>
+
+<td>${user.first_seen || ""}</td>
+
+<td>${user.last_seen || ""}</td>
+
+`;
+
+users.appendChild(row);
+
+});
+
 }
 
+function escapeHtml(value){
+
+const div =
+document.createElement("div");
+
+div.textContent =
+value ?? "";
+
+return div.innerHTML;
+
+}
 
 loadStats();
 
