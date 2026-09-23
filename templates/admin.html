@@ -2,97 +2,122 @@
 <html lang="en">
 <head>
 
-<meta charset="UTF-8">
+    <meta charset="UTF-8">
 
-<meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
->
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
-<title>AskOra Admin</title>
+    <title>AskOra Admin</title>
 
-<style>
+    <style>
 
-* {
-    box-sizing: border-box;
-}
+        * {
+            box-sizing: border-box;
+        }
 
-body {
-    margin: 0;
-    min-height: 100vh;
+        body {
+            margin: 0;
+            background: #080b18;
+            color: #f5f7ff;
+            font-family:
+                Inter,
+                system-ui,
+                sans-serif;
+            padding: 25px;
+        }
 
-    background: #080B18;
+        .container {
+            max-width: 1200px;
+            margin: auto;
+        }
 
-    color: #F5F7FF;
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
 
-    font-family:
-        system-ui,
-        -apple-system,
-        BlinkMacSystemFont,
-        "Segoe UI",
-        sans-serif;
+        .header h1 {
+            margin: 0;
+        }
 
-    padding: 25px;
-}
+        .header a {
+            color: #60a5fa;
+            text-decoration: none;
+        }
 
-.container {
-    width: min(900px, 100%);
-    margin: auto;
-}
+        .cards {
+            display: grid;
+            grid-template-columns:
+                repeat(
+                    auto-fit,
+                    minmax(180px, 1fr)
+                );
+            gap: 14px;
+            margin-bottom: 25px;
+        }
 
-h1 {
-    margin-bottom: 5px;
-}
+        .card {
+            background: #10152b;
+            border: 1px solid rgba(255,255,255,.08);
+            border-radius: 15px;
+            padding: 20px;
+        }
 
-.subtitle {
-    color: #9CA3AF;
-    margin-bottom: 25px;
-}
+        .card-label {
+            color: #9ca3af;
+            font-size: 12px;
+        }
 
-.grid {
-    display: grid;
+        .card-value {
+            font-size: 28px;
+            font-weight: 800;
+            margin-top: 8px;
+        }
 
-    grid-template-columns:
-        repeat(
-            auto-fit,
-            minmax(180px, 1fr)
-        );
+        .panel {
+            background: #10152b;
+            border: 1px solid rgba(255,255,255,.08);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            overflow-x: auto;
+        }
 
-    gap: 15px;
-}
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 700px;
+        }
 
-.card {
-    padding: 20px;
+        th,
+        td {
+            text-align: left;
+            padding: 11px;
+            border-bottom: 1px solid rgba(255,255,255,.06);
+            font-size: 13px;
+        }
 
-    border-radius: 18px;
+        th {
+            color: #9ca3af;
+            font-weight: 600;
+        }
 
-    background: #10152B;
+        .event {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255,255,255,.05);
+        }
 
-    border: 1px solid rgba(255,255,255,.08);
-}
+        .muted {
+            color: #9ca3af;
+        }
 
-.label {
-    color: #9CA3AF;
-    font-size: 13px;
-}
-
-.value {
-    font-size: 30px;
-    font-weight: 800;
-    margin-top: 7px;
-}
-
-a {
-    display: inline-block;
-
-    margin-top: 25px;
-
-    color: #60A5FA;
-
-    text-decoration: none;
-}
-
-</style>
+    </style>
 
 </head>
 
@@ -100,81 +125,347 @@ a {
 
 <div class="container">
 
-    <h1>
-        AskOra Admin
-    </h1>
+    <div class="header">
 
-    <div class="subtitle">
-        Website statistics
+        <div>
+            <h1>
+                AskOra Admin
+            </h1>
+
+            <div class="muted">
+                Dashboard
+            </div>
+        </div>
+
+        <a href="/">
+            ← Back to AskOra
+        </a>
+
     </div>
 
-    <div
-        class="grid"
-        id="stats"
-    ></div>
 
-    <a href="/">
-        ← Back to AskOra
-    </a>
+    <div
+        class="cards"
+        id="cards"
+    >
+
+        <div class="card">
+            <div class="card-label">
+                Total users
+            </div>
+
+            <div
+                class="card-value"
+                id="totalUsers"
+            >
+                —
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-label">
+                Users today
+            </div>
+
+            <div
+                class="card-value"
+                id="usersToday"
+            >
+                —
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-label">
+                Active today
+            </div>
+
+            <div
+                class="card-value"
+                id="activeToday"
+            >
+                —
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-label">
+                Total chats
+            </div>
+
+            <div
+                class="card-value"
+                id="totalChats"
+            >
+                —
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-label">
+                Total messages
+            </div>
+
+            <div
+                class="card-value"
+                id="totalMessages"
+            >
+                —
+            </div>
+        </div>
+
+    </div>
+
+
+    <div class="panel">
+
+        <h2>
+            Events
+        </h2>
+
+        <div id="events">
+            Loading...
+        </div>
+
+    </div>
+
+
+    <div class="panel">
+
+        <h2>
+            Users
+        </h2>
+
+        <table>
+
+            <thead>
+
+                <tr>
+                    <th>ID</th>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Chats</th>
+                    <th>Messages</th>
+                    <th>Last active</th>
+                </tr>
+
+            </thead>
+
+            <tbody id="users">
+            </tbody>
+
+        </table>
+
+    </div>
 
 </div>
 
 
 <script>
 
+const csrfToken =
+    "{{ csrf_token }}";
+
+
 async function loadStats() {
 
     const response =
-        await fetch("/api/admin/stats");
+        await fetch(
+            "/api/admin/stats",
+            {
+                headers: {
+                    "X-CSRF-Token":
+                        csrfToken
+                }
+            }
+        );
 
     const data =
         await response.json();
 
-    if (!data.success) {
+    if (!response.ok) {
+
+        alert(
+            data.error
+            || "Could not load dashboard."
+        );
+
         return;
     }
 
-    const items = [
+    const stats =
+        data.stats;
 
-        ["Total Users", data.total_users],
+    document
+        .getElementById(
+            "totalUsers"
+        )
+        .textContent =
+        stats.total_users;
 
-        ["New Users Today", data.new_users_today],
+    document
+        .getElementById(
+            "usersToday"
+        )
+        .textContent =
+        stats.users_today;
 
-        ["New Users This Week", data.new_users_week],
+    document
+        .getElementById(
+            "activeToday"
+        )
+        .textContent =
+        stats.active_today;
 
-        ["Active Today", data.active_users_today],
+    document
+        .getElementById(
+            "totalChats"
+        )
+        .textContent =
+        stats.total_chats;
 
-        ["Total Messages", data.total_messages],
+    document
+        .getElementById(
+            "totalMessages"
+        )
+        .textContent =
+        stats.total_messages;
 
-        ["Messages Today", data.messages_today],
 
-        ["Text Requests", data.text_requests],
+    const events =
+        document.getElementById(
+            "events"
+        );
 
-        ["Voice Requests", data.voice_requests],
+    events.innerHTML = "";
 
-        ["Total Events", data.total_events],
+    data.events.forEach(
+        event => {
 
-    ];
+            const row =
+                document.createElement(
+                    "div"
+                );
 
-    document.getElementById("stats").innerHTML =
-        items.map(item => `
+            row.className =
+                "event";
 
-            <div class="card">
+            row.innerHTML = `
+                <span>
+                    ${escapeHtml(
+                        event.event_type
+                    )}
+                </span>
 
-                <div class="label">
-                    ${item[0]}
-                </div>
+                <strong>
+                    ${event.count}
+                </strong>
+            `;
 
-                <div class="value">
-                    ${item[1]}
-                </div>
+            events.appendChild(row);
 
-            </div>
+        }
+    );
 
-        `).join("");
+
+    const users =
+        document.getElementById(
+            "users"
+        );
+
+    users.innerHTML = "";
+
+    data.users.forEach(
+        user => {
+
+            const row =
+                document.createElement(
+                    "tr"
+                );
+
+            row.innerHTML = `
+                <td>${user.id}</td>
+
+                <td>
+                    ${escapeHtml(
+                        user.username
+                    )}
+                </td>
+
+                <td>
+                    ${escapeHtml(
+                        user.email || ""
+                    )}
+                </td>
+
+                <td>
+                    ${user.chats}
+                </td>
+
+                <td>
+                    ${user.messages}
+                </td>
+
+                <td>
+                    ${formatDate(
+                        user.last_seen
+                    )}
+                </td>
+            `;
+
+            users.appendChild(row);
+
+        }
+    );
+
 }
 
+
+function escapeHtml(text) {
+
+    return String(text)
+        .replace(
+            /&/g,
+            "&amp;"
+        )
+        .replace(
+            /</g,
+            "&lt;"
+        )
+        .replace(
+            />/g,
+            "&gt;"
+        )
+        .replace(
+            /"/g,
+            "&quot;"
+        )
+        .replace(
+            /'/g,
+            "&#039;"
+        );
+
+}
+
+
+function formatDate(value) {
+
+    if (!value) {
+        return "";
+    }
+
+    return new Date(value)
+        .toLocaleString();
+
+}
+
+
 loadStats();
+
+setInterval(
+    loadStats,
+    30000
+);
 
 </script>
 
