@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Login — AskOra</title>
+
+<style>
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 20px;
+
+    background:
+        radial-gradient(
+            circle at 20% 20%,
+            rgba(59,130,246,.18),
+            transparent 35%
+        ),
+        radial-gradient(
+            circle at 80% 80%,
+            rgba(124,58,237,.18),
+            transparent 35%
+        ),
+        #080B18;
+
+    color: #F5F7FF;
+
+    font-family:
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+}
+
+.card {
+    width: 100%;
+    max-width: 410px;
+
+    padding: 30px;
+
+    border-radius: 24px;
+
+    background: rgba(16,21,43,.85);
+
+    border: 1px solid rgba(255,255,255,.09);
+
+    box-shadow:
+        0 25px 70px rgba(0,0,0,.4);
+
+    backdrop-filter: blur(20px);
+}
+
+.logo {
+    width: 55px;
+    height: 55px;
+
+    margin-bottom: 20px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 17px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #3B82F6,
+            #7C3AED
+        );
+
+    font-size: 27px;
+    font-weight: 900;
+
+    box-shadow:
+        0 0 30px rgba(59,130,246,.3);
+}
+
+h1 {
+    margin: 0 0 7px;
+}
+
+.subtitle {
+    color: #9CA3AF;
+    margin-bottom: 25px;
+}
+
+label {
+    display: block;
+    margin-bottom: 7px;
+    font-size: 13px;
+    color: #D1D5DB;
+}
+
+input {
+    width: 100%;
+
+    padding: 13px 14px;
+
+    margin-bottom: 17px;
+
+    border-radius: 12px;
+
+    border: 1px solid rgba(255,255,255,.1);
+
+    background: rgba(255,255,255,.05);
+
+    color: white;
+
+    outline: none;
+}
+
+input:focus {
+    border-color: #3B82F6;
+}
+
+button {
+    width: 100%;
+
+    padding: 13px;
+
+    border: none;
+
+    border-radius: 12px;
+
+    color: white;
+
+    font-weight: 700;
+
+    cursor: pointer;
+
+    background:
+        linear-gradient(
+            135deg,
+            #3B82F6,
+            #7C3AED
+        );
+}
+
+.error {
+    padding: 11px;
+
+    margin-bottom: 15px;
+
+    border-radius: 10px;
+
+    background: rgba(220,38,38,.12);
+
+    border: 1px solid rgba(220,38,38,.25);
+
+    color: #FCA5A5;
+
+    font-size: 13px;
+}
+
+.bottom {
+    text-align: center;
+
+    color: #9CA3AF;
+
+    font-size: 13px;
+
+    margin-top: 20px;
+}
+
+a {
+    color: #60A5FA;
+    text-decoration: none;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="card">
+
+    <div class="logo">
+        A
+    </div>
+
+    <h1>
+        Welcome back
+    </h1>
+
+    <div class="subtitle">
+        Sign in to AskOra.
+    </div>
+
+    {% if error %}
+        <div class="error">
+            {{ error }}
+        </div>
+    {% endif %}
+
+    <form method="POST">
+
+        <input
+            type="hidden"
+            name="csrf_token"
+            value="{{ csrf_token }}"
+        >
+
+        <label>
+            Username
+        </label>
+
+        <input
+            name="username"
+            required
+            autocomplete="username"
+            placeholder="Your username"
+        >
+
+        <label>
+            Password
+        </label>
+
+        <input
+            type="password"
+            name="password"
+            required
+            autocomplete="current-password"
+            placeholder="Your password"
+        >
+
+        <button type="submit">
+            Login
+        </button>
+
+    </form>
+
+    <div class="bottom">
+
+        Don't have an account?
+        <a href="/register">
+            Create one
+        </a>
+
+    </div>
+
+</div>
+
+</body>
+</html>
