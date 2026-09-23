@@ -1,4 +1,5 @@
 Flask
+gunicorn
 groq
-python-telegram-bot==22.5
 psycopg2-binary
+Werkzeug
