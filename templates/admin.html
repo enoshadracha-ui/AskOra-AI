@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-
     <meta charset="UTF-8">
 
     <meta
@@ -12,202 +11,193 @@
     <title>AskOra Admin</title>
 
     <style>
-
         * {
             box-sizing: border-box;
         }
 
         body {
             margin: 0;
+            min-height: 100vh;
             background: #080b18;
             color: #f5f7ff;
             font-family:
-                Inter,
                 system-ui,
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
                 sans-serif;
-            padding: 25px;
         }
 
-        .container {
-            max-width: 1200px;
-            margin: auto;
-        }
-
-        .header {
+        header {
+            height: 64px;
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            margin-bottom: 25px;
+            justify-content: space-between;
+            padding: 0 25px;
+            border-bottom: 1px solid rgba(255,255,255,.08);
+            background: #0c1020;
         }
 
-        .header h1 {
-            margin: 0;
-        }
-
-        .header a {
-            color: #60a5fa;
+        header a {
+            color: #9ca3af;
             text-decoration: none;
         }
 
-        .cards {
-            display: grid;
-            grid-template-columns:
-                repeat(
-                    auto-fit,
-                    minmax(180px, 1fr)
-                );
-            gap: 14px;
-            margin-bottom: 25px;
+        main {
+            max-width: 1200px;
+            margin: auto;
+            padding: 30px 20px;
         }
 
-        .card {
-            background: #10152b;
-            border: 1px solid rgba(255,255,255,.08);
-            border-radius: 15px;
-            padding: 20px;
-        }
-
-        .card-label {
-            color: #9ca3af;
-            font-size: 12px;
-        }
-
-        .card-value {
-            font-size: 28px;
-            font-weight: 800;
-            margin-top: 8px;
-        }
-
-        .panel {
-            background: #10152b;
-            border: 1px solid rgba(255,255,255,.08);
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 20px;
-            overflow-x: auto;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            min-width: 700px;
-        }
-
-        th,
-        td {
-            text-align: left;
-            padding: 11px;
-            border-bottom: 1px solid rgba(255,255,255,.06);
-            font-size: 13px;
-        }
-
-        th {
-            color: #9ca3af;
-            font-weight: 600;
-        }
-
-        .event {
-            display: flex;
-            justify-content: space-between;
-            padding: 10px 0;
-            border-bottom: 1px solid rgba(255,255,255,.05);
+        h1 {
+            margin-top: 0;
         }
 
         .muted {
             color: #9ca3af;
         }
 
-    </style>
+        .stats {
+            display: grid;
+            grid-template-columns:
+                repeat(
+                    auto-fit,
+                    minmax(170px, 1fr)
+                );
+            gap: 14px;
+            margin: 25px 0;
+        }
 
+        .stat {
+            background: #10152b;
+            border: 1px solid rgba(255,255,255,.08);
+            border-radius: 14px;
+            padding: 18px;
+        }
+
+        .stat-label {
+            color: #9ca3af;
+            font-size: 13px;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 800;
+            margin-top: 8px;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+            background: #10152b;
+            border: 1px solid rgba(255,255,255,.08);
+            border-radius: 14px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,.06);
+            white-space: nowrap;
+        }
+
+        th {
+            color: #9ca3af;
+            font-size: 12px;
+        }
+    </style>
 </head>
 
 <body>
 
-<div class="container">
+<header>
 
-    <div class="header">
+    <strong>
+        AskOra Admin
+    </strong>
 
-        <div>
-            <h1>
-                AskOra Admin
-            </h1>
+    <a href="/">
+        ← Back to AskOra
+    </a>
 
-            <div class="muted">
-                Dashboard
-            </div>
-        </div>
+</header>
 
-        <a href="/">
-            ← Back to AskOra
-        </a>
+<main>
 
+    <h1>
+        Dashboard
+    </h1>
+
+    <div class="muted">
+        Welcome, {{ user.username }}
     </div>
 
+    <div class="stats">
 
-    <div
-        class="cards"
-        id="cards"
-    >
-
-        <div class="card">
-            <div class="card-label">
+        <div class="stat">
+            <div class="stat-label">
                 Total users
             </div>
 
             <div
-                class="card-value"
+                class="stat-value"
                 id="totalUsers"
             >
                 —
             </div>
         </div>
 
-        <div class="card">
-            <div class="card-label">
+        <div class="stat">
+            <div class="stat-label">
                 Users today
             </div>
 
             <div
-                class="card-value"
+                class="stat-value"
                 id="usersToday"
             >
                 —
             </div>
         </div>
 
-        <div class="card">
-            <div class="card-label">
+        <div class="stat">
+            <div class="stat-label">
                 Active today
             </div>
 
             <div
-                class="card-value"
+                class="stat-value"
                 id="activeToday"
             >
                 —
             </div>
         </div>
 
-        <div class="card">
-            <div class="card-label">
+        <div class="stat">
+            <div class="stat-label">
                 Total chats
             </div>
 
             <div
-                class="card-value"
+                class="stat-value"
                 id="totalChats"
             >
                 —
             </div>
         </div>
 
-        <div class="card">
-            <div class="card-label">
+        <div class="stat">
+            <div class="stat-label">
                 Total messages
             </div>
 
             <div
-                class="card-value"
+                class="stat-value"
                 id="totalMessages"
             >
                 —
@@ -216,32 +206,17 @@
 
     </div>
 
+    <h2>
+        Users
+    </h2>
 
-    <div class="panel">
-
-        <h2>
-            Events
-        </h2>
-
-        <div id="events">
-            Loading...
-        </div>
-
-    </div>
-
-
-    <div class="panel">
-
-        <h2>
-            Users
-        </h2>
+    <div class="table-wrap">
 
         <table>
 
             <thead>
 
                 <tr>
-                    <th>ID</th>
                     <th>Username</th>
                     <th>Email</th>
                     <th>Chats</th>
@@ -258,13 +233,13 @@
 
     </div>
 
-</div>
+</main>
 
 
 <script>
 
 const csrfToken =
-    "{{ csrf_token }}";
+    {{ csrf_token|tojson }};
 
 
 async function loadStats() {
@@ -285,88 +260,36 @@ async function loadStats() {
 
     if (!response.ok) {
 
-        alert(
-            data.error
-            || "Could not load dashboard."
-        );
+        document.body.innerHTML =
+            "<h2 style='padding:30px'>Access denied.</h2>";
 
         return;
     }
 
-    const stats =
-        data.stats;
+    document.getElementById(
+        "totalUsers"
+    ).textContent =
+        data.stats.total_users;
 
-    document
-        .getElementById(
-            "totalUsers"
-        )
-        .textContent =
-        stats.total_users;
+    document.getElementById(
+        "usersToday"
+    ).textContent =
+        data.stats.users_today;
 
-    document
-        .getElementById(
-            "usersToday"
-        )
-        .textContent =
-        stats.users_today;
+    document.getElementById(
+        "activeToday"
+    ).textContent =
+        data.stats.active_today;
 
-    document
-        .getElementById(
-            "activeToday"
-        )
-        .textContent =
-        stats.active_today;
+    document.getElementById(
+        "totalChats"
+    ).textContent =
+        data.stats.total_chats;
 
-    document
-        .getElementById(
-            "totalChats"
-        )
-        .textContent =
-        stats.total_chats;
-
-    document
-        .getElementById(
-            "totalMessages"
-        )
-        .textContent =
-        stats.total_messages;
-
-
-    const events =
-        document.getElementById(
-            "events"
-        );
-
-    events.innerHTML = "";
-
-    data.events.forEach(
-        event => {
-
-            const row =
-                document.createElement(
-                    "div"
-                );
-
-            row.className =
-                "event";
-
-            row.innerHTML = `
-                <span>
-                    ${escapeHtml(
-                        event.event_type
-                    )}
-                </span>
-
-                <strong>
-                    ${event.count}
-                </strong>
-            `;
-
-            events.appendChild(row);
-
-        }
-    );
-
+    document.getElementById(
+        "totalMessages"
+    ).textContent =
+        data.stats.total_messages;
 
     const users =
         document.getElementById(
@@ -384,46 +307,36 @@ async function loadStats() {
                 );
 
             row.innerHTML = `
-                <td>${user.id}</td>
-
                 <td>
-                    ${escapeHtml(
-                        user.username
-                    )}
+                    ${escapeHtml(user.username)}
                 </td>
 
                 <td>
-                    ${escapeHtml(
-                        user.email || ""
-                    )}
+                    ${escapeHtml(user.email || "")}
                 </td>
 
                 <td>
-                    ${user.chats}
+                    ${user.chat_count}
                 </td>
 
                 <td>
-                    ${user.messages}
+                    ${user.message_count}
                 </td>
 
                 <td>
-                    ${formatDate(
-                        user.last_seen
-                    )}
+                    ${user.last_seen || ""}
                 </td>
             `;
 
             users.appendChild(row);
-
         }
     );
-
 }
 
 
-function escapeHtml(text) {
+function escapeHtml(value) {
 
-    return String(text)
+    return String(value)
         .replace(
             /&/g,
             "&amp;"
@@ -444,28 +357,10 @@ function escapeHtml(text) {
             /'/g,
             "&#039;"
         );
-
-}
-
-
-function formatDate(value) {
-
-    if (!value) {
-        return "";
-    }
-
-    return new Date(value)
-        .toLocaleString();
-
 }
 
 
 loadStats();
-
-setInterval(
-    loadStats,
-    30000
-);
 
 </script>
 
