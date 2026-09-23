@@ -1,149 +1,83 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+
     <meta charset="UTF-8">
 
     <meta
         name="viewport"
-        content="width=device-width,
-                 initial-scale=1.0,
-                 maximum-scale=1.0,
-                 user-scalable=no"
+        content="width=device-width, initial-scale=1.0"
     >
 
-    <title>AskOra</title>
+    <meta
+        name="theme-color"
+        content="#080B18"
+    >
 
-    <!-- Telegram Mini App -->
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-
-    <!-- Monetag In-App Interstitial -->
-    <script
-        src="//libtl.com/sdk.js"
-        data-zone="11827766"
-        data-sdk="show_11827766"
-    ></script>
+    <title>AskOra — Ask. Get answers.</title>
 
     <style>
+
         * {
             box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        html,
-        body {
             margin: 0;
             padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            font-family:
-                -apple-system,
-                BlinkMacSystemFont,
-                "Segoe UI",
-                Roboto,
-                Arial,
-                sans-serif;
-            background: #080B18;
-            color: #F5F7FF;
         }
 
         body {
-            position: relative;
-        }
-
-        /* =========================
-           BACKGROUND
-        ========================= */
-
-        .background {
-            position: fixed;
-            inset: 0;
-            overflow: hidden;
-            pointer-events: none;
+            min-height: 100vh;
             background:
                 radial-gradient(
-                    circle at 20% 10%,
-                    rgba(59, 130, 246, 0.18),
-                    transparent 32%
+                    circle at 10% 10%,
+                    rgba(59,130,246,.16),
+                    transparent 30%
                 ),
                 radial-gradient(
-                    circle at 85% 25%,
-                    rgba(124, 58, 237, 0.18),
+                    circle at 90% 80%,
+                    rgba(124,58,237,.16),
                     transparent 30%
                 ),
                 #080B18;
+
+            color: #F5F7FF;
+
+            font-family:
+                Inter,
+                system-ui,
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                sans-serif;
         }
 
-        .orb {
-            position: absolute;
-            border-radius: 50%;
-            filter: blur(70px);
-            opacity: 0.28;
+        button,
+        input {
+            font: inherit;
         }
-
-        .orb.one {
-            width: 180px;
-            height: 180px;
-            background: #3B82F6;
-            top: -70px;
-            left: -50px;
-        }
-
-        .orb.two {
-            width: 220px;
-            height: 220px;
-            background: #7C3AED;
-            right: -80px;
-            top: 180px;
-        }
-
-        .orb.three {
-            width: 180px;
-            height: 180px;
-            background: #2563EB;
-            bottom: -80px;
-            left: 20%;
-        }
-
-        /* =========================
-           APP
-        ========================= */
 
         .app {
-            position: relative;
-            z-index: 2;
-
-            width: 100%;
-            height: 100%;
-
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
         }
 
-        /* =========================
-           HEADER
-        ========================= */
-
-        .header {
-            flex-shrink: 0;
+        header {
+            height: 70px;
+            border-bottom: 1px solid rgba(255,255,255,.08);
 
             display: flex;
             align-items: center;
             justify-content: space-between;
 
-            padding:
-                calc(12px + env(safe-area-inset-top))
-                16px
-                12px;
-
-            border-bottom:
-                1px solid
-                rgba(255, 255, 255, 0.07);
-
-            background:
-                rgba(8, 11, 24, 0.78);
+            padding: 0 20px;
 
             backdrop-filter: blur(20px);
+
+            position: sticky;
+            top: 0;
+            z-index: 20;
+
+            background: rgba(8,11,24,.78);
         }
 
         .brand {
@@ -153,230 +87,122 @@
         }
 
         .logo {
-            width: 43px;
-            height: 43px;
+            width: 40px;
+            height: 40px;
+
             border-radius: 13px;
 
             display: flex;
             align-items: center;
             justify-content: center;
 
-            font-size: 24px;
+            font-size: 22px;
             font-weight: 900;
 
             background:
                 linear-gradient(
-                    145deg,
-                    rgba(59, 130, 246, 0.95),
-                    rgba(124, 58, 237, 0.95)
-                );
-
-            box-shadow:
-                0 8px 30px
-                rgba(59, 130, 246, 0.25);
-        }
-
-        .brand-name {
-            font-size: 18px;
-            font-weight: 800;
-        }
-
-        .brand-tagline {
-            margin-top: 2px;
-            color: #9CA3AF;
-            font-size: 11px;
-        }
-
-        .status {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-
-            color: #9CA3AF;
-            font-size: 11px;
-        }
-
-        .status-dot {
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-            background: #22C55E;
-
-            box-shadow:
-                0 0 10px
-                rgba(34, 197, 94, 0.7);
-        }
-
-        /* =========================
-           BUTTONS
-        ========================= */
-
-        .header-actions {
-            display: flex;
-            gap: 7px;
-        }
-
-        .icon-btn {
-            width: 38px;
-            height: 38px;
-            border: 0;
-            border-radius: 12px;
-
-            color: #F5F7FF;
-            background:
-                rgba(255, 255, 255, 0.07);
-
-            font-size: 17px;
-            cursor: pointer;
-        }
-
-        .icon-btn:active {
-            transform: scale(0.94);
-        }
-
-        /* =========================
-           CHAT
-        ========================= */
-
-        .chat {
-            flex: 1;
-            overflow-y: auto;
-
-            padding:
-                20px
-                15px
-                18px;
-
-            scroll-behavior: smooth;
-        }
-
-        .chat::-webkit-scrollbar {
-            width: 0;
-        }
-
-        .welcome {
-            max-width: 430px;
-            margin: 28px auto 25px;
-            text-align: center;
-        }
-
-        .welcome-logo {
-            width: 70px;
-            height: 70px;
-            margin: 0 auto 17px;
-
-            border-radius: 22px;
-
-            display: flex;
-            align-items: center;
-            justify-content: center;
-
-            font-size: 39px;
-            font-weight: 900;
-
-            background:
-                linear-gradient(
-                    145deg,
+                    135deg,
                     #3B82F6,
                     #7C3AED
                 );
 
             box-shadow:
-                0 18px 50px
-                rgba(59, 130, 246, 0.22);
+                0 0 25px rgba(59,130,246,.35);
         }
 
-        .welcome h1 {
-            margin: 0;
-            font-size: 27px;
-            letter-spacing: -0.7px;
+        .brand-name {
+            font-size: 19px;
+            font-weight: 800;
         }
 
-        .welcome p {
-            margin: 9px auto 0;
-            max-width: 320px;
-
+        .brand-tagline {
             color: #9CA3AF;
-            line-height: 1.55;
-            font-size: 14px;
+            font-size: 11px;
+            margin-top: 2px;
         }
 
-        .welcome-card {
-            margin-top: 20px;
-            padding: 15px;
-
-            border:
-                1px solid
-                rgba(255, 255, 255, 0.07);
-
-            border-radius: 17px;
-
-            background:
-                rgba(255, 255, 255, 0.045);
-
-            text-align: left;
-        }
-
-        .welcome-card-title {
-            font-weight: 700;
-            margin-bottom: 10px;
-            font-size: 13px;
-        }
-
-        .suggestions {
-            display: grid;
+        .header-actions {
+            display: flex;
             gap: 8px;
         }
 
-        .suggestion {
-            border: 0;
-            border-radius: 11px;
-            padding: 11px;
+        .small-btn {
+            border: 1px solid rgba(255,255,255,.1);
+            background: rgba(255,255,255,.05);
+            color: #F5F7FF;
 
-            color: #DDE4FF;
-            text-align: left;
-            background:
-                rgba(255, 255, 255, 0.055);
+            padding: 9px 12px;
+            border-radius: 10px;
 
             cursor: pointer;
         }
 
-        .suggestion:active {
-            transform: scale(0.98);
+        .small-btn:hover {
+            background: rgba(255,255,255,.1);
         }
 
-        /* =========================
-           MESSAGES
-        ========================= */
+        main {
+            width: min(900px, 100%);
+            margin: auto;
+            padding: 28px 16px 120px;
+            flex: 1;
+        }
 
-        .message-row {
+        .welcome {
+            text-align: center;
+            padding: 45px 15px 30px;
+        }
+
+        .welcome h1 {
+            font-size: clamp(30px, 8vw, 52px);
+            line-height: 1.05;
+            margin-bottom: 14px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #F5F7FF,
+                    #8BB9FF,
+                    #B28AFF
+                );
+
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .welcome p {
+            color: #9CA3AF;
+            font-size: 15px;
+        }
+
+        .messages {
             display: flex;
-            margin: 9px 0;
-        }
-
-        .message-row.user {
-            justify-content: flex-end;
-        }
-
-        .message-row.assistant {
-            justify-content: flex-start;
+            flex-direction: column;
+            gap: 15px;
         }
 
         .message {
-            max-width: 87%;
-
-            padding:
-                11px 13px;
-
-            border-radius: 16px;
-
-            line-height: 1.55;
-            font-size: 14px;
-
-            overflow-wrap: anywhere;
+            display: flex;
         }
 
         .message.user {
+            justify-content: flex-end;
+        }
+
+        .bubble {
+            max-width: 82%;
+            padding: 13px 15px;
+
+            border-radius: 18px;
+
+            line-height: 1.55;
+            font-size: 15px;
+
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
+        .user .bubble {
             background:
                 linear-gradient(
                     135deg,
@@ -387,79 +213,22 @@
             border-bottom-right-radius: 5px;
         }
 
-        .message.assistant {
-            background:
-                rgba(255, 255, 255, 0.065);
-
-            border:
-                1px solid
-                rgba(255, 255, 255, 0.065);
+        .assistant .bubble {
+            background: rgba(255,255,255,.06);
+            border: 1px solid rgba(255,255,255,.07);
 
             border-bottom-left-radius: 5px;
         }
 
-        .message p {
-            margin: 0 0 8px;
-        }
-
-        .message p:last-child {
-            margin-bottom: 0;
-        }
-
-        .message ul,
-        .message ol {
-            margin:
-                7px 0
-                7px 20px;
-
-            padding: 0;
-        }
-
-        .message li {
-            margin: 4px 0;
-        }
-
-        .message strong {
-            color: #FFFFFF;
-        }
-
-        .message code {
-            padding: 2px 5px;
-            border-radius: 5px;
-            background:
-                rgba(0, 0, 0, 0.28);
-            font-family: monospace;
-        }
-
-        .message pre {
-            overflow-x: auto;
-            padding: 11px;
-            border-radius: 10px;
-            background: #070A13;
-        }
-
-        /* =========================
-           THINKING
-        ========================= */
-
         .thinking {
             display: none;
             align-items: center;
-            gap: 9px;
-
-            width: fit-content;
-
-            margin: 10px 0;
-
-            padding: 10px 13px;
-
-            border-radius: 14px;
-
-            background:
-                rgba(255, 255, 255, 0.055);
+            gap: 8px;
 
             color: #9CA3AF;
-            font-size: 12px;
+            font-size: 13px;
+
+            margin: 15px 5px;
         }
 
         .thinking.show {
@@ -468,126 +237,108 @@
 
         .dots {
             display: flex;
-            gap: 3px;
+            gap: 4px;
         }
 
         .dots span {
-            width: 5px;
-            height: 5px;
+            width: 6px;
+            height: 6px;
             border-radius: 50%;
-            background: #9CA3AF;
+            background: #7C3AED;
 
-            animation:
-                bounce 1.2s infinite;
+            animation: bounce 1.2s infinite;
         }
 
         .dots span:nth-child(2) {
-            animation-delay: 0.15s;
+            animation-delay: .15s;
         }
 
         .dots span:nth-child(3) {
-            animation-delay: 0.3s;
+            animation-delay: .3s;
         }
 
         @keyframes bounce {
-            0%,
-            60%,
-            100% {
+            0%, 60%, 100% {
                 transform: translateY(0);
+                opacity: .4;
             }
 
             30% {
-                transform: translateY(-4px);
+                transform: translateY(-5px);
+                opacity: 1;
             }
         }
 
-        /* =========================
-           COMPOSER
-        ========================= */
+        .composer-wrap {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
 
-        .composer-area {
-            flex-shrink: 0;
-
-            padding:
-                9px 12px
-                calc(9px + env(safe-area-inset-bottom));
+            padding: 12px 15px 15px;
 
             background:
                 linear-gradient(
                     to top,
-                    rgba(8, 11, 24, 0.98),
-                    rgba(8, 11, 24, 0.82)
+                    #080B18 65%,
+                    transparent
                 );
 
-            border-top:
-                1px solid
-                rgba(255, 255, 255, 0.06);
+            z-index: 30;
         }
 
         .composer {
-            display: flex;
-            align-items: flex-end;
-            gap: 7px;
-
-            max-width: 800px;
+            width: min(900px, 100%);
             margin: auto;
-        }
-
-        .input-wrap {
-            flex: 1;
 
             display: flex;
-            align-items: flex-end;
+            align-items: center;
+            gap: 8px;
 
-            min-height: 48px;
+            padding: 8px;
 
-            padding:
-                5px 6px 5px 13px;
+            border-radius: 18px;
 
-            border:
-                1px solid
-                rgba(255, 255, 255, 0.08);
+            background: rgba(16,21,43,.94);
 
-            border-radius: 17px;
+            border: 1px solid rgba(255,255,255,.1);
 
-            background:
-                rgba(255, 255, 255, 0.055);
+            box-shadow:
+                0 10px 40px rgba(0,0,0,.35);
         }
 
-        textarea {
+        #messageInput {
             flex: 1;
 
-            width: 100%;
-            max-height: 120px;
+            min-width: 0;
 
-            resize: none;
-            border: 0;
+            border: none;
             outline: none;
 
-            padding:
-                8px 4px;
-
             background: transparent;
+
             color: #F5F7FF;
 
-            font-family: inherit;
-            font-size: 14px;
-            line-height: 1.4;
+            padding: 11px 8px;
+
+            font-size: 15px;
         }
 
-        textarea::placeholder {
-            color: #71788D;
+        #messageInput::placeholder {
+            color: #6B7280;
         }
 
-        .send-btn,
-        .mic-btn {
-            width: 39px;
-            height: 39px;
+        .action-btn {
+            width: 42px;
+            height: 42px;
 
-            flex-shrink: 0;
+            border-radius: 13px;
 
-            border: 0;
-            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,.08);
+
+            background: rgba(255,255,255,.06);
+
+            color: #F5F7FF;
 
             cursor: pointer;
 
@@ -595,108 +346,117 @@
             align-items: center;
             justify-content: center;
 
-            font-size: 17px;
+            flex-shrink: 0;
+        }
+
+        .action-btn:hover {
+            background: rgba(255,255,255,.11);
         }
 
         .send-btn {
-            color: white;
-
             background:
                 linear-gradient(
                     135deg,
                     #3B82F6,
                     #7C3AED
                 );
+
+            border: none;
         }
 
-        .mic-btn {
-            color: #D8DEEF;
-            background:
-                rgba(255, 255, 255, 0.06);
+        .send-btn:hover {
+            opacity: .9;
         }
 
-        .send-btn:active,
-        .mic-btn:active {
-            transform: scale(0.93);
+        .recording {
+            background: #DC2626 !important;
+            animation: pulse 1s infinite;
         }
 
-        .mic-btn.recording {
-            background:
-                rgba(239, 68, 68, 0.2);
-
-            color: #F87171;
+        @keyframes pulse {
+            50% {
+                box-shadow: 0 0 0 7px rgba(220,38,38,.15);
+            }
         }
 
         .footer {
             text-align: center;
-            color: #555D73;
-            font-size: 9px;
-            margin-top: 5px;
+            color: #6B7280;
+            font-size: 11px;
+            margin-top: 25px;
         }
-
-        /* =========================
-           INVITE POPUP
-        ========================= */
 
         .toast {
             position: fixed;
-            z-index: 20;
-
             left: 50%;
-            bottom: 95px;
+            bottom: 90px;
 
             transform:
-                translate(-50%, 20px);
+                translateX(-50%)
+                translateY(20px);
 
             opacity: 0;
-            pointer-events: none;
 
-            padding: 10px 15px;
+            background: #151A31;
+            border: 1px solid rgba(255,255,255,.1);
+
+            color: #F5F7FF;
+
+            padding: 11px 15px;
 
             border-radius: 12px;
 
-            background:
-                rgba(25, 30, 50, 0.95);
+            font-size: 13px;
 
-            border:
-                1px solid
-                rgba(255, 255, 255, 0.08);
+            transition: .25s;
 
-            color: #F5F7FF;
-            font-size: 12px;
-
-            transition:
-                opacity 0.2s,
-                transform 0.2s;
+            z-index: 100;
         }
 
         .toast.show {
-            opacity: 1;
             transform:
-                translate(-50%, 0);
+                translateX(-50%)
+                translateY(0);
+
+            opacity: 1;
         }
 
-        @media (min-width: 700px) {
-            .chat {
-                padding-left: 25%;
-                padding-right: 25%;
+        @media (max-width: 600px) {
+
+            header {
+                padding: 0 13px;
+            }
+
+            .brand-tagline {
+                display: none;
+            }
+
+            .small-btn {
+                padding: 8px 9px;
+            }
+
+            main {
+                padding-left: 10px;
+                padding-right: 10px;
+            }
+
+            .bubble {
+                max-width: 90%;
+            }
+
+            .welcome {
+                padding-top: 35px;
             }
         }
+
     </style>
 </head>
 
 <body>
 
-<div class="background">
-    <div class="orb one"></div>
-    <div class="orb two"></div>
-    <div class="orb three"></div>
-</div>
-
 <div class="app">
 
-    <!-- HEADER -->
-    <header class="header">
+    <header>
 
         <div class="brand">
 
@@ -705,6 +465,7 @@
             </div>
 
             <div>
+
                 <div class="brand-name">
                     AskOra
                 </div>
@@ -712,6 +473,7 @@
                 <div class="brand-tagline">
                     Ask. Get answers.
                 </div>
+
             </div>
 
         </div>
@@ -719,19 +481,17 @@
         <div class="header-actions">
 
             <button
-                class="icon-btn"
-                id="inviteBtn"
-                title="Invite"
+                class="small-btn"
+                onclick="clearChat()"
             >
-                ✨
+                Clear
             </button>
 
             <button
-                class="icon-btn"
-                id="clearBtn"
-                title="Clear"
+                class="small-btn"
+                onclick="logout()"
             >
-                ↻
+                Logout
             </button>
 
         </div>
@@ -739,66 +499,29 @@
     </header>
 
 
-    <!-- CHAT -->
-    <main
-        class="chat"
-        id="chat"
-    >
+    <main>
 
         <section
             class="welcome"
             id="welcome"
         >
 
-            <div class="welcome-logo">
-                A
-            </div>
-
             <h1>
-                Welcome to AskOra
+                Ask anything.
             </h1>
 
             <p>
-                Your simple AI assistant on Telegram.
-                Ask anything and get a clear answer.
+                Advanced AI, made simple.
             </p>
-
-            <div class="welcome-card">
-
-                <div class="welcome-card-title">
-                    Try asking
-                </div>
-
-                <div class="suggestions">
-
-                    <button
-                        class="suggestion"
-                        data-question="Explain artificial intelligence in simple terms."
-                    >
-                        🤖 Explain AI simply
-                    </button>
-
-                    <button
-                        class="suggestion"
-                        data-question="Help me understand something I'm learning."
-                    >
-                        📚 Help me learn
-                    </button>
-
-                    <button
-                        class="suggestion"
-                        data-question="Give me an interesting fact."
-                    >
-                        💡 Give me an interesting fact
-                    </button>
-
-                </div>
-
-            </div>
 
         </section>
 
-        <div id="messages"></div>
+
+        <section
+            class="messages"
+            id="messages"
+        ></section>
+
 
         <div
             class="thinking"
@@ -811,39 +534,40 @@
                 <span></span>
             </div>
 
-            AskOra is thinking
+            AskOra is thinking...
 
+        </div>
+
+
+        <div class="footer">
+            AskOra • Free AI assistant
         </div>
 
     </main>
 
 
-    <!-- COMPOSER -->
-    <section class="composer-area">
+    <div class="composer-wrap">
 
         <div class="composer">
 
-            <div class="input-wrap">
-
-                <textarea
-                    id="messageInput"
-                    rows="1"
-                    placeholder="Ask AskOra anything..."
-                ></textarea>
-
-                <button
-                    class="mic-btn"
-                    id="micBtn"
-                    title="Voice"
-                >
-                    🎤
-                </button>
-
-            </div>
+            <input
+                id="messageInput"
+                type="text"
+                autocomplete="off"
+                placeholder="Ask AskOra anything..."
+            >
 
             <button
-                class="send-btn"
-                id="sendBtn"
+                class="action-btn"
+                id="micButton"
+                title="Voice"
+            >
+                🎙️
+            </button>
+
+            <button
+                class="action-btn send-btn"
+                id="sendButton"
                 title="Send"
             >
                 ➤
@@ -851,11 +575,7 @@
 
         </div>
 
-        <div class="footer">
-            AskOra • Advanced AI, made simple.
-        </div>
-
-    </section>
+    </div>
 
 </div>
 
@@ -863,774 +583,479 @@
 <div
     class="toast"
     id="toast"
->
-    Copied!
-</div>
+></div>
 
 
 <script>
-    // ========================================================
-    // TELEGRAM
-    // ========================================================
 
-    const tg = window.Telegram.WebApp;
+const csrfToken =
+    "{{ csrf_token }}";
 
-    tg.ready();
-    tg.expand();
+const messagesBox =
+    document.getElementById("messages");
+
+const welcome =
+    document.getElementById("welcome");
+
+const input =
+    document.getElementById("messageInput");
+
+const sendButton =
+    document.getElementById("sendButton");
+
+const micButton =
+    document.getElementById("micButton");
+
+const thinking =
+    document.getElementById("thinking");
+
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecording = false;
 
 
-    // ========================================================
-    // MONETAG IN-APP INTERSTITIAL
-    // ========================================================
+function showToast(message) {
 
-    /*
-        Monetag configuration:
+    const toast =
+        document.getElementById("toast");
 
-        frequency: 2
-        capping: 0.1 hours = 6 minutes
-        interval: 300
-        timeout: 5 seconds
-        everyPage: false
+    toast.textContent = message;
 
-        The Monetag SDK handles the ad schedule after
-        show_11827766() is called.
-    */
+    toast.classList.add("show");
+
+    setTimeout(() => {
+        toast.classList.remove("show");
+    }, 2500);
+}
+
+
+function addMessage(role, content) {
+
+    welcome.style.display = "none";
+
+    const wrapper =
+        document.createElement("div");
+
+    wrapper.className =
+        "message " + role;
+
+    const bubble =
+        document.createElement("div");
+
+    bubble.className =
+        "bubble";
+
+    bubble.textContent =
+        content;
+
+    wrapper.appendChild(bubble);
+
+    messagesBox.appendChild(wrapper);
+
+    window.scrollTo({
+        top: document.body.scrollHeight,
+        behavior: "smooth"
+    });
+}
+
+
+function setThinking(value) {
+
+    if (value) {
+        thinking.classList.add("show");
+    } else {
+        thinking.classList.remove("show");
+    }
+}
+
+
+async function loadHistory() {
 
     try {
 
-        if (
-            typeof show_11827766 === "function"
-        ) {
+        const response =
+            await fetch("/api/history");
 
-            show_11827766({
-                type: "inApp",
+        const data =
+            await response.json();
 
-                inAppSettings: {
-                    frequency: 2,
-                    capping: 0.1,
-                    interval: 30,
-                    timeout: 5,
-                    everyPage: false
-                }
-            });
+        if (!data.success) {
+            return;
+        }
 
-        } else {
+        messagesBox.innerHTML = "";
 
-            console.warn(
-                "Monetag SDK is not available."
+        if (!data.messages.length) {
+
+            welcome.style.display = "block";
+
+            return;
+        }
+
+        welcome.style.display = "none";
+
+        for (const message of data.messages) {
+
+            addMessage(
+                message.role,
+                message.content
             );
-
         }
 
     } catch (error) {
 
-        console.error(
-            "Monetag error:",
-            error
-        );
+        console.error(error);
 
     }
+}
 
 
-    // ========================================================
-    // ELEMENTS
-    // ========================================================
+async function sendMessage() {
 
-    const chat = document.getElementById("chat");
-    const messages = document.getElementById("messages");
-    const welcome = document.getElementById("welcome");
-    const thinking = document.getElementById("thinking");
+    const message =
+        input.value.trim();
 
-    const input = document.getElementById("messageInput");
-    const sendBtn = document.getElementById("sendBtn");
-    const micBtn = document.getElementById("micBtn");
-
-    const inviteBtn = document.getElementById("inviteBtn");
-    const clearBtn = document.getElementById("clearBtn");
-
-    const toast = document.getElementById("toast");
-
-
-    // ========================================================
-    // HELPERS
-    // ========================================================
-
-    function escapeHtml(text) {
-
-        return text
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;");
+    if (!message) {
+        return;
     }
 
+    input.value = "";
 
-    function markdown(text) {
+    addMessage(
+        "user",
+        message
+    );
 
-        let html = escapeHtml(text);
+    setThinking(true);
 
-        // Code blocks
-        html = html.replace(
-            /```([\s\S]*?)```/g,
-            "<pre><code>$1</code></pre>"
-        );
+    sendButton.disabled = true;
 
-        // Inline code
-        html = html.replace(
-            /`([^`]+)`/g,
-            "<code>$1</code>"
-        );
+    try {
 
-        // Bold
-        html = html.replace(
-            /\*\*(.*?)\*\*/g,
-            "<strong>$1</strong>"
-        );
+        const response =
+            await fetch(
+                "/api/chat",
+                {
+                    method: "POST",
 
-        // Italic
-        html = html.replace(
-            /(^|[^*])\*([^*]+)\*/g,
-            "$1<em>$2</em>"
-        );
+                    headers: {
+                        "Content-Type":
+                            "application/json",
 
-        // Headings
-        html = html.replace(
-            /^### (.*)$/gm,
-            "<strong>$1</strong>"
-        );
+                        "X-CSRF-Token":
+                            csrfToken
+                    },
 
-        html = html.replace(
-            /^## (.*)$/gm,
-            "<strong>$1</strong>"
-        );
-
-        html = html.replace(
-            /^# (.*)$/gm,
-            "<strong>$1</strong>"
-        );
-
-        // Unordered lists
-        html = html.replace(
-            /(?:^|\n)[-*] (.*)(?=\n|$)/g,
-            "\n<li>$1</li>"
-        );
-
-        html = html.replace(
-            /(<li>.*<\/li>)/gs,
-            "<ul>$1</ul>"
-        );
-
-        // Paragraphs
-        html = html
-            .split(/\n\n+/)
-            .map(block => {
-
-                if (
-                    block.startsWith("<pre>") ||
-                    block.startsWith("<ul>")
-                ) {
-                    return block;
+                    body: JSON.stringify({
+                        message: message
+                    })
                 }
+            );
 
-                return "<p>" +
-                    block.replace(/\n/g, "<br>") +
-                    "</p>";
-            })
-            .join("");
+        const data =
+            await response.json();
 
-        return html;
+        if (!data.success) {
+
+            throw new Error(
+                data.error ||
+                "Something went wrong."
+            );
+        }
+
+        addMessage(
+            "assistant",
+            data.answer
+        );
+
+    } catch (error) {
+
+        addMessage(
+            "assistant",
+            "⚠️ " + error.message
+        );
+
+    } finally {
+
+        setThinking(false);
+
+        sendButton.disabled = false;
+
+        input.focus();
+    }
+}
+
+
+async function clearChat() {
+
+    if (!confirm(
+        "Clear your conversation?"
+    )) {
+        return;
     }
 
+    try {
 
-    function scrollBottom() {
+        const response =
+            await fetch(
+                "/api/reset",
+                {
+                    method: "POST",
 
-        setTimeout(() => {
+                    headers: {
+                        "X-CSRF-Token":
+                            csrfToken
+                    }
+                }
+            );
 
-            chat.scrollTo({
-                top: chat.scrollHeight,
-                behavior: "smooth"
+        const data =
+            await response.json();
+
+        if (!data.success) {
+            throw new Error(
+                data.error
+            );
+        }
+
+        messagesBox.innerHTML = "";
+
+        welcome.style.display =
+            "block";
+
+        showToast(
+            "Conversation cleared."
+        );
+
+    } catch (error) {
+
+        showToast(
+            error.message
+        );
+    }
+}
+
+
+async function logout() {
+
+    const form =
+        document.createElement("form");
+
+    form.method = "POST";
+    form.action = "/logout";
+
+    const token =
+        document.createElement("input");
+
+    token.type = "hidden";
+    token.name = "csrf_token";
+    token.value = csrfToken;
+
+    form.appendChild(token);
+
+    document.body.appendChild(form);
+
+    form.submit();
+}
+
+
+async function startRecording() {
+
+    if (!navigator.mediaDevices ||
+        !navigator.mediaDevices.getUserMedia) {
+
+        showToast(
+            "Voice recording isn't supported here."
+        );
+
+        return;
+    }
+
+    try {
+
+        const stream =
+            await navigator.mediaDevices.getUserMedia({
+                audio: true
             });
 
-        }, 50);
-    }
+        audioChunks = [];
 
+        mediaRecorder =
+            new MediaRecorder(stream);
 
-    function showToast(text) {
+        mediaRecorder.ondataavailable =
+            event => {
 
-        toast.textContent = text;
+                if (event.data.size > 0) {
+                    audioChunks.push(
+                        event.data
+                    );
+                }
+            };
 
-        toast.classList.add("show");
+        mediaRecorder.onstop =
+            async () => {
 
-        setTimeout(() => {
-            toast.classList.remove("show");
-        }, 1800);
-    }
+                stream
+                    .getTracks()
+                    .forEach(track => track.stop());
 
+                const blob =
+                    new Blob(
+                        audioChunks,
+                        {
+                            type:
+                                mediaRecorder.mimeType ||
+                                "audio/webm"
+                        }
+                    );
 
-    function setThinking(value) {
+                await sendVoice(blob);
+            };
 
-        if (value) {
-            thinking.classList.add("show");
-        } else {
-            thinking.classList.remove("show");
-        }
+        mediaRecorder.start();
 
-        scrollBottom();
-    }
+        isRecording = true;
 
+        micButton.classList.add(
+            "recording"
+        );
 
-    function addMessage(
-        role,
-        text
-    ) {
+        showToast(
+            "Recording... tap 🎙️ again to stop."
+        );
 
-        welcome.style.display = "none";
+    } catch (error) {
 
-        const row =
-            document.createElement("div");
-
-        row.className =
-            "message-row " + role;
-
-        const bubble =
-            document.createElement("div");
-
-        bubble.className =
-            "message " + role;
-
-        if (role === "assistant") {
-            bubble.innerHTML =
-                markdown(text);
-        } else {
-            bubble.textContent = text;
-        }
-
-        row.appendChild(bubble);
-
-        messages.appendChild(row);
-
-        scrollBottom();
-    }
-
-
-    // ========================================================
-    // API
-    // ========================================================
-
-    async function api(
-        url,
-        options = {}
-    ) {
-
-        const headers = {
-            ...(options.headers || {}),
-            "X-Telegram-Init-Data":
-                tg.initData || ""
-        };
-
-        return fetch(
-            url,
-            {
-                ...options,
-                headers
-            }
+        showToast(
+            "Microphone permission was denied."
         );
     }
+}
 
 
-    // ========================================================
-    // SEND MESSAGE
-    // ========================================================
+function stopRecording() {
 
-    async function sendMessage(
-        customText = null
+    if (
+        mediaRecorder &&
+        mediaRecorder.state !== "inactive"
     ) {
 
-        const text =
-            customText !== null
-                ? customText.trim()
-                : input.value.trim();
+        mediaRecorder.stop();
 
-        if (!text) {
-            return;
-        }
+        isRecording = false;
 
-        input.value = "";
-        input.style.height = "auto";
-
-        addMessage(
-            "user",
-            text
+        micButton.classList.remove(
+            "recording"
         );
 
         setThinking(true);
-
-        sendBtn.disabled = true;
-
-        try {
-
-            const response =
-                await api(
-                    "/api/chat",
-                    {
-                        method: "POST",
-                        headers: {
-                            "Content-Type":
-                                "application/json"
-                        },
-                        body: JSON.stringify({
-                            message: text
-                        })
-                    }
-                );
-
-            const data =
-                await response.json();
-
-            if (!response.ok || !data.ok) {
-
-                throw new Error(
-                    data.error ||
-                    "Request failed."
-                );
-            }
-
-            addMessage(
-                "assistant",
-                data.answer
-            );
-
-        } catch (error) {
-
-            console.error(error);
-
-            addMessage(
-                "assistant",
-                "⚠️ Sorry, something went wrong. Please try again."
-            );
-
-        } finally {
-
-            setThinking(false);
-            sendBtn.disabled = false;
-
-            input.focus();
-        }
     }
+}
 
 
-    // ========================================================
-    // LOAD HISTORY
-    // ========================================================
+async function sendVoice(blob) {
 
-    async function loadHistory() {
+    const formData =
+        new FormData();
 
-        try {
-
-            const response =
-                await api(
-                    "/api/history"
-                );
-
-            const data =
-                await response.json();
-
-            if (
-                !response.ok ||
-                !data.ok
-            ) {
-                return;
-            }
-
-            if (
-                data.history &&
-                data.history.length
-            ) {
-
-                welcome.style.display =
-                    "none";
-
-                data.history.forEach(
-                    item => {
-
-                        addMessage(
-                            item.role === "user"
-                                ? "user"
-                                : "assistant",
-                            item.content
-                        );
-
-                    }
-                );
-            }
-
-        } catch (error) {
-
-            console.error(
-                "History error:",
-                error
-            );
-        }
-    }
-
-
-    // ========================================================
-    // CLEAR
-    // ========================================================
-
-    async function clearConversation() {
-
-        try {
-
-            const response =
-                await api(
-                    "/api/reset",
-                    {
-                        method: "POST"
-                    }
-                );
-
-            const data =
-                await response.json();
-
-            if (
-                !response.ok ||
-                !data.ok
-            ) {
-                throw new Error(
-                    data.error ||
-                    "Could not clear conversation."
-                );
-            }
-
-            messages.innerHTML = "";
-
-            welcome.style.display =
-                "block";
-
-            showToast(
-                "Conversation cleared"
-            );
-
-        } catch (error) {
-
-            console.error(error);
-
-            showToast(
-                "Could not clear conversation"
-            );
-        }
-    }
-
-
-    // ========================================================
-    // INVITE
-    // ========================================================
-
-    function inviteFriend() {
-
-        const url =
-            "https://t.me/share/url" +
-            "?url=" +
-            encodeURIComponent(
-                "https://t.me/askora_official_bot"
-            ) +
-            "&text=" +
-            encodeURIComponent(
-                "Try AskOra 🤖 — a free AI assistant on Telegram!"
-            );
-
-        if (
-            tg.openTelegramLink
-        ) {
-
-            tg.openTelegramLink(
-                url
-            );
-
-        } else {
-
-            window.open(
-                url,
-                "_blank"
-            );
-        }
-    }
-
-
-    // ========================================================
-    // TEXTAREA
-    // ========================================================
-
-    input.addEventListener(
-        "input",
-        () => {
-
-            input.style.height =
-                "auto";
-
-            input.style.height =
-                Math.min(
-                    input.scrollHeight,
-                    120
-                ) + "px";
-        }
+    formData.append(
+        "audio",
+        blob,
+        "askora-recording.webm"
     );
 
+    try {
 
-    input.addEventListener(
-        "keydown",
-        event => {
+        const response =
+            await fetch(
+                "/api/voice",
+                {
+                    method: "POST",
 
-            if (
-                event.key === "Enter" &&
-                !event.shiftKey
-            ) {
+                    headers: {
+                        "X-CSRF-Token":
+                            csrfToken
+                    },
 
-                event.preventDefault();
-
-                sendMessage();
-            }
-        }
-    );
-
-
-    sendBtn.addEventListener(
-        "click",
-        () => sendMessage()
-    );
-
-
-    clearBtn.addEventListener(
-        "click",
-        clearConversation
-    );
-
-
-    inviteBtn.addEventListener(
-        "click",
-        inviteFriend
-    );
-
-
-    // ========================================================
-    // SUGGESTIONS
-    // ========================================================
-
-    document
-        .querySelectorAll(".suggestion")
-        .forEach(button => {
-
-            button.addEventListener(
-                "click",
-                () => {
-
-                    sendMessage(
-                        button.dataset.question
-                    );
+                    body: formData
                 }
             );
 
-        });
+        const data =
+            await response.json();
 
+        if (!data.success) {
 
-    // ========================================================
-    // VOICE RECORDING
-    // ========================================================
-
-    let mediaRecorder = null;
-    let audioChunks = [];
-    let recording = false;
-
-
-    async function startRecording() {
-
-        try {
-
-            const stream =
-                await navigator.mediaDevices.getUserMedia({
-                    audio: true
-                });
-
-            audioChunks = [];
-
-            mediaRecorder =
-                new MediaRecorder(
-                    stream
-                );
-
-            mediaRecorder.ondataavailable =
-                event => {
-
-                    if (
-                        event.data.size > 0
-                    ) {
-
-                        audioChunks.push(
-                            event.data
-                        );
-                    }
-                };
-
-            mediaRecorder.onstop =
-                async () => {
-
-                    stream
-                        .getTracks()
-                        .forEach(
-                            track =>
-                                track.stop()
-                        );
-
-                    const blob =
-                        new Blob(
-                            audioChunks,
-                            {
-                                type:
-                                    "audio/webm"
-                            }
-                        );
-
-                    await sendVoice(
-                        blob
-                    );
-                };
-
-            mediaRecorder.start();
-
-            recording = true;
-
-            micBtn.classList.add(
-                "recording"
-            );
-
-            micBtn.textContent =
-                "⏹";
-
-            showToast(
-                "Recording..."
-            );
-
-        } catch (error) {
-
-            console.error(error);
-
-            showToast(
-                "Microphone permission is needed"
+            throw new Error(
+                data.error ||
+                "Voice processing failed."
             );
         }
-    }
-
-
-    function stopRecording() {
-
-        if (
-            mediaRecorder &&
-            recording
-        ) {
-
-            mediaRecorder.stop();
-
-            recording = false;
-
-            micBtn.classList.remove(
-                "recording"
-            );
-
-            micBtn.textContent =
-                "🎤";
-
-            showToast(
-                "Processing voice..."
-            );
-        }
-    }
-
-
-    async function sendVoice(blob) {
 
         addMessage(
             "user",
-            "🎤 Voice message"
+            "🎙️ " + data.transcript
         );
 
-        setThinking(true);
+        addMessage(
+            "assistant",
+            data.answer
+        );
 
-        try {
+    } catch (error) {
 
-            const formData =
-                new FormData();
+        addMessage(
+            "assistant",
+            "⚠️ " + error.message
+        );
 
-            formData.append(
-                "audio",
-                blob,
-                "voice.webm"
-            );
+    } finally {
 
-            const response =
-                await api(
-                    "/api/voice",
-                    {
-                        method: "POST",
-                        body: formData
-                    }
-                );
+        setThinking(false);
+    }
+}
 
-            const data =
-                await response.json();
 
-            if (
-                !response.ok ||
-                !data.ok
-            ) {
+sendButton.addEventListener(
+    "click",
+    sendMessage
+);
 
-                throw new Error(
-                    data.error ||
-                    "Voice request failed."
-                );
-            }
 
-            addMessage(
-                "assistant",
-                data.answer
-            );
+input.addEventListener(
+    "keydown",
+    event => {
 
-        } catch (error) {
+        if (
+            event.key === "Enter" &&
+            !event.shiftKey
+        ) {
 
-            console.error(error);
+            event.preventDefault();
 
-            addMessage(
-                "assistant",
-                "⚠️ Sorry, I couldn't process that voice message."
-            );
-
-        } finally {
-
-            setThinking(false);
+            sendMessage();
         }
     }
+);
 
 
-    micBtn.addEventListener(
-        "click",
-        () => {
+micButton.addEventListener(
+    "click",
+    () => {
 
-            if (recording) {
-                stopRecording();
-            } else {
-                startRecording();
-            }
-
+        if (isRecording) {
+            stopRecording();
+        } else {
+            startRecording();
         }
-    );
+    }
+);
 
 
-    // ========================================================
-    // START
-    // ========================================================
+loadHistory();
 
-    loadHistory();
-
-    input.focus();
+input.focus();
 
 </script>
 
