@@ -1,1297 +1,951 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-
-<meta charset="UTF-8">
-
-<meta
-name="viewport"
-content="width=device-width,initial-scale=1.0,viewport-fit=cover"
->
-
-<title>AskOra</title>
-
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-
-<script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
-
-<style>
-
-*{
-box-sizing:border-box
-}
-
-html,
-body{
-margin:0;
-width:100%;
-height:100%;
-overflow:hidden
-}
-
-body{
-background:#080B18;
-color:#F5F7FF;
-font-family:
-Inter,
-system-ui,
--apple-system,
-BlinkMacSystemFont,
-"Segoe UI",
-sans-serif
-}
-
-button,
-input,
-textarea{
-font:inherit
-}
-
-button{
-cursor:pointer
-}
-
-/* =========================================================
-APP
-========================================================= */
-
-.app{
-height:100vh;
-display:flex;
-overflow:hidden
-}
-
-/* =========================================================
-SIDEBAR
-========================================================= */
-
-.sidebar{
-width:285px;
-height:100vh;
-flex-shrink:0;
-
-display:flex;
-flex-direction:column;
-
-background:#0B1022;
-
-border-right:
-1px solid rgba(255,255,255,.08);
-
-padding:14px
-}
-
-.brand{
-display:flex;
-align-items:center;
-gap:11px;
-
-padding:8px 8px 18px
-}
-
-.brand-logo{
-width:38px;
-height:38px;
-
-display:flex;
-align-items:center;
-justify-content:center;
-
-border-radius:12px;
-
-background:
-linear-gradient(
-135deg,
-#3B82F6,
-#7C3AED
-);
-
-font-weight:900;
-font-size:19px
-}
-
-.brand-text{
-font-size:18px;
-font-weight:800
-}
-
-.new-chat{
-width:100%;
-height:46px;
-
-border:1px solid rgba(255,255,255,.1);
-border-radius:13px;
-
-background:#11182F;
-color:#F5F7FF;
-
-display:flex;
-align-items:center;
-justify-content:center;
-gap:8px;
-
-font-weight:700
-}
-
-.new-chat:hover{
-background:#16203D
-}
-
-.search{
-margin-top:12px;
-
-height:42px;
-
-width:100%;
-
-border:1px solid rgba(255,255,255,.08);
-border-radius:12px;
-
-background:#080D1D;
-color:#F5F7FF;
-
-padding:0 12px;
-
-outline:none
-}
-
-.chat-list{
-flex:1;
-overflow-y:auto;
-margin-top:14px
-}
-
-.chat-list-title{
-font-size:11px;
-font-weight:700;
-text-transform:uppercase;
-letter-spacing:.08em;
-color:#6B7280;
-padding:8px
-}
-
-.chat-item{
-display:flex;
-align-items:center;
-gap:6px;
-
-padding:10px;
-
-border-radius:11px;
-
-margin-bottom:3px;
-
-color:#D7DBE8
-}
-
-.chat-item:hover{
-background:#11182F
-}
-
-.chat-item.active{
-background:#16203D
-}
-
-.chat-open{
-flex:1;
-min-width:0;
-
-border:0;
-background:none;
-color:inherit;
-
-text-align:left;
-
-overflow:hidden;
-white-space:nowrap;
-text-overflow:ellipsis;
-
-font-size:14px
-}
-
-.chat-delete{
-width:30px;
-height:30px;
-
-border:0;
-border-radius:8px;
-
-background:transparent;
-
-color:#6B7280
-}
-
-.chat-delete:hover{
-background:rgba(239,68,68,.12);
-color:#F87171
-}
-
-.account{
-padding-top:10px;
-border-top:1px solid rgba(255,255,255,.08)
-}
-
-.account-card{
-display:flex;
-align-items:center;
-gap:10px;
-
-padding:10px;
-
-border-radius:12px;
-
-background:#10152B
-}
-
-.avatar{
-width:36px;
-height:36px;
-
-border-radius:50%;
-
-display:flex;
-align-items:center;
-justify-content:center;
-
-background:
-linear-gradient(
-135deg,
-#3B82F6,
-#7C3AED
-);
-
-font-weight:800
-}
-
-.account-info{
-flex:1;
-min-width:0
-}
-
-.account-name{
-font-size:13px;
-font-weight:700;
-
-white-space:nowrap;
-overflow:hidden;
-text-overflow:ellipsis
-}
-
-.account-email{
-font-size:11px;
-color:#6B7280;
-
-white-space:nowrap;
-overflow:hidden;
-text-overflow:ellipsis
-}
-
-.account-actions{
-margin-top:8px;
-
-display:flex;
-gap:6px
-}
-
-.account-actions a,
-.account-actions button{
-flex:1;
-
-height:34px;
-
-border:1px solid rgba(255,255,255,.08);
-border-radius:9px;
-
-background:#0B1022;
-color:#BFC5D4;
-
-font-size:12px;
-
-text-decoration:none
-}
-
-/* =========================================================
-MAIN
-========================================================= */
-
-.main{
-flex:1;
-min-width:0;
-height:100vh;
-
-display:flex;
-flex-direction:column;
-
-background:
-radial-gradient(
-circle at top right,
-rgba(59,130,246,.05),
-transparent 35%
-)
-}
-
-/* =========================================================
-STICKY HEADER
-========================================================= */
-
-.chat-header{
-height:76px;
-flex-shrink:0;
-
-position:relative;
-z-index:20;
-
-display:flex;
-align-items:center;
-
-padding:0 22px;
-
-background:rgba(8,11,24,.94);
-
-border-bottom:
-1px solid rgba(255,255,255,.08);
-
-backdrop-filter:blur(18px)
-}
-
-.mobile-menu{
-display:none;
-
-width:38px;
-height:38px;
-
-margin-right:10px;
-
-border:0;
-border-radius:10px;
-
-background:#11182F;
-color:white
-}
-
-.header-info{
-display:flex;
-flex-direction:column;
-gap:2px
-}
-
-.header-name{
-font-size:17px;
-font-weight:800
-}
-
-.header-status{
-font-size:12px;
-color:#60A5FA
-}
-
-.header-subtitle{
-font-size:11px;
-color:#6B7280
-}
-
-.header-chat-title{
-margin-left:auto;
-
-max-width:220px;
-
-font-size:12px;
-color:#9CA3AF;
-
-white-space:nowrap;
-overflow:hidden;
-text-overflow:ellipsis
-}
-
-/* =========================================================
-MESSAGES
-========================================================= */
-
-.messages{
-flex:1;
-overflow-y:auto;
-scroll-behavior:smooth
-}
-
-.messages-inner{
-width:100%;
-max-width:900px;
-
-margin:0 auto;
-
-padding:30px 22px 160px
-}
-
-.welcome{
-min-height:55vh;
-
-display:flex;
-flex-direction:column;
-align-items:center;
-justify-content:center;
-
-text-align:center
-}
-
-.welcome-logo{
-width:64px;
-height:64px;
-
-display:flex;
-align-items:center;
-justify-content:center;
-
-border-radius:20px;
-
-background:
-linear-gradient(
-135deg,
-#3B82F6,
-#7C3AED
-);
-
-font-size:28px;
-font-weight:900;
-
-margin-bottom:20px
-}
-
-.welcome h1{
-margin:0 0 8px;
-font-size:30px
-}
-
-.welcome p{
-margin:0;
-color:#9CA3AF
-}
-
-.message{
-display:flex;
-gap:14px;
-
-margin-bottom:28px
-}
-
-.message-avatar{
-width:34px;
-height:34px;
-
-flex-shrink:0;
-
-display:flex;
-align-items:center;
-justify-content:center;
-
-border-radius:10px;
-
-font-size:13px;
-font-weight:800
-}
-
-.message.user .message-avatar{
-background:#1D4ED8
-}
-
-.message.assistant .message-avatar{
-background:
-linear-gradient(
-135deg,
-#3B82F6,
-#7C3AED
-)
-}
-
-.message-body{
-min-width:0;
-flex:1;
-
-line-height:1.7;
-
-font-size:15px
-}
-
-.message-body p{
-margin:0 0 14px
-}
-
-.message-body p:last-child{
-margin-bottom:0
-}
-
-.message-body h1,
-.message-body h2,
-.message-body h3{
-margin:
-20px 0 10px;
-
-line-height:1.3
-}
-
-.message-body ul,
-.message-body ol{
-padding-left:24px
-}
-
-.message-body li{
-margin:5px 0
-}
-
-.message-body blockquote{
-margin:14px 0;
-padding:10px 15px;
-
-border-left:3px solid #3B82F6;
-
-background:#10152B;
-
-color:#CBD5E1
-}
-
-.message-body code{
-padding:2px 5px;
-
-border-radius:5px;
-
-background:#111827;
-
-font-size:.9em
-}
-
-.message-body pre{
-overflow:auto;
-
-padding:15px;
-
-border-radius:12px;
-
-background:#070B16;
-
-border:1px solid rgba(255,255,255,.08)
-}
-
-.message-body pre code{
-padding:0;
-background:none
-}
-
-.message-body table{
-width:100%;
-
-border-collapse:collapse;
-
-margin:15px 0;
-
-display:block;
-
-overflow-x:auto
-}
-
-.message-body th,
-.message-body td{
-border:1px solid rgba(255,255,255,.12);
-
-padding:9px 11px;
-
-text-align:left
-}
-
-.message-body th{
-background:#11182F
-}
-
-.message-body a{
-color:#60A5FA
-}
-
-/* Never display AI-generated image elements */
-.message-body img{
-display:none!important
-}
-
-/* =========================================================
-TYPING
-========================================================= */
-
-.typing{
-display:none;
-
-gap:5px;
-
-align-items:center;
-
-padding:10px 0
-}
-
-.typing.show{
-display:flex
-}
-
-.dot{
-width:7px;
-height:7px;
-
-border-radius:50%;
-
-background:#6B7280;
-
-animation:bounce 1.2s infinite
-}
-
-.dot:nth-child(2){
-animation-delay:.15s
-}
-
-.dot:nth-child(3){
-animation-delay:.3s
-}
-
-@keyframes bounce{
-0%,60%,100%{
-transform:translateY(0);
-opacity:.5
-}
-
-30%{
-transform:translateY(-5px);
-opacity:1
-}
-}
-
-/* =========================================================
-COMPOSER
-========================================================= */
-
-.composer-wrap{
-position:relative;
-
-padding:
-12px 22px
-calc(18px + env(safe-area-inset-bottom));
-
-background:
-linear-gradient(
-to top,
-#080B18 70%,
-transparent
-)
-}
-
-.composer{
-max-width:900px;
-margin:0 auto;
-
-display:flex;
-align-items:flex-end;
-gap:8px;
-
-padding:8px;
-
-border-radius:18px;
-
-background:#10152B;
-
-border:
-1px solid rgba(255,255,255,.1);
-
-box-shadow:
-0 15px 45px rgba(0,0,0,.3)
-}
-
-.composer textarea{
-flex:1;
-
-min-height:44px;
-max-height:160px;
-
-resize:none;
-
-border:0;
-outline:0;
-
-background:transparent;
-
-color:#F5F7FF;
-
-padding:11px;
-
-line-height:1.4
-}
-
-.composer textarea::placeholder{
-color:#6B7280
-}
-
-.icon-btn{
-width:42px;
-height:42px;
-
-flex-shrink:0;
-
-border:0;
-border-radius:12px;
-
-background:#18213B;
-color:#CBD5E1;
-
-display:flex;
-align-items:center;
-justify-content:center;
-
-font-size:17px
-}
-
-.icon-btn:hover{
-background:#202C4D
-}
-
-.send-btn{
-background:
-linear-gradient(
-135deg,
-#3B82F6,
-#7C3AED
-);
-
-color:white
-}
-
-/* =========================================================
-RECORDING
-========================================================= */
-
-.recording{
-display:none;
-
-position:absolute;
-
-left:22px;
-right:22px;
-bottom:92px;
-
-max-width:900px;
-margin:auto;
-
-padding:14px 16px;
-
-border-radius:16px;
-
-background:#10152B;
-
-border:1px solid rgba(239,68,68,.25);
-
-box-shadow:0 15px 40px rgba(0,0,0,.4)
-}
-
-.recording.show{
-display:flex;
-align-items:center;
-gap:12px
-}
-
-.recording-pulse{
-width:12px;
-height:12px;
-
-border-radius:50%;
-
-background:#EF4444;
-
-box-shadow:
-0 0 0 0 rgba(239,68,68,.5);
-
-animation:pulse 1.3s infinite
-}
-
-@keyframes pulse{
-70%{
-box-shadow:
-0 0 0 9px rgba(239,68,68,0)
-}
-}
-
-.recording-text{
-flex:1
-}
-
-.recording-title{
-font-weight:700;
-font-size:13px
-}
-
-.recording-time{
-font-size:12px;
-color:#9CA3AF
-}
-
-.recording button{
-border:0;
-border-radius:9px;
-
-padding:8px 11px;
-
-background:#1A233D;
-color:#CBD5E1
-}
-
-.recording .stop{
-background:#EF4444;
-color:white
-}
-
-/* =========================================================
-MOBILE
-========================================================= */
-
-@media(max-width:760px){
-
-.sidebar{
-position:fixed;
-z-index:100;
-
-left:0;
-top:0;
-bottom:0;
-
-transform:translateX(-100%);
-
-transition:
-transform .22s ease;
-
-box-shadow:
-15px 0 50px rgba(0,0,0,.4)
-}
-
-.sidebar.open{
-transform:translateX(0)
-}
-
-.mobile-menu{
-display:block
-}
-
-.chat-header{
-padding:0 12px
-}
-
-.header-chat-title{
-display:none
-}
-
-.messages-inner{
-padding:
-22px
-18px
-145px
-}
-
-.message{
-gap:10px;
-margin-bottom:22px
-}
-
-.message-body{
-font-size:15px
-}
-
-.composer-wrap{
-padding-left:10px;
-padding-right:10px
-}
-
-.composer{
-border-radius:16px
-}
-
-.welcome h1{
-font-size:25px
-}
-
-}
-
-/* =========================================================
-LOADING
-========================================================= */
-
-.loading-screen{
-position:fixed;
-inset:0;
-
-display:flex;
-align-items:center;
-justify-content:center;
-
-background:#080B18;
-
-z-index:999;
-
-transition:opacity .25s
-}
-
-.loading-screen.hidden{
-opacity:0;
-pointer-events:none
-}
-
-.loading-logo{
-width:55px;
-height:55px;
-
-display:flex;
-align-items:center;
-justify-content:center;
-
-border-radius:17px;
-
-background:
-linear-gradient(
-135deg,
-#3B82F6,
-#7C3AED
-);
-
-font-size:24px;
-font-weight:900
-}
-
-</style>
-
+    <meta charset="UTF-8">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    >
+
+    <meta name="theme-color" content="#080B18">
+
+    <title>AskOra — Ask. Get answers.</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        :root {
+            --deep: #080B18;
+            --midnight: #10152B;
+            --blue: #3B82F6;
+            --violet: #7C3AED;
+            --white: #F5F7FF;
+            --gray: #9CA3AF;
+            --border: rgba(255,255,255,.09);
+            --panel: rgba(16,21,43,.88);
+        }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family:
+                Inter,
+                ui-sans-serif,
+                system-ui,
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                sans-serif;
+            background: var(--deep);
+            color: var(--white);
+        }
+
+        button,
+        textarea,
+        input {
+            font: inherit;
+        }
+
+        button {
+            cursor: pointer;
+        }
+
+        .app {
+            display: flex;
+            width: 100%;
+            height: 100dvh;
+            overflow: hidden;
+        }
+
+        /* SIDEBAR */
+
+        .sidebar {
+            width: 280px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            background:
+                linear-gradient(
+                    180deg,
+                    #0c1124,
+                    #080B18
+                );
+            border-right: 1px solid var(--border);
+            z-index: 30;
+        }
+
+        .brand {
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-logo {
+            width: 42px;
+            height: 42px;
+            border-radius: 13px;
+            display: grid;
+            place-items: center;
+            font-weight: 900;
+            font-size: 22px;
+            color: white;
+            background:
+                linear-gradient(
+                    135deg,
+                    var(--blue),
+                    var(--violet)
+                );
+            box-shadow:
+                0 0 30px rgba(59,130,246,.25);
+        }
+
+        .brand-name {
+            font-size: 20px;
+            font-weight: 800;
+            letter-spacing: -.4px;
+        }
+
+        .new-chat {
+            margin: 0 16px 14px;
+            width: calc(100% - 32px);
+            border: 1px solid rgba(255,255,255,.12);
+            background: rgba(255,255,255,.05);
+            color: white;
+            border-radius: 12px;
+            padding: 12px 14px;
+            text-align: left;
+            font-weight: 700;
+            transition: .2s;
+        }
+
+        .new-chat:hover {
+            background: rgba(59,130,246,.13);
+            border-color: rgba(59,130,246,.4);
+        }
+
+        .search-box {
+            padding: 0 16px 14px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 11px 13px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            outline: none;
+            color: white;
+            background: rgba(255,255,255,.045);
+        }
+
+        .search-box input:focus {
+            border-color: rgba(59,130,246,.65);
+        }
+
+        .chat-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 10px 10px;
+        }
+
+        .chat-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 3px;
+            border-radius: 10px;
+            transition: .2s;
+        }
+
+        .chat-open {
+            flex: 1;
+            min-width: 0;
+            border: 0;
+            background: transparent;
+            color: #dfe5f5;
+            padding: 11px 10px;
+            text-align: left;
+            border-radius: 10px;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+
+        .chat-open:hover,
+        .chat-item.active .chat-open {
+            background: rgba(255,255,255,.07);
+            color: white;
+        }
+
+        .chat-delete {
+            border: 0;
+            background: transparent;
+            color: #68728d;
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+        }
+
+        .chat-delete:hover {
+            color: #ff6b81;
+            background: rgba(255,107,129,.08);
+        }
+
+        .empty-chats {
+            color: #68728d;
+            text-align: center;
+            padding: 30px 15px;
+            font-size: 13px;
+        }
+
+        .account {
+            border-top: 1px solid var(--border);
+            padding: 14px;
+        }
+
+        .account-name {
+            font-weight: 700;
+            margin-bottom: 3px;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+
+        .account-email {
+            color: var(--gray);
+            font-size: 12px;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+
+        .account-actions {
+            display: flex;
+            gap: 7px;
+            margin-top: 12px;
+        }
+
+        .account-actions a,
+        .account-actions button {
+            flex: 1;
+            padding: 9px;
+            border-radius: 9px;
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,.04);
+            color: #dfe5f5;
+            text-decoration: none;
+            font-size: 12px;
+            text-align: center;
+        }
+
+        .account-actions a:hover,
+        .account-actions button:hover {
+            background: rgba(255,255,255,.08);
+        }
+
+        /* MAIN */
+
+        .main {
+            min-width: 0;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background:
+                radial-gradient(
+                    circle at 50% 0%,
+                    rgba(59,130,246,.08),
+                    transparent 35%
+                ),
+                var(--deep);
+        }
+
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            min-height: 70px;
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            background: rgba(8,11,24,.85);
+            backdrop-filter: blur(18px);
+        }
+
+        .menu-btn {
+            display: none;
+            border: 0;
+            background: transparent;
+            color: white;
+            font-size: 22px;
+            margin-right: 10px;
+        }
+
+        .top-title {
+            font-weight: 800;
+            font-size: 16px;
+        }
+
+        .online {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-left: 12px;
+            color: #7f8aa5;
+            font-size: 12px;
+        }
+
+        .online-dot {
+            width: 7px;
+            height: 7px;
+            background: #22c55e;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #22c55e;
+        }
+
+        .tagline {
+            margin-left: auto;
+            color: #6f7890;
+            font-size: 12px;
+        }
+
+        /* MESSAGES */
+
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+        }
+
+        .messages-inner {
+            width: min(900px, calc(100% - 30px));
+            margin: 0 auto;
+            padding: 35px 0 180px;
+        }
+
+        .welcome {
+            min-height: 55vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 30px 15px;
+        }
+
+        .welcome-logo {
+            width: 72px;
+            height: 72px;
+            border-radius: 22px;
+            display: grid;
+            place-items: center;
+            font-size: 35px;
+            font-weight: 900;
+            background:
+                linear-gradient(
+                    135deg,
+                    var(--blue),
+                    var(--violet)
+                );
+            box-shadow:
+                0 0 60px rgba(59,130,246,.18);
+            margin-bottom: 24px;
+        }
+
+        .welcome h1 {
+            margin: 0 0 10px;
+            font-size: clamp(28px, 5vw, 42px);
+            letter-spacing: -1.5px;
+        }
+
+        .welcome p {
+            margin: 0;
+            color: var(--gray);
+            max-width: 520px;
+            line-height: 1.7;
+        }
+
+        .message {
+            display: flex;
+            gap: 14px;
+            margin-bottom: 28px;
+        }
+
+        .avatar {
+            width: 34px;
+            height: 34px;
+            flex-shrink: 0;
+            border-radius: 10px;
+            display: grid;
+            place-items: center;
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .message.user .avatar {
+            background: rgba(255,255,255,.1);
+        }
+
+        .message.assistant .avatar {
+            background:
+                linear-gradient(
+                    135deg,
+                    var(--blue),
+                    var(--violet)
+                );
+        }
+
+        .message-body {
+            min-width: 0;
+            flex: 1;
+            line-height: 1.7;
+            color: #e8ecf7;
+        }
+
+        .message-body p:first-child {
+            margin-top: 0;
+        }
+
+        .message-body p:last-child {
+            margin-bottom: 0;
+        }
+
+        .message-body h1,
+        .message-body h2,
+        .message-body h3 {
+            line-height: 1.3;
+            margin-top: 1.3em;
+        }
+
+        .message-body ul,
+        .message-body ol {
+            padding-left: 24px;
+        }
+
+        .message-body code {
+            background: rgba(255,255,255,.08);
+            padding: 2px 5px;
+            border-radius: 5px;
+            font-size: .9em;
+        }
+
+        .message-body pre {
+            overflow-x: auto;
+            background: #070a14;
+            border: 1px solid var(--border);
+            padding: 15px;
+            border-radius: 11px;
+        }
+
+        .message-body pre code {
+            background: transparent;
+            padding: 0;
+        }
+
+        .message-body blockquote {
+            border-left: 3px solid var(--blue);
+            margin-left: 0;
+            padding-left: 15px;
+            color: #aeb7ca;
+        }
+
+        .message-body table {
+            border-collapse: collapse;
+            width: 100%;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+
+        .message-body th,
+        .message-body td {
+            border: 1px solid var(--border);
+            padding: 8px 10px;
+            text-align: left;
+        }
+
+        /* COMPOSER */
+
+        .composer-area {
+            position: absolute;
+            bottom: 0;
+            left: 280px;
+            right: 0;
+            padding: 20px 20px 24px;
+            pointer-events: none;
+            background:
+                linear-gradient(
+                    to top,
+                    var(--deep) 55%,
+                    transparent
+                );
+        }
+
+        .composer {
+            pointer-events: auto;
+            width: min(900px, 100%);
+            margin: 0 auto;
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+            padding: 9px;
+            border-radius: 17px;
+            border: 1px solid rgba(255,255,255,.12);
+            background: rgba(16,21,43,.94);
+            box-shadow:
+                0 15px 50px rgba(0,0,0,.3);
+        }
+
+        textarea {
+            flex: 1;
+            min-width: 0;
+            max-height: 180px;
+            resize: none;
+            border: 0;
+            outline: none;
+            color: white;
+            background: transparent;
+            padding: 10px 8px;
+            line-height: 1.5;
+        }
+
+        textarea::placeholder {
+            color: #69738b;
+        }
+
+        .composer-btn {
+            width: 42px;
+            height: 42px;
+            flex-shrink: 0;
+            border: 0;
+            border-radius: 11px;
+            color: white;
+            background: rgba(255,255,255,.07);
+        }
+
+        .composer-btn:hover {
+            background: rgba(255,255,255,.13);
+        }
+
+        .send-btn {
+            background:
+                linear-gradient(
+                    135deg,
+                    var(--blue),
+                    var(--violet)
+                );
+        }
+
+        .send-btn:hover {
+            opacity: .9;
+        }
+
+        .recording {
+            position: fixed;
+            z-index: 100;
+            left: 50%;
+            bottom: 110px;
+            transform: translateX(-50%);
+            display: none;
+            align-items: center;
+            gap: 13px;
+            padding: 12px 16px;
+            border: 1px solid rgba(255,255,255,.12);
+            border-radius: 14px;
+            background: rgba(16,21,43,.97);
+            box-shadow: 0 15px 50px rgba(0,0,0,.4);
+        }
+
+        .recording.active {
+            display: flex;
+        }
+
+        .recording-dot {
+            width: 11px;
+            height: 11px;
+            background: #ef4444;
+            border-radius: 50%;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            50% {
+                transform: scale(1.35);
+                opacity: .5;
+            }
+        }
+
+        .record-time {
+            min-width: 45px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .record-stop,
+        .record-cancel {
+            border: 0;
+            border-radius: 8px;
+            padding: 7px 10px;
+            color: white;
+        }
+
+        .record-stop {
+            background: #ef4444;
+        }
+
+        .record-cancel {
+            background: rgba(255,255,255,.08);
+        }
+
+        .typing {
+            color: #7f8aa5;
+            font-size: 13px;
+        }
+
+        /* MOBILE */
+
+        .overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 20;
+            background: rgba(0,0,0,.6);
+        }
+
+        @media (max-width: 800px) {
+
+            .sidebar {
+                position: fixed;
+                left: 0;
+                top: 0;
+                bottom: 0;
+                transform: translateX(-100%);
+                transition: transform .25s ease;
+                box-shadow: 20px 0 60px rgba(0,0,0,.4);
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .overlay.open {
+                display: block;
+            }
+
+            .menu-btn {
+                display: block;
+            }
+
+            .topbar {
+                padding: 0 14px;
+            }
+
+            .tagline {
+                display: none;
+            }
+
+            .composer-area {
+                left: 0;
+                padding: 12px 10px 15px;
+            }
+
+            .messages-inner {
+                width: calc(100% - 20px);
+                padding-top: 22px;
+            }
+
+            .message {
+                gap: 10px;
+                margin-bottom: 22px;
+            }
+
+            .avatar {
+                width: 31px;
+                height: 31px;
+            }
+
+            .welcome {
+                min-height: 65vh;
+            }
+        }
+    </style>
 </head>
 
 <body>
 
-<div class="loading-screen" id="loadingScreen">
-<div class="loading-logo">A</div>
-</div>
-
 <div class="app">
 
-<!-- =====================================================
-SIDEBAR
-===================================================== -->
+    <div
+        id="overlay"
+        class="overlay"
+        onclick="closeSidebar()"
+    ></div>
 
-<aside class="sidebar" id="sidebar">
+    <aside id="sidebar" class="sidebar">
 
-<div class="brand">
+        <div class="brand">
+            <div class="brand-logo">A</div>
+            <div class="brand-name">AskOra</div>
+        </div>
 
-<div class="brand-logo">A</div>
+        <button
+            class="new-chat"
+            onclick="newChat()"
+        >
+            ＋ New chat
+        </button>
 
-<div class="brand-text">
-AskOra
+        <div class="search-box">
+            <input
+                id="chatSearch"
+                type="search"
+                placeholder="Search chats..."
+                oninput="filterChats()"
+            >
+        </div>
+
+        <div id="chatList" class="chat-list">
+            <div class="empty-chats">
+                Loading chats...
+            </div>
+        </div>
+
+        <div class="account">
+
+            <div
+                id="accountName"
+                class="account-name"
+            >
+                Account
+            </div>
+
+            <div
+                id="accountEmail"
+                class="account-email"
+            >
+                ...
+            </div>
+
+            <div class="account-actions">
+
+                {% if is_admin %}
+                <a href="/admin">Admin</a>
+                {% endif %}
+
+                <button onclick="logout()">
+                    Logout
+                </button>
+
+            </div>
+
+        </div>
+
+    </aside>
+
+
+    <main class="main">
+
+        <header class="topbar">
+
+            <button
+                class="menu-btn"
+                onclick="openSidebar()"
+                aria-label="Open menu"
+            >
+                ☰
+            </button>
+
+            <div class="top-title">
+                AskOra
+            </div>
+
+            <div class="online">
+                <span class="online-dot"></span>
+                Online
+            </div>
+
+            <div class="tagline">
+                Ask. Get answers.
+            </div>
+
+        </header>
+
+
+        <section
+            id="messages"
+            class="messages"
+        >
+
+            <div
+                id="messagesInner"
+                class="messages-inner"
+            >
+
+                <div
+                    id="welcome"
+                    class="welcome"
+                >
+
+                    <div class="welcome-logo">
+                        A
+                    </div>
+
+                    <h1>
+                        How can I help?
+                    </h1>
+
+                    <p>
+                        Ask anything. Get clear, useful answers
+                        powered by advanced AI.
+                    </p>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <div class="composer-area">
+
+            <div class="composer">
+
+                <textarea
+                    id="messageInput"
+                    rows="1"
+                    placeholder="Message AskOra..."
+                    onkeydown="handleInputKey(event)"
+                ></textarea>
+
+                <button
+                    id="voiceBtn"
+                    class="composer-btn"
+                    onclick="startRecording()"
+                    title="Voice input"
+                >
+                    🎙
+                </button>
+
+                <button
+                    id="sendBtn"
+                    class="composer-btn send-btn"
+                    onclick="sendMessage()"
+                    title="Send"
+                >
+                    ➤
+                </button>
+
+            </div>
+
+        </div>
+
+    </main>
+
 </div>
 
-</div>
-
-<button
-class="new-chat"
-id="newChatBtn"
->
-＋ New chat
-</button>
-
-<input
-class="search"
-id="searchChats"
-placeholder="Search chats..."
->
-
-<div class="chat-list">
-
-<div class="chat-list-title">
-Recent
-</div>
-
-<div id="chatList"></div>
-
-</div>
-
-<div class="account">
-
-<div class="account-card">
-
-<div class="avatar">
-{{ user.username[0]|upper }}
-</div>
-
-<div class="account-info">
-
-<div class="account-name">
-{{ user.username }}
-</div>
-
-<div class="account-email">
-{{ user.email or "Account" }}
-</div>
-
-</div>
-
-</div>
-
-<div class="account-actions">
-
-{% if is_admin %}
-<a href="/admin">
-Admin
-</a>
-{% endif %}
-
-<button id="logoutBtn">
-Logout
-</button>
-
-</div>
-
-</div>
-
-</aside>
-
-
-<!-- =====================================================
-MAIN
-===================================================== -->
-
-<main class="main">
-
-<!-- STICKY HEADER -->
-
-<header class="chat-header">
-
-<button
-class="mobile-menu"
-id="mobileMenu"
->
-☰
-</button>
-
-<div class="header-info">
-
-<div class="header-name">
-AskOra
-</div>
-
-<div class="header-status">
-● Online
-</div>
-
-<div class="header-subtitle">
-Ask. Get answers.
-</div>
-
-</div>
 
 <div
-class="header-chat-title"
-id="headerChatTitle"
->
-New chat
-</div>
-
-</header>
-
-
-<!-- =====================================================
-MESSAGES
-===================================================== -->
-
-<section
-class="messages"
-id="messages"
+    id="recording"
+    class="recording"
 >
 
-<div
-class="messages-inner"
-id="messagesInner"
->
+    <div class="recording-dot"></div>
 
-<div
-class="welcome"
-id="welcome"
->
+    <span>Recording</span>
 
-<div class="welcome-logo">
-A
-</div>
+    <span
+        id="recordTime"
+        class="record-time"
+    >
+        00:00
+    </span>
 
-<h1>
-How can I help?
-</h1>
+    <button
+        class="record-stop"
+        onclick="stopRecording()"
+    >
+        Stop
+    </button>
 
-<p>
-Ask anything. Get clear answers.
-</p>
-
-</div>
-
-</div>
-
-</section>
-
-
-<!-- =====================================================
-RECORDING
-===================================================== -->
-
-<div
-class="recording"
-id="recordingBox"
->
-
-<div class="recording-pulse"></div>
-
-<div class="recording-text">
-
-<div class="recording-title">
-Listening...
-</div>
-
-<div
-class="recording-time"
-id="recordingTime"
->
-00:00
-</div>
-
-</div>
-
-<button id="cancelRecording">
-Cancel
-</button>
-
-<button
-class="stop"
-id="stopRecording"
->
-Stop
-</button>
-
-</div>
-
-
-<!-- =====================================================
-COMPOSER
-===================================================== -->
-
-<div class="composer-wrap">
-
-<form
-class="composer"
-id="composer"
->
-
-<button
-type="button"
-class="icon-btn"
-id="micBtn"
-title="Voice"
->
-🎙
-</button>
-
-<textarea
-id="messageInput"
-placeholder="Message AskOra..."
-rows="1"
-></textarea>
-
-<button
-type="submit"
-class="icon-btn send-btn"
-id="sendBtn"
-title="Send"
->
-➤
-</button>
-
-</form>
-
-</div>
-
-</main>
+    <button
+        class="record-cancel"
+        onclick="cancelRecording()"
+    >
+        Cancel
+    </button>
 
 </div>
 
 
 <script>
-
-const csrfToken = "{{ csrf_token }}";
+const CSRF = {{ csrf_token|tojson }};
 
 let chats = [];
-let currentChatId = null;
-
-const sidebar =
-document.getElementById("sidebar");
-
-const chatList =
-document.getElementById("chatList");
-
-const messages =
-document.getElementById("messages");
-
-const messagesInner =
-document.getElementById("messagesInner");
-
-const welcome =
-document.getElementById("welcome");
-
-const input =
-document.getElementById("messageInput");
-
-const composer =
-document.getElementById("composer");
-
-const headerChatTitle =
-document.getElementById("headerChatTitle");
-
-const loadingScreen =
-document.getElementById("loadingScreen");
-
-const recordingBox =
-document.getElementById("recordingBox");
-
-const recordingTime =
-document.getElementById("recordingTime");
-
-const searchChats =
-document.getElementById("searchChats");
+let activeChatId = null;
+let mediaRecorder = null;
+let mediaStream = null;
+let audioChunks = [];
+let recordingStarted = null;
+let recordingTimer = null;
 
 
-// ========================================================
-// API
-// ========================================================
+const messages = document.getElementById("messages");
+const messagesInner = document.getElementById("messagesInner");
+const input = document.getElementById("messageInput");
+const sendBtn = document.getElementById("sendBtn");
 
-async function api(
-    url,
-    options = {}
-){
 
-    options.headers =
-        options.headers || {};
+/* ============================================================
+   FETCH
+   ============================================================ */
 
-    options.headers[
-        "X-CSRF-Token"
-    ] = csrfToken;
+async function api(url, options = {}) {
 
-    const response =
-        await fetch(
-            url,
-            options
-        );
+    const headers = {
+        ...(options.headers || {})
+    };
 
-    let data;
-
-    try{
-        data = await response.json();
-    }catch{
-        data = {
-            ok:false,
-            error:"Unexpected server response."
-        };
+    if (
+        options.method &&
+        options.method !== "GET"
+    ) {
+        headers["X-CSRF-Token"] = CSRF;
     }
 
-    if(!response.ok){
+    if (
+        options.body &&
+        !(options.body instanceof FormData)
+    ) {
+        headers["Content-Type"] = "application/json";
+    }
+
+    const response = await fetch(
+        url,
+        {
+            ...options,
+            headers
+        }
+    );
+
+    if (response.status === 401) {
+        window.location.href = "/login";
+        return null;
+    }
+
+    const data = await response.json().catch(
+        () => ({})
+    );
+
+    if (!response.ok) {
         throw new Error(
-            data.error ||
-            "Something went wrong."
+            data.error || "Something went wrong."
         );
     }
 
@@ -1299,801 +953,570 @@ async function api(
 }
 
 
-// ========================================================
-// ESCAPE
-// ========================================================
+/* ============================================================
+   ACCOUNT
+   ============================================================ */
 
-function escapeHtml(text){
+async function loadAccount() {
 
-    const div =
-        document.createElement("div");
+    try {
 
-    div.textContent = text;
+        const user = await api("/api/me");
 
-    return div.innerHTML;
-}
+        if (!user) return;
 
-
-// ========================================================
-// MARKDOWN
-// ========================================================
-
-function renderMarkdown(text){
-
-    if(
-        typeof marked === "undefined"
-        ||
-        typeof DOMPurify === "undefined"
-    ){
-        return escapeHtml(text)
-            .replace(/\n/g,"<br>");
-    }
-
-    marked.setOptions({
-        breaks:true,
-        gfm:true
-    });
-
-    let html =
-        marked.parse(text);
-
-    html =
-        DOMPurify.sanitize(
-            html,
-            {
-                FORBID_TAGS:["img"],
-                FORBID_ATTR:[
-                    "src",
-                    "srcset"
-                ]
-            }
-        );
-
-    return html;
-}
-
-
-// ========================================================
-// MESSAGE
-// ========================================================
-
-function addMessage(
-    role,
-    content
-){
-
-    if(welcome){
-        welcome.style.display =
-            "none";
-    }
-
-    const wrapper =
-        document.createElement("div");
-
-    wrapper.className =
-        `message ${role}`;
-
-    const avatar =
-        role === "user"
-        ? "{{ user.username[0]|upper }}"
-        : "A";
-
-    wrapper.innerHTML = `
-        <div class="message-avatar">
-            ${escapeHtml(avatar)}
-        </div>
-
-        <div class="message-body">
-            ${
-                role === "assistant"
-                ? renderMarkdown(content)
-                : escapeHtml(content)
-                    .replace(/\n/g,"<br>")
-            }
-        </div>
-    `;
-
-    messagesInner.appendChild(
-        wrapper
-    );
-
-    scrollToBottom();
-}
-
-
-// ========================================================
-// TYPING
-// ========================================================
-
-function showTyping(){
-
-    const typing =
-        document.createElement("div");
-
-    typing.id =
-        "typingIndicator";
-
-    typing.className =
-        "message assistant";
-
-    typing.innerHTML = `
-        <div class="message-avatar">A</div>
-
-        <div class="message-body">
-            <div class="typing show">
-                <span class="dot"></span>
-                <span class="dot"></span>
-                <span class="dot"></span>
-            </div>
-        </div>
-    `;
-
-    messagesInner.appendChild(
-        typing
-    );
-
-    scrollToBottom();
-}
-
-
-function hideTyping(){
-
-    const typing =
         document.getElementById(
-            "typingIndicator"
-        );
+            "accountName"
+        ).textContent = user.username;
 
-    if(typing){
-        typing.remove();
+        document.getElementById(
+            "accountEmail"
+        ).textContent = user.email;
+
+    } catch (error) {
+        console.error(error);
     }
 }
 
 
-// ========================================================
-// SCROLL
-// ========================================================
+/* ============================================================
+   CHATS
+   ============================================================ */
 
-function scrollToBottom(){
+async function loadChats() {
 
-    setTimeout(() => {
+    try {
 
-        messages.scrollTop =
-            messages.scrollHeight;
-
-    },20);
-}
-
-
-// ========================================================
-// LOAD CHATS
-// ========================================================
-
-async function loadChats(){
-
-    try{
-
-        const data =
-            await api(
-                "/api/chats"
-            );
-
-        chats =
-            data.chats || [];
+        chats = await api("/api/chats");
 
         renderChatList();
 
-        if(
-            !currentChatId
-            &&
-            chats.length
-        ){
-
-            await openChat(
-                chats[0].id
-            );
-
-        }else if(
-            !currentChatId
-        ){
-
-            const data =
-                await api(
-                    "/api/chats",
-                    {
-                        method:"POST"
-                    }
-                );
-
-            chats.unshift(
-                data.chat
-            );
-
-            currentChatId =
-                data.chat.id;
-
-            headerChatTitle.textContent =
-                "New chat";
-
-        }
-
-    }catch(error){
+    } catch (error) {
 
         console.error(error);
 
+        document.getElementById(
+            "chatList"
+        ).innerHTML = `
+            <div class="empty-chats">
+                Could not load chats.
+            </div>
+        `;
     }
 }
 
 
-// ========================================================
-// CHAT LIST
-// ========================================================
+function renderChatList() {
 
-function renderChatList(){
+    const list = document.getElementById(
+        "chatList"
+    );
 
-    const query =
-        searchChats.value
-            .trim()
-            .toLowerCase();
+    const search = document.getElementById(
+        "chatSearch"
+    ).value
+        .trim()
+        .toLowerCase();
 
-    chatList.innerHTML = "";
-
-    const filtered =
-        chats.filter(chat =>
+    const filtered = chats.filter(
+        chat =>
             chat.title
                 .toLowerCase()
-                .includes(query)
-        );
+                .includes(search)
+    );
 
-    filtered.forEach(chat => {
+    if (!filtered.length) {
 
-        const item =
-            document.createElement("div");
-
-        item.className =
-            "chat-item";
-
-        if(
-            Number(chat.id)
-            ===
-            Number(currentChatId)
-        ){
-            item.classList.add(
-                "active"
-            );
-        }
-
-        const open =
-            document.createElement("button");
-
-        open.className =
-            "chat-open";
-
-        open.textContent =
-            chat.title || "New chat";
-
-        open.onclick =
-            () => openChat(chat.id);
-
-        const del =
-            document.createElement("button");
-
-        del.className =
-            "chat-delete";
-
-        del.title =
-            "Delete chat";
-
-        del.textContent =
-            "×";
-
-        del.onclick =
-            event => {
-
-                event.stopPropagation();
-
-                deleteChat(
-                    chat.id
-                );
-            };
-
-        item.appendChild(open);
-        item.appendChild(del);
-
-        chatList.appendChild(item);
-
-    });
-}
-
-
-// ========================================================
-// OPEN CHAT
-// ========================================================
-
-async function openChat(chatId){
-
-    currentChatId =
-        Number(chatId);
-
-    const chat =
-        chats.find(
-            c =>
-                Number(c.id)
-                ===
-                Number(chatId)
-        );
-
-    headerChatTitle.textContent =
-        chat
-        ? chat.title
-        : "New chat";
-
-    messagesInner.innerHTML = "";
-
-    try{
-
-        const data =
-            await api(
-                `/api/chats/${chatId}/messages`
-            );
-
-        if(
-            !data.messages.length
-        ){
-
-            messagesInner.innerHTML = `
-                <div class="welcome">
-                    <div class="welcome-logo">A</div>
-                    <h1>How can I help?</h1>
-                    <p>Ask anything. Get clear answers.</p>
-                </div>
-            `;
-
-        }else{
-
-            data.messages.forEach(
-                message => {
-
-                    addMessage(
-                        message.role,
-                        message.content
-                    );
-
-                }
-            );
-
-        }
-
-        renderChatList();
-
-        sidebar.classList.remove(
-            "open"
-        );
-
-        scrollToBottom();
-
-    }catch(error){
-
-        alert(error.message);
-
-    }
-}
-
-
-// ========================================================
-// NEW CHAT
-// ========================================================
-
-async function createNewChat(){
-
-    try{
-
-        const data =
-            await api(
-                "/api/chats",
-                {
-                    method:"POST"
-                }
-            );
-
-        chats.unshift(
-            data.chat
-        );
-
-        currentChatId =
-            data.chat.id;
-
-        headerChatTitle.textContent =
-            "New chat";
-
-        messagesInner.innerHTML = `
-            <div class="welcome">
-                <div class="welcome-logo">A</div>
-                <h1>How can I help?</h1>
-                <p>Ask anything. Get clear answers.</p>
+        list.innerHTML = `
+            <div class="empty-chats">
+                No chats found.
             </div>
         `;
 
-        renderChatList();
+        return;
+    }
+
+    list.innerHTML = filtered.map(
+        chat => `
+            <div
+                class="chat-item ${
+                    Number(chat.id) === Number(activeChatId)
+                        ? "active"
+                        : ""
+                }"
+            >
+
+                <button
+                    class="chat-open"
+                    onclick="openChat(${chat.id})"
+                >
+                    ${escapeHtml(chat.title)}
+                </button>
+
+                <button
+                    class="chat-delete"
+                    onclick="deleteChat(${chat.id}, event)"
+                    title="Delete chat"
+                >
+                    ×
+                </button>
+
+            </div>
+        `
+    ).join("");
+}
+
+
+function filterChats() {
+    renderChatList();
+}
+
+
+async function newChat() {
+
+    try {
+
+        const chat = await api(
+            "/api/chats",
+            {
+                method: "POST",
+                body: JSON.stringify({
+                    title: "New chat"
+                })
+            }
+        );
+
+        activeChatId = chat.id;
+
+        clearMessages();
+
+        await loadChats();
+
+        closeSidebar();
 
         input.focus();
 
-    }catch(error){
-
+    } catch (error) {
         alert(error.message);
-
     }
 }
 
 
-// ========================================================
-// DELETE CHAT
-// ========================================================
+async function openChat(chatId) {
 
-async function deleteChat(chatId){
+    try {
 
-    const confirmed =
-        confirm(
-            "Delete this chat permanently?"
+        const data = await api(
+            `/api/chats/${chatId}/messages`
         );
 
-    if(!confirmed){
+        activeChatId = chatId;
+
+        clearMessages();
+
+        for (const message of data.messages) {
+
+            appendMessage(
+                message.role,
+                message.content
+            );
+        }
+
+        renderChatList();
+
+        closeSidebar();
+
+        scrollToBottom();
+
+    } catch (error) {
+        alert(error.message);
+    }
+}
+
+
+async function deleteChat(chatId, event) {
+
+    event.stopPropagation();
+
+    if (
+        !confirm(
+            "Delete this conversation?"
+        )
+    ) {
         return;
     }
 
-    try{
+    try {
 
         await api(
             `/api/chats/${chatId}`,
             {
-                method:"DELETE"
+                method: "DELETE"
             }
         );
 
-        chats =
-            chats.filter(
-                chat =>
-                    Number(chat.id)
-                    !==
-                    Number(chatId)
-            );
-
-        if(
-            Number(currentChatId)
-            ===
-            Number(chatId)
-        ){
-
-            currentChatId = null;
-
-            if(chats.length){
-
-                await openChat(
-                    chats[0].id
-                );
-
-            }else{
-
-                await createNewChat();
-
-            }
-
-        }else{
-
-            renderChatList();
-
+        if (
+            Number(activeChatId) === Number(chatId)
+        ) {
+            activeChatId = null;
+            clearMessages();
         }
 
-    }catch(error){
+        await loadChats();
 
+    } catch (error) {
         alert(error.message);
-
     }
 }
 
 
-// ========================================================
-// SEND MESSAGE
-// ========================================================
+/* ============================================================
+   MESSAGES
+   ============================================================ */
 
-composer.addEventListener(
-    "submit",
-    async event => {
+function clearMessages() {
 
-        event.preventDefault();
+    messagesInner.innerHTML = `
+        <div
+            id="welcome"
+            class="welcome"
+        >
 
-        const text =
-            input.value.trim();
+            <div class="welcome-logo">
+                A
+            </div>
 
-        if(!text){
-            return;
-        }
+            <h1>
+                How can I help?
+            </h1>
 
-        input.value = "";
+            <p>
+                Ask anything. Get clear, useful answers
+                powered by advanced AI.
+            </p>
 
-        input.style.height =
-            "44px";
+        </div>
+    `;
+}
 
-        addMessage(
-            "user",
-            text
+
+function appendMessage(role, content) {
+
+    const welcome = document.getElementById(
+        "welcome"
+    );
+
+    if (welcome) {
+        welcome.remove();
+    }
+
+    const wrapper = document.createElement("div");
+
+    wrapper.className =
+        `message ${role}`;
+
+    const avatar = document.createElement("div");
+
+    avatar.className = "avatar";
+
+    avatar.textContent =
+        role === "user"
+            ? "You"
+            : "A";
+
+    const body = document.createElement("div");
+
+    body.className = "message-body";
+
+    if (role === "assistant") {
+
+        body.innerHTML = renderMarkdown(
+            content
         );
 
-        showTyping();
+    } else {
 
-        try{
+        body.textContent = content;
+    }
 
-            const data =
-                await api(
-                    "/api/chat",
-                    {
-                        method:"POST",
+    wrapper.appendChild(avatar);
+    wrapper.appendChild(body);
 
-                        headers:{
-                            "Content-Type":
-                                "application/json"
-                        },
+    messagesInner.appendChild(wrapper);
 
-                        body:JSON.stringify({
-                            message:text,
-                            chat_id:
-                                currentChatId
-                        })
-                    }
-                );
+    return wrapper;
+}
 
-            hideTyping();
 
-            currentChatId =
-                data.chat_id;
+function appendTyping() {
 
-            addMessage(
-                "assistant",
-                data.answer
-            );
+    const welcome = document.getElementById(
+        "welcome"
+    );
 
-            await loadChats();
+    if (welcome) {
+        welcome.remove();
+    }
 
-        }catch(error){
+    const wrapper = document.createElement("div");
 
-            hideTyping();
+    wrapper.className =
+        "message assistant";
 
-            addMessage(
-                "assistant",
-                "⚠️ " + error.message
-            );
+    wrapper.id = "typingMessage";
 
+    wrapper.innerHTML = `
+        <div class="avatar">A</div>
+
+        <div class="message-body">
+            <span class="typing">
+                AskOra is thinking...
+            </span>
+        </div>
+    `;
+
+    messagesInner.appendChild(wrapper);
+
+    scrollToBottom();
+}
+
+
+function removeTyping() {
+
+    const element = document.getElementById(
+        "typingMessage"
+    );
+
+    if (element) {
+        element.remove();
+    }
+}
+
+
+function scrollToBottom() {
+
+    requestAnimationFrame(() => {
+
+        messages.scrollTop =
+            messages.scrollHeight;
+
+    });
+}
+
+
+/* ============================================================
+   MARKDOWN
+   ============================================================ */
+
+function renderMarkdown(text) {
+
+    const html = marked.parse(
+        text,
+        {
+            breaks: true,
+            gfm: true
         }
+    );
+
+    return DOMPurify.sanitize(
+        html,
+        {
+            FORBID_TAGS: [
+                "img",
+                "svg",
+                "iframe",
+                "object",
+                "embed",
+                "video",
+                "audio",
+                "source",
+                "form"
+            ],
+            FORBID_ATTR: [
+                "style",
+                "src",
+                "srcset",
+                "onerror",
+                "onclick"
+            ]
+        }
+    );
+}
+
+
+function escapeHtml(value) {
+
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+
+/* ============================================================
+   SEND
+   ============================================================ */
+
+async function sendMessage() {
+
+    const message = input.value.trim();
+
+    if (!message) return;
+
+    input.value = "";
+    resizeTextarea();
+
+    appendMessage(
+        "user",
+        message
+    );
+
+    appendTyping();
+
+    sendBtn.disabled = true;
+
+    try {
+
+        const data = await api(
+            "/api/chat",
+            {
+                method: "POST",
+                body: JSON.stringify({
+                    chat_id: activeChatId,
+                    message
+                })
+            }
+        );
+
+        removeTyping();
+
+        activeChatId = data.chat_id;
+
+        appendMessage(
+            "assistant",
+            data.answer
+        );
+
+        await loadChats();
+
+        scrollToBottom();
+
+    } catch (error) {
+
+        removeTyping();
+
+        appendMessage(
+            "assistant",
+            `⚠️ ${error.message}`
+        );
+
+    } finally {
+
+        sendBtn.disabled = false;
 
         input.focus();
     }
-);
-
-
-// ========================================================
-// TEXTAREA
-// ========================================================
-
-input.addEventListener(
-    "input",
-    () => {
-
-        input.style.height =
-            "44px";
-
-        input.style.height =
-            Math.min(
-                input.scrollHeight,
-                160
-            ) + "px";
-    }
-);
-
-
-input.addEventListener(
-    "keydown",
-    event => {
-
-        if(
-            event.key === "Enter"
-            &&
-            !event.shiftKey
-        ){
-
-            event.preventDefault();
-
-            composer.requestSubmit();
-
-        }
-    }
-);
-
-
-// ========================================================
-// SEARCH
-// ========================================================
-
-searchChats.addEventListener(
-    "input",
-    renderChatList
-);
-
-
-// ========================================================
-// NEW CHAT BUTTON
-// ========================================================
-
-document
-    .getElementById("newChatBtn")
-    .addEventListener(
-        "click",
-        createNewChat
-    );
-
-
-// ========================================================
-// MOBILE MENU
-// ========================================================
-
-document
-    .getElementById("mobileMenu")
-    .addEventListener(
-        "click",
-        () => {
-
-            sidebar.classList.toggle(
-                "open"
-            );
-
-        }
-    );
-
-
-// ========================================================
-// LOGOUT
-// ========================================================
-
-document
-    .getElementById("logoutBtn")
-    .addEventListener(
-        "click",
-        async () => {
-
-            try{
-
-                await api(
-                    "/logout",
-                    {
-                        method:"POST"
-                    }
-                );
-
-                location.href =
-                    "/login";
-
-            }catch(error){
-
-                alert(
-                    error.message
-                );
-
-            }
-
-        }
-    );
-
-
-// ========================================================
-// VOICE
-// ========================================================
-
-let mediaRecorder = null;
-let audioChunks = [];
-let recordingStarted = 0;
-let recordingTimer = null;
-
-
-function updateRecordingTime(){
-
-    const seconds =
-        Math.floor(
-            (
-                Date.now()
-                -
-                recordingStarted
-            ) / 1000
-        );
-
-    const minutes =
-        String(
-            Math.floor(seconds / 60)
-        ).padStart(2,"0");
-
-    const remaining =
-        String(
-            seconds % 60
-        ).padStart(2,"0");
-
-    recordingTime.textContent =
-        `${minutes}:${remaining}`;
 }
 
 
-async function startRecording(){
+/* ============================================================
+   INPUT
+   ============================================================ */
 
-    if(
-        !navigator.mediaDevices
-        ||
-        !navigator.mediaDevices.getUserMedia
-    ){
+function handleInputKey(event) {
+
+    if (
+        event.key === "Enter" &&
+        !event.shiftKey
+    ) {
+        event.preventDefault();
+
+        sendMessage();
+    }
+
+    setTimeout(
+        resizeTextarea,
+        0
+    );
+}
+
+
+function resizeTextarea() {
+
+    input.style.height = "auto";
+
+    input.style.height =
+        Math.min(
+            input.scrollHeight,
+            180
+        ) + "px";
+}
+
+
+/* ============================================================
+   VOICE
+   ============================================================ */
+
+async function startRecording() {
+
+    if (!navigator.mediaDevices) {
 
         alert(
-            "Voice recording is not supported by this browser."
+            "Your browser does not support microphone access."
         );
 
         return;
     }
 
-    try{
+    try {
 
-        const stream =
-            await navigator
-                .mediaDevices
-                .getUserMedia({
-                    audio:true
-                });
+        mediaStream =
+            await navigator.mediaDevices.getUserMedia({
+                audio: true
+            });
+
+        audioChunks = [];
 
         mediaRecorder =
             new MediaRecorder(
-                stream
+                mediaStream
             );
-
-        audioChunks = [];
 
         mediaRecorder.ondataavailable =
             event => {
 
-                if(
-                    event.data.size > 0
-                ){
-
+                if (event.data.size > 0) {
                     audioChunks.push(
                         event.data
                     );
-
                 }
             };
 
         mediaRecorder.onstop =
             async () => {
 
-                stream
-                    .getTracks()
-                    .forEach(
-                        track =>
-                            track.stop()
-                    );
-
-                clearInterval(
-                    recordingTimer
-                );
-
                 const blob =
                     new Blob(
                         audioChunks,
                         {
                             type:
+                                mediaRecorder.mimeType ||
                                 "audio/webm"
                         }
                     );
 
-                if(blob.size > 0){
+                cleanupRecording();
 
-                    await sendVoice(
-                        blob
-                    );
-
+                if (
+                    !blob.size ||
+                    blob.size < 100
+                ) {
+                    return;
                 }
 
+                await sendVoice(blob);
             };
 
         mediaRecorder.start();
@@ -2101,199 +1524,268 @@ async function startRecording(){
         recordingStarted =
             Date.now();
 
-        recordingTime.textContent =
-            "00:00";
+        document
+            .getElementById("recording")
+            .classList.add("active");
 
-        recordingBox.classList.add(
-            "show"
-        );
+        updateRecordingTimer();
 
         recordingTimer =
             setInterval(
-                updateRecordingTime,
+                updateRecordingTimer,
                 1000
             );
 
-    }catch(error){
+    } catch (error) {
+
+        console.error(error);
 
         alert(
-            "Microphone permission was denied or unavailable."
+            "Microphone permission was not granted."
+        );
+    }
+}
+
+
+function updateRecordingTimer() {
+
+    if (!recordingStarted) return;
+
+    const elapsed =
+        Math.floor(
+            (Date.now() - recordingStarted)
+            / 1000
         );
 
-    }
+    const minutes =
+        String(
+            Math.floor(elapsed / 60)
+        ).padStart(2, "0");
+
+    const seconds =
+        String(
+            elapsed % 60
+        ).padStart(2, "0");
+
+    document.getElementById(
+        "recordTime"
+    ).textContent =
+        `${minutes}:${seconds}`;
 }
 
 
-function stopRecording(){
+function stopRecording() {
 
-    if(
-        mediaRecorder
-        &&
+    if (
+        mediaRecorder &&
         mediaRecorder.state !== "inactive"
-    ){
-
+    ) {
         mediaRecorder.stop();
-
     }
-
-    recordingBox.classList.remove(
-        "show"
-    );
 }
 
 
-function cancelRecording(){
+function cancelRecording() {
 
-    if(
-        mediaRecorder
-        &&
+    if (
+        mediaRecorder &&
         mediaRecorder.state !== "inactive"
-    ){
-
+    ) {
         mediaRecorder.onstop = null;
-
         mediaRecorder.stop();
-
-        if(
-            mediaRecorder.stream
-        ){
-
-            mediaRecorder.stream
-                .getTracks()
-                .forEach(
-                    track =>
-                        track.stop()
-                );
-
-        }
-
     }
 
+    cleanupRecording();
+}
+
+
+function cleanupRecording() {
+
+    if (recordingTimer) {
+
+        clearInterval(
+            recordingTimer
+        );
+
+        recordingTimer = null;
+    }
+
+    if (mediaStream) {
+
+        mediaStream
+            .getTracks()
+            .forEach(
+                track => track.stop()
+            );
+
+        mediaStream = null;
+    }
+
+    mediaRecorder = null;
+    recordingStarted = null;
     audioChunks = [];
 
-    clearInterval(
-        recordingTimer
-    );
+    document
+        .getElementById("recording")
+        .classList.remove("active");
 
-    recordingBox.classList.remove(
-        "show"
-    );
+    document.getElementById(
+        "recordTime"
+    ).textContent = "00:00";
 }
 
 
-async function sendVoice(blob){
+async function sendVoice(blob) {
 
-    showTyping();
+    appendTyping();
 
-    const form =
+    const formData =
         new FormData();
 
-    form.append(
+    formData.append(
         "audio",
         blob,
         "recording.webm"
     );
 
-    if(currentChatId){
+    if (activeChatId) {
 
-        form.append(
+        formData.append(
             "chat_id",
-            currentChatId
+            activeChatId
         );
-
     }
 
-    try{
+    try {
 
-        const data =
-            await api(
+        const response =
+            await fetch(
                 "/api/voice",
                 {
-                    method:"POST",
-                    body:form
+                    method: "POST",
+                    headers: {
+                        "X-CSRF-Token": CSRF
+                    },
+                    body: formData
                 }
             );
 
-        hideTyping();
+        if (response.status === 401) {
+            window.location.href =
+                "/login";
+            return;
+        }
 
-        currentChatId =
+        const data =
+            await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                data.error ||
+                "Voice request failed."
+            );
+        }
+
+        removeTyping();
+
+        activeChatId =
             data.chat_id;
 
-        addMessage(
+        appendMessage(
             "user",
             data.transcription
         );
 
-        addMessage(
+        appendMessage(
             "assistant",
             data.answer
         );
 
         await loadChats();
 
-    }catch(error){
+        scrollToBottom();
 
-        hideTyping();
+    } catch (error) {
 
-        addMessage(
+        removeTyping();
+
+        appendMessage(
             "assistant",
-            "⚠️ " + error.message
+            `⚠️ ${error.message}`
         );
-
     }
 }
 
 
-document
-    .getElementById("micBtn")
-    .addEventListener(
-        "click",
-        startRecording
-    );
+/* ============================================================
+   MOBILE SIDEBAR
+   ============================================================ */
+
+function openSidebar() {
+
+    document
+        .getElementById("sidebar")
+        .classList.add("open");
+
+    document
+        .getElementById("overlay")
+        .classList.add("open");
+}
 
 
-document
-    .getElementById("stopRecording")
-    .addEventListener(
-        "click",
-        stopRecording
-    );
+function closeSidebar() {
+
+    document
+        .getElementById("sidebar")
+        .classList.remove("open");
+
+    document
+        .getElementById("overlay")
+        .classList.remove("open");
+}
 
 
-document
-    .getElementById("cancelRecording")
-    .addEventListener(
-        "click",
-        cancelRecording
-    );
+/* ============================================================
+   LOGOUT
+   ============================================================ */
 
+async function logout() {
 
-// ========================================================
-// START
-// ========================================================
+    try {
 
-(async function(){
-
-    try{
-
-        await loadChats();
-
-    }finally{
-
-        setTimeout(
-            () => {
-
-                loadingScreen.classList.add(
-                    "hidden"
-                );
-
-            },
-            250
+        await api(
+            "/logout",
+            {
+                method: "POST"
+            }
         );
 
-    }
+        window.location.href =
+            "/login";
 
-})();
+    } catch (error) {
+
+        alert(error.message);
+    }
+}
+
+
+/* ============================================================
+   INIT
+   ============================================================ */
+
+async function init() {
+
+    resizeTextarea();
+
+    await loadAccount();
+
+    await loadChats();
+
+    input.focus();
+}
+
+init();
 
 </script>
 
