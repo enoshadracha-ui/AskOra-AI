@@ -2,251 +2,555 @@
 <html lang="en">
 <head>
 
-<meta charset="UTF-8">
+    <meta charset="UTF-8">
 
-<meta
-name="viewport"
-content="width=device-width,initial-scale=1.0"
->
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
-<title>AskOra Admin</title>
+    <title>AskOra Admin</title>
 
-<style>
+    <style>
 
-*{
-box-sizing:border-box
-}
+        * {
+            box-sizing: border-box;
+        }
 
-body{
-margin:0;
-background:#080B18;
-color:#F5F7FF;
-font-family:Inter,system-ui,sans-serif;
-padding:25px
-}
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background:
+                radial-gradient(
+                    circle at top,
+                    rgba(59,130,246,.1),
+                    transparent 35%
+                ),
+                #080B18;
+            color: #F5F7FF;
+            font-family:
+                Inter,
+                system-ui,
+                sans-serif;
+        }
 
-.container{
-max-width:1100px;
-margin:auto
-}
+        header {
+            height: 70px;
+            display: flex;
+            align-items: center;
+            padding: 0 24px;
+            border-bottom: 1px solid rgba(255,255,255,.09);
+            background: rgba(8,11,24,.85);
+            backdrop-filter: blur(15px);
+        }
 
-.top{
-display:flex;
-align-items:center;
-justify-content:space-between;
-gap:15px;
-margin-bottom:25px
-}
+        .logo {
+            width: 40px;
+            height: 40px;
+            display: grid;
+            place-items: center;
+            margin-right: 12px;
+            border-radius: 12px;
+            font-weight: 900;
+            background: linear-gradient(
+                135deg,
+                #3B82F6,
+                #7C3AED
+            );
+        }
 
-h1{
-margin:0
-}
+        .title {
+            font-weight: 800;
+        }
 
-a{
-color:#60A5FA;
-text-decoration:none
-}
+        .back {
+            margin-left: auto;
+            color: #9CA3AF;
+            text-decoration: none;
+            font-size: 14px;
+        }
 
-.grid{
-display:grid;
-grid-template-columns:repeat(5,1fr);
-gap:12px
-}
+        .container {
+            width: min(1100px, calc(100% - 30px));
+            margin: 0 auto;
+            padding: 35px 0;
+        }
 
-.card{
-background:#10152B;
-border:1px solid rgba(255,255,255,.08);
-border-radius:16px;
-padding:20px
-}
+        h1 {
+            margin: 0 0 8px;
+        }
 
-.label{
-color:#9CA3AF;
-font-size:13px
-}
+        .subtitle {
+            color: #8d97ad;
+            margin-bottom: 30px;
+        }
 
-.value{
-font-size:28px;
-font-weight:800;
-margin-top:8px
-}
+        .stats {
+            display: grid;
+            grid-template-columns:
+                repeat(3, minmax(0, 1fr));
+            gap: 15px;
+        }
 
-.table-wrap{
-margin-top:20px;
-overflow:auto
-}
+        .stat {
+            padding: 22px;
+            border: 1px solid rgba(255,255,255,.09);
+            border-radius: 15px;
+            background: rgba(16,21,43,.82);
+        }
 
-table{
-width:100%;
-border-collapse:collapse
-}
+        .stat-label {
+            color: #8e98ae;
+            font-size: 13px;
+        }
 
-th,
-td{
-padding:12px;
-border-bottom:1px solid rgba(255,255,255,.08);
-text-align:left;
-white-space:nowrap
-}
+        .stat-value {
+            margin-top: 9px;
+            font-size: 30px;
+            font-weight: 800;
+        }
 
-th{
-color:#9CA3AF;
-font-size:13px
-}
+        .section {
+            margin-top: 28px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,.09);
+            border-radius: 15px;
+            background: rgba(16,21,43,.82);
+        }
 
-@media(max-width:800px){
+        .section h2 {
+            margin-top: 0;
+            font-size: 18px;
+        }
 
-.grid{
-grid-template-columns:repeat(2,1fr)
-}
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
 
-}
-</style>
+        th,
+        td {
+            padding: 12px 8px;
+            border-bottom: 1px solid rgba(255,255,255,.07);
+            text-align: left;
+            font-size: 13px;
+        }
+
+        th {
+            color: #8993a9;
+        }
+
+        td {
+            color: #dce2ef;
+        }
+
+        .event {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255,255,255,.07);
+        }
+
+        .event:last-child {
+            border-bottom: 0;
+        }
+
+        .event-name {
+            color: #aeb7ca;
+        }
+
+        .event-count {
+            font-weight: 800;
+        }
+
+        .loading {
+            color: #8d97ad;
+        }
+
+        @media (max-width: 700px) {
+
+            .stats {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .container {
+                width: calc(100% - 20px);
+            }
+
+            .section {
+                overflow-x: auto;
+            }
+
+            table {
+                min-width: 650px;
+            }
+        }
+
+        @media (max-width: 450px) {
+
+            .stats {
+                grid-template-columns: 1fr;
+            }
+        }
+
+    </style>
 
 </head>
 
 <body>
 
-<div class="container">
+<header>
 
-<div class="top">
+    <div class="logo">
+        A
+    </div>
 
-<h1>AskOra Admin</h1>
+    <div class="title">
+        AskOra Admin
+    </div>
 
-<a href="/">← Back to AskOra</a>
+    <a
+        href="/"
+        class="back"
+    >
+        ← Back to AskOra
+    </a>
 
-</div>
+</header>
 
-<div
-class="grid"
-id="stats"
->
-Loading...
-</div>
 
-<div class="card table-wrap">
+<main class="container">
 
-<h2>Users</h2>
+    <h1>
+        Dashboard
+    </h1>
 
-<table>
+    <div class="subtitle">
+        Overview of your AskOra platform.
+    </div>
 
-<thead>
 
-<tr>
-<th>Username</th>
-<th>Email</th>
-<th>First seen</th>
-<th>Last seen</th>
-</tr>
+    <div class="stats">
 
-</thead>
+        <div class="stat">
+            <div class="stat-label">
+                Total users
+            </div>
 
-<tbody id="users"></tbody>
+            <div
+                id="totalUsers"
+                class="stat-value"
+            >
+                —
+            </div>
+        </div>
 
-</table>
 
-</div>
+        <div class="stat">
+            <div class="stat-label">
+                Users today
+            </div>
 
-</div>
+            <div
+                id="usersToday"
+                class="stat-value"
+            >
+                —
+            </div>
+        </div>
+
+
+        <div class="stat">
+            <div class="stat-label">
+                Active today
+            </div>
+
+            <div
+                id="activeToday"
+                class="stat-value"
+            >
+                —
+            </div>
+        </div>
+
+
+        <div class="stat">
+            <div class="stat-label">
+                Total chats
+            </div>
+
+            <div
+                id="totalChats"
+                class="stat-value"
+            >
+                —
+            </div>
+        </div>
+
+
+        <div class="stat">
+            <div class="stat-label">
+                Questions
+            </div>
+
+            <div
+                id="totalQuestions"
+                class="stat-value"
+            >
+                —
+            </div>
+        </div>
+
+
+        <div class="stat">
+            <div class="stat-label">
+                Voice requests
+            </div>
+
+            <div
+                id="voiceRequests"
+                class="stat-value"
+            >
+                —
+            </div>
+        </div>
+
+    </div>
+
+
+    <section class="section">
+
+        <h2>
+            Usage events
+        </h2>
+
+        <div id="events">
+            <div class="loading">
+                Loading...
+            </div>
+        </div>
+
+    </section>
+
+
+    <section class="section">
+
+        <h2>
+            Recent users
+        </h2>
+
+        <table>
+
+            <thead>
+
+                <tr>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Joined</th>
+                    <th>Last seen</th>
+                </tr>
+
+            </thead>
+
+            <tbody id="users">
+
+                <tr>
+                    <td colspan="4">
+                        Loading...
+                    </td>
+                </tr>
+
+            </tbody>
+
+        </table>
+
+    </section>
+
+</main>
+
 
 <script>
 
-async function loadStats(){
+async function loadStats() {
 
-const response =
-await fetch(
-"/api/admin/stats"
-);
+    try {
 
-const data =
-await response.json();
+        const response =
+            await fetch(
+                "/api/admin/stats"
+            );
 
-if(!data.ok){
+        if (!response.ok) {
+            throw new Error(
+                "Could not load admin data."
+            );
+        }
 
-document.getElementById(
-"stats"
-).textContent =
-data.error;
+        const data =
+            await response.json();
 
-return;
 
+        document.getElementById(
+            "totalUsers"
+        ).textContent =
+            data.total_users;
+
+
+        document.getElementById(
+            "usersToday"
+        ).textContent =
+            data.users_today;
+
+
+        document.getElementById(
+            "activeToday"
+        ).textContent =
+            data.active_today;
+
+
+        document.getElementById(
+            "totalChats"
+        ).textContent =
+            data.total_chats;
+
+
+        document.getElementById(
+            "totalQuestions"
+        ).textContent =
+            data.total_questions;
+
+
+        document.getElementById(
+            "voiceRequests"
+        ).textContent =
+            data.voice_requests;
+
+
+        const events =
+            document.getElementById(
+                "events"
+            );
+
+
+        if (!data.events.length) {
+
+            events.innerHTML =
+                `<div class="loading">
+                    No usage events yet.
+                </div>`;
+
+        } else {
+
+            events.innerHTML =
+                data.events.map(
+                    event => `
+                        <div class="event">
+
+                            <div class="event-name">
+                                ${escapeHtml(
+                                    event.event_type
+                                )}
+                            </div>
+
+                            <div class="event-count">
+                                ${event.count}
+                            </div>
+
+                        </div>
+                    `
+                ).join("");
+        }
+
+
+        const users =
+            document.getElementById(
+                "users"
+            );
+
+
+        if (!data.recent_users.length) {
+
+            users.innerHTML = `
+                <tr>
+                    <td colspan="4">
+                        No users yet.
+                    </td>
+                </tr>
+            `;
+
+        } else {
+
+            users.innerHTML =
+                data.recent_users.map(
+                    user => `
+                        <tr>
+
+                            <td>
+                                ${escapeHtml(
+                                    user.username
+                                )}
+                            </td>
+
+                            <td>
+                                ${escapeHtml(
+                                    user.email
+                                )}
+                            </td>
+
+                            <td>
+                                ${formatDate(
+                                    user.first_seen
+                                )}
+                            </td>
+
+                            <td>
+                                ${formatDate(
+                                    user.last_seen
+                                )}
+                            </td>
+
+                        </tr>
+                    `
+                ).join("");
+        }
+
+    } catch (error) {
+
+        console.error(error);
+
+        document.getElementById(
+            "events"
+        ).innerHTML =
+            `<div class="loading">
+                Could not load dashboard.
+            </div>`;
+    }
 }
 
-const s =
-data.stats;
 
-document.getElementById(
-"stats"
-).innerHTML = `
+function escapeHtml(value) {
 
-<div class="card">
-<div class="label">Total users</div>
-<div class="value">${s.total_users}</div>
-</div>
-
-<div class="card">
-<div class="label">Users today</div>
-<div class="value">${s.users_today}</div>
-</div>
-
-<div class="card">
-<div class="label">Active today</div>
-<div class="value">${s.active_today}</div>
-</div>
-
-<div class="card">
-<div class="label">Total chats</div>
-<div class="value">${s.total_chats}</div>
-</div>
-
-<div class="card">
-<div class="label">Messages</div>
-<div class="value">${s.total_messages}</div>
-</div>
-
-`;
-
-const users =
-document.getElementById(
-"users"
-);
-
-users.innerHTML = "";
-
-s.users.forEach(user => {
-
-const row =
-document.createElement("tr");
-
-row.innerHTML = `
-
-<td>${escapeHtml(user.username)}</td>
-
-<td>${escapeHtml(user.email || "")}</td>
-
-<td>${user.first_seen || ""}</td>
-
-<td>${user.last_seen || ""}</td>
-
-`;
-
-users.appendChild(row);
-
-});
-
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
 }
 
-function escapeHtml(value){
 
-const div =
-document.createElement("div");
+function formatDate(value) {
 
-div.textContent =
-value ?? "";
+    try {
 
-return div.innerHTML;
+        return new Date(value)
+            .toLocaleString();
 
+    } catch {
+        return value;
+    }
 }
+
 
 loadStats();
 
