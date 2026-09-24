@@ -1,17 +1,29 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-
     <meta charset="UTF-8">
-
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1.0"
     >
 
+    <meta
+        name="theme-color"
+        content="#080B18"
+    >
+
     <title>AskOra Admin</title>
 
     <style>
+        :root {
+            --space: #080B18;
+            --midnight: #10152B;
+            --blue: #3B82F6;
+            --violet: #7C3AED;
+            --white: #F5F7FF;
+            --gray: #9CA3AF;
+            --border: rgba(255,255,255,.09);
+        }
 
         * {
             box-sizing: border-box;
@@ -20,28 +32,33 @@
         body {
             margin: 0;
             min-height: 100vh;
-            background:
-                radial-gradient(
-                    circle at top,
-                    rgba(59,130,246,.1),
-                    transparent 35%
-                ),
-                #080B18;
-            color: #F5F7FF;
+            background: var(--space);
+            color: var(--white);
             font-family:
                 Inter,
                 system-ui,
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
                 sans-serif;
         }
 
-        header {
-            height: 70px;
+        .header {
+            height: 72px;
             display: flex;
             align-items: center;
+            justify-content: space-between;
             padding: 0 24px;
-            border-bottom: 1px solid rgba(255,255,255,.09);
-            background: rgba(8,11,24,.85);
-            backdrop-filter: blur(15px);
+            border-bottom: 1px solid var(--border);
+            background: rgba(16,21,43,.8);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 800;
+            font-size: 20px;
         }
 
         .logo {
@@ -49,31 +66,30 @@
             height: 40px;
             display: grid;
             place-items: center;
-            margin-right: 12px;
             border-radius: 12px;
-            font-weight: 900;
-            background: linear-gradient(
-                135deg,
-                #3B82F6,
-                #7C3AED
-            );
-        }
-
-        .title {
-            font-weight: 800;
+            background:
+                linear-gradient(
+                    135deg,
+                    var(--blue),
+                    var(--violet)
+                );
+            font-size: 23px;
         }
 
         .back {
-            margin-left: auto;
-            color: #9CA3AF;
+            color: white;
             text-decoration: none;
-            font-size: 14px;
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,.04);
+            padding: 9px 14px;
+            border-radius: 10px;
         }
 
         .container {
-            width: min(1100px, calc(100% - 30px));
-            margin: 0 auto;
-            padding: 35px 0;
+            width: 100%;
+            max-width: 1200px;
+            margin: auto;
+            padding: 28px 20px;
         }
 
         h1 {
@@ -81,26 +97,26 @@
         }
 
         .subtitle {
-            color: #8d97ad;
-            margin-bottom: 30px;
+            color: var(--gray);
+            margin-bottom: 26px;
         }
 
         .stats {
             display: grid;
             grid-template-columns:
                 repeat(3, minmax(0, 1fr));
-            gap: 15px;
+            gap: 14px;
         }
 
         .stat {
-            padding: 22px;
-            border: 1px solid rgba(255,255,255,.09);
-            border-radius: 15px;
-            background: rgba(16,21,43,.82);
+            padding: 20px;
+            border: 1px solid var(--border);
+            border-radius: 17px;
+            background: rgba(255,255,255,.04);
         }
 
         .stat-label {
-            color: #8e98ae;
+            color: var(--gray);
             font-size: 13px;
         }
 
@@ -110,17 +126,22 @@
             font-weight: 800;
         }
 
-        .section {
-            margin-top: 28px;
-            padding: 20px;
-            border: 1px solid rgba(255,255,255,.09);
-            border-radius: 15px;
-            background: rgba(16,21,43,.82);
+        .panel {
+            margin-top: 24px;
+            border: 1px solid var(--border);
+            border-radius: 17px;
+            overflow: hidden;
+            background: rgba(255,255,255,.035);
         }
 
-        .section h2 {
-            margin-top: 0;
-            font-size: 18px;
+        .panel-title {
+            padding: 17px 18px;
+            border-bottom: 1px solid var(--border);
+            font-weight: 700;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
         }
 
         table {
@@ -130,82 +151,47 @@
 
         th,
         td {
-            padding: 12px 8px;
-            border-bottom: 1px solid rgba(255,255,255,.07);
+            padding: 13px 16px;
             text-align: left;
+            border-bottom: 1px solid var(--border);
             font-size: 13px;
+            white-space: nowrap;
         }
 
         th {
-            color: #8993a9;
+            color: var(--gray);
+            font-weight: 600;
         }
 
-        td {
-            color: #dce2ef;
-        }
-
-        .event {
-            display: flex;
-            justify-content: space-between;
-            padding: 12px 0;
-            border-bottom: 1px solid rgba(255,255,255,.07);
-        }
-
-        .event:last-child {
-            border-bottom: 0;
-        }
-
-        .event-name {
-            color: #aeb7ca;
-        }
-
-        .event-count {
-            font-weight: 800;
-        }
-
-        .loading {
-            color: #8d97ad;
+        .error {
+            color: #ff8d8d;
+            margin-top: 20px;
         }
 
         @media (max-width: 700px) {
 
             .stats {
-                grid-template-columns: 1fr 1fr;
+                grid-template-columns:
+                    repeat(2, minmax(0, 1fr));
+            }
+
+            .header {
+                padding: 0 14px;
             }
 
             .container {
-                width: calc(100% - 20px);
-            }
-
-            .section {
-                overflow-x: auto;
-            }
-
-            table {
-                min-width: 650px;
+                padding: 22px 12px;
             }
         }
-
-        @media (max-width: 450px) {
-
-            .stats {
-                grid-template-columns: 1fr;
-            }
-        }
-
     </style>
-
 </head>
 
 <body>
 
-<header>
+<header class="header">
 
-    <div class="logo">
-        A
-    </div>
-
-    <div class="title">
+    <div class="brand">
+        <div class="logo">A</div>
         AskOra Admin
     </div>
 
@@ -213,24 +199,20 @@
         href="/"
         class="back"
     >
-        ← Back to AskOra
+        Back to AskOra
     </a>
 
 </header>
 
-
 <main class="container">
 
-    <h1>
-        Dashboard
-    </h1>
+    <h1>Dashboard</h1>
 
     <div class="subtitle">
-        Overview of your AskOra platform.
+        AskOra platform statistics
     </div>
 
-
-    <div class="stats">
+    <section class="stats">
 
         <div class="stat">
             <div class="stat-label">
@@ -245,7 +227,6 @@
             </div>
         </div>
 
-
         <div class="stat">
             <div class="stat-label">
                 Users today
@@ -258,7 +239,6 @@
                 —
             </div>
         </div>
-
 
         <div class="stat">
             <div class="stat-label">
@@ -273,7 +253,6 @@
             </div>
         </div>
 
-
         <div class="stat">
             <div class="stat-label">
                 Total chats
@@ -286,7 +265,6 @@
                 —
             </div>
         </div>
-
 
         <div class="stat">
             <div class="stat-label">
@@ -301,7 +279,6 @@
             </div>
         </div>
 
-
         <div class="stat">
             <div class="stat-label">
                 Voice requests
@@ -315,63 +292,46 @@
             </div>
         </div>
 
-    </div>
+    </section>
 
+    <section class="panel">
 
-    <section class="section">
+        <div class="panel-title">
+            Recent users
+        </div>
 
-        <h2>
-            Usage events
-        </h2>
+        <div class="table-wrap">
 
-        <div id="events">
-            <div class="loading">
-                Loading...
-            </div>
+            <table>
+
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Joined</th>
+                        <th>Last seen</th>
+                    </tr>
+                </thead>
+
+                <tbody id="usersTable">
+                </tbody>
+
+            </table>
+
         </div>
 
     </section>
 
-
-    <section class="section">
-
-        <h2>
-            Recent users
-        </h2>
-
-        <table>
-
-            <thead>
-
-                <tr>
-                    <th>Username</th>
-                    <th>Email</th>
-                    <th>Joined</th>
-                    <th>Last seen</th>
-                </tr>
-
-            </thead>
-
-            <tbody id="users">
-
-                <tr>
-                    <td colspan="4">
-                        Loading...
-                    </td>
-                </tr>
-
-            </tbody>
-
-        </table>
-
-    </section>
+    <div
+        id="error"
+        class="error"
+    ></div>
 
 </main>
 
-
 <script>
 
-async function loadStats() {
+async function loadDashboard() {
 
     try {
 
@@ -380,179 +340,114 @@ async function loadStats() {
                 "/api/admin/stats"
             );
 
-        if (!response.ok) {
-            throw new Error(
-                "Could not load admin data."
-            );
-        }
-
         const data =
             await response.json();
 
+        if (!data.ok) {
+            document.getElementById(
+                "error"
+            ).textContent =
+                data.error ||
+                "Unable to load dashboard.";
+
+            return;
+        }
+
+        const stats =
+            data.stats;
 
         document.getElementById(
             "totalUsers"
         ).textContent =
-            data.total_users;
-
+            stats.total_users;
 
         document.getElementById(
             "usersToday"
         ).textContent =
-            data.users_today;
-
+            stats.users_today;
 
         document.getElementById(
             "activeToday"
         ).textContent =
-            data.active_today;
-
+            stats.active_today;
 
         document.getElementById(
             "totalChats"
         ).textContent =
-            data.total_chats;
-
+            stats.total_chats;
 
         document.getElementById(
             "totalQuestions"
         ).textContent =
-            data.total_questions;
-
+            stats.total_questions;
 
         document.getElementById(
             "voiceRequests"
         ).textContent =
-            data.voice_requests;
+            stats.voice_requests;
 
-
-        const events =
+        const table =
             document.getElementById(
-                "events"
+                "usersTable"
             );
 
+        table.innerHTML = "";
 
-        if (!data.events.length) {
+        (data.recent_users || [])
+            .forEach(user => {
 
-            events.innerHTML =
-                `<div class="loading">
-                    No usage events yet.
-                </div>`;
+                const row =
+                    document.createElement(
+                        "tr"
+                    );
 
-        } else {
+                const joined =
+                    new Date(
+                        user.first_seen
+                    ).toLocaleString();
 
-            events.innerHTML =
-                data.events.map(
-                    event => `
-                        <div class="event">
+                const lastSeen =
+                    new Date(
+                        user.last_seen
+                    ).toLocaleString();
 
-                            <div class="event-name">
-                                ${escapeHtml(
-                                    event.event_type
-                                )}
-                            </div>
+                row.innerHTML = `
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                `;
 
-                            <div class="event-count">
-                                ${event.count}
-                            </div>
+                row.children[0]
+                    .textContent =
+                    user.username;
 
-                        </div>
-                    `
-                ).join("");
-        }
+                row.children[1]
+                    .textContent =
+                    user.email;
 
+                row.children[2]
+                    .textContent =
+                    joined;
 
-        const users =
-            document.getElementById(
-                "users"
-            );
+                row.children[3]
+                    .textContent =
+                    lastSeen;
 
-
-        if (!data.recent_users.length) {
-
-            users.innerHTML = `
-                <tr>
-                    <td colspan="4">
-                        No users yet.
-                    </td>
-                </tr>
-            `;
-
-        } else {
-
-            users.innerHTML =
-                data.recent_users.map(
-                    user => `
-                        <tr>
-
-                            <td>
-                                ${escapeHtml(
-                                    user.username
-                                )}
-                            </td>
-
-                            <td>
-                                ${escapeHtml(
-                                    user.email
-                                )}
-                            </td>
-
-                            <td>
-                                ${formatDate(
-                                    user.first_seen
-                                )}
-                            </td>
-
-                            <td>
-                                ${formatDate(
-                                    user.last_seen
-                                )}
-                            </td>
-
-                        </tr>
-                    `
-                ).join("");
-        }
-
-    } catch (error) {
-
-        console.error(error);
-
-        document.getElementById(
-            "events"
-        ).innerHTML =
-            `<div class="loading">
-                Could not load dashboard.
-            </div>`;
-    }
-}
-
-
-function escapeHtml(value) {
-
-    return String(value)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
-}
-
-
-function formatDate(value) {
-
-    try {
-
-        return new Date(value)
-            .toLocaleString();
+                table.appendChild(row);
+            });
 
     } catch {
-        return value;
+
+        document.getElementById(
+            "error"
+        ).textContent =
+            "Unable to load dashboard.";
+
     }
 }
 
-
-loadStats();
+loadDashboard();
 
 </script>
 
