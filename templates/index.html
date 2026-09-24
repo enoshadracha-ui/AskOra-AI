@@ -1,49 +1,40 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
     <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0, viewport-fit=cover"
-    >
-
-    <meta
-        name="theme-color"
-        content="#080B18"
-    >
+    <meta name="theme-color" content="#080B18">
 
     <title>AskOra — Ask. Get answers.</title>
 
     <script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js"></script>
-
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
 
     <style>
-
-        * {
-            box-sizing: border-box;
-        }
-
         :root {
-            --deep: #080B18;
+            --space: #080B18;
             --midnight: #10152B;
             --blue: #3B82F6;
             --violet: #7C3AED;
             --white: #F5F7FF;
             --gray: #9CA3AF;
             --border: rgba(255,255,255,.09);
+            --panel: rgba(255,255,255,.045);
+        }
+
+        * {
+            box-sizing: border-box;
         }
 
         html,
         body {
             margin: 0;
-            padding: 0;
             width: 100%;
             height: 100%;
-            overflow: hidden;
+            background: var(--space);
+            color: var(--white);
             font-family:
                 Inter,
                 system-ui,
@@ -51,8 +42,6 @@
                 BlinkMacSystemFont,
                 "Segoe UI",
                 sans-serif;
-            background: var(--deep);
-            color: var(--white);
         }
 
         button,
@@ -65,793 +54,574 @@
             cursor: pointer;
         }
 
-
-        /* =====================================================
-           APP
-           ===================================================== */
-
-        .app {
-            display: flex;
-            width: 100%;
-            height: 100dvh;
-            overflow: hidden;
+        .hidden {
+            display: none !important;
         }
 
+        /* ==================================================
+           AUTH
+        ================================================== */
 
-        /* =====================================================
-           SIDEBAR
-           ===================================================== */
-
-        .sidebar {
-            width: 280px;
-            flex-shrink: 0;
+        .auth-page {
+            min-height: 100vh;
             display: flex;
-            flex-direction: column;
-
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
             background:
-                linear-gradient(
-                    180deg,
-                    #0c1124,
-                    #080B18
-                );
+                radial-gradient(
+                    circle at 20% 10%,
+                    rgba(59,130,246,.16),
+                    transparent 35%
+                ),
+                radial-gradient(
+                    circle at 80% 90%,
+                    rgba(124,58,237,.16),
+                    transparent 35%
+                ),
+                var(--space);
+        }
 
-            border-right:
-                1px solid var(--border);
-
-            z-index: 30;
+        .auth-card {
+            width: 100%;
+            max-width: 430px;
+            padding: 32px;
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            background: rgba(16,21,43,.88);
+            box-shadow: 0 30px 90px rgba(0,0,0,.35);
         }
 
         .brand {
-            padding: 20px;
             display: flex;
             align-items: center;
             gap: 12px;
+            margin-bottom: 28px;
         }
 
-        .brand-logo {
-            width: 42px;
-            height: 42px;
-
+        .logo {
+            width: 48px;
+            height: 48px;
+            border-radius: 15px;
             display: grid;
             place-items: center;
-
-            border-radius: 13px;
-
-            font-weight: 900;
-            font-size: 22px;
-
             background:
                 linear-gradient(
                     135deg,
                     var(--blue),
                     var(--violet)
                 );
-
+            font-size: 28px;
+            font-weight: 800;
             box-shadow:
-                0 0 30px
-                rgba(59,130,246,.25);
+                0 12px 35px rgba(59,130,246,.25);
         }
 
         .brand-name {
-            font-size: 20px;
+            font-size: 25px;
             font-weight: 800;
         }
 
-        .new-chat {
-            margin:
-                0 16px 14px;
-
-            width:
-                calc(100% - 32px);
-
-            border:
-                1px solid
-                rgba(255,255,255,.12);
-
-            background:
-                rgba(255,255,255,.05);
-
-            color: white;
-
-            border-radius: 12px;
-
-            padding:
-                12px 14px;
-
-            text-align: left;
-
-            font-weight: 700;
+        .tagline {
+            color: var(--gray);
+            font-size: 13px;
+            margin-top: 2px;
         }
 
-        .new-chat:hover {
+        .auth-title {
+            font-size: 25px;
+            margin: 0 0 8px;
+        }
+
+        .auth-subtitle {
+            color: var(--gray);
+            margin: 0 0 24px;
+        }
+
+        .field {
+            margin-bottom: 14px;
+        }
+
+        .field label {
+            display: block;
+            color: #d8dced;
+            font-size: 13px;
+            margin-bottom: 7px;
+        }
+
+        .field input {
+            width: 100%;
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,.045);
+            color: var(--white);
+            border-radius: 13px;
+            padding: 13px 14px;
+            outline: none;
+        }
+
+        .field input:focus {
+            border-color: rgba(59,130,246,.7);
+        }
+
+        .primary-btn {
+            width: 100%;
+            border: 0;
+            border-radius: 13px;
+            padding: 14px;
+            color: white;
+            font-weight: 700;
             background:
-                rgba(59,130,246,.13);
+                linear-gradient(
+                    135deg,
+                    var(--blue),
+                    var(--violet)
+                );
+        }
+
+        .auth-link {
+            border: 0;
+            background: transparent;
+            color: #8bb8ff;
+            margin-top: 15px;
+            padding: 0;
+        }
+
+        .auth-message {
+            color: #ff9a9a;
+            margin-top: 14px;
+            font-size: 13px;
+        }
+
+        /* ==================================================
+           APP
+        ================================================== */
+
+        .app {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 290px;
+            flex: 0 0 290px;
+            height: 100%;
+            background: #0b1022;
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            z-index: 20;
+        }
+
+        .sidebar-top {
+            padding: 20px;
+        }
+
+        .sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            margin-bottom: 22px;
+        }
+
+        .sidebar-brand .logo {
+            width: 42px;
+            height: 42px;
+            font-size: 24px;
+            border-radius: 13px;
+        }
+
+        .new-chat-btn {
+            width: 100%;
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,.05);
+            color: white;
+            border-radius: 15px;
+            padding: 15px;
+            font-weight: 700;
+            text-align: left;
+        }
+
+        .new-chat-btn:hover {
+            background: rgba(255,255,255,.08);
         }
 
         .search-box {
-            padding:
-                0 16px 14px;
+            margin-top: 14px;
         }
 
         .search-box input {
             width: 100%;
-
-            padding:
-                11px 13px;
-
-            border-radius: 10px;
-
-            border:
-                1px solid
-                var(--border);
-
-            outline: none;
-
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            background: rgba(255,255,255,.04);
             color: white;
-
-            background:
-                rgba(255,255,255,.045);
-        }
-
-        .search-box input:focus {
-            border-color:
-                rgba(59,130,246,.65);
+            padding: 13px;
+            outline: none;
         }
 
         .chat-list {
             flex: 1;
             overflow-y: auto;
-            padding:
-                0 10px 10px;
+            padding: 4px 12px 16px;
         }
 
         .chat-item {
             display: flex;
             align-items: center;
             gap: 8px;
-
-            margin-bottom: 3px;
-
-            border-radius: 10px;
+            border-radius: 13px;
+            padding: 11px 10px;
+            margin-bottom: 4px;
+            color: #dfe3f4;
+            cursor: pointer;
         }
 
-        .chat-open {
+        .chat-item:hover,
+        .chat-item.active {
+            background: rgba(255,255,255,.07);
+        }
+
+        .chat-title {
             flex: 1;
-            min-width: 0;
-
-            border: 0;
-            background: transparent;
-
-            color: #dfe5f5;
-
-            padding:
-                11px 10px;
-
-            text-align: left;
-
-            border-radius: 10px;
-
             overflow: hidden;
-
             white-space: nowrap;
             text-overflow: ellipsis;
+            font-size: 14px;
         }
 
-        .chat-open:hover,
-        .chat-item.active .chat-open {
-            background:
-                rgba(255,255,255,.07);
-
-            color: white;
-        }
-
-        .chat-delete {
+        .delete-chat {
             border: 0;
             background: transparent;
-
-            color: #68728d;
-
-            width: 34px;
-            height: 34px;
-
-            border-radius: 8px;
+            color: #687087;
+            font-size: 18px;
+            padding: 3px 5px;
         }
 
-        .chat-delete:hover {
-            color: #ff6b81;
-
-            background:
-                rgba(255,107,129,.08);
+        .delete-chat:hover {
+            color: #ff8080;
         }
-
-        .empty-chats {
-            color: #68728d;
-
-            text-align: center;
-
-            padding: 30px 15px;
-
-            font-size: 13px;
-        }
-
-
-        /* =====================================================
-           ACCOUNT
-           ===================================================== */
 
         .account {
-            border-top:
-                1px solid var(--border);
-
-            padding: 14px;
+            padding: 18px;
+            border-top: 1px solid var(--border);
         }
 
         .account-name {
             font-weight: 700;
-            margin-bottom: 3px;
-
-            overflow: hidden;
-
-            white-space: nowrap;
-
-            text-overflow: ellipsis;
         }
 
         .account-email {
             color: var(--gray);
             font-size: 12px;
-
+            margin-top: 4px;
+            margin-bottom: 14px;
             overflow: hidden;
-
-            white-space: nowrap;
-
             text-overflow: ellipsis;
         }
 
         .account-actions {
             display: flex;
-            gap: 7px;
-
-            margin-top: 12px;
+            gap: 8px;
         }
 
-        .account-actions a,
-        .account-actions button {
+        .account-actions button,
+        .account-actions a {
             flex: 1;
-
-            padding: 9px;
-
-            border-radius: 9px;
-
-            border:
-                1px solid
-                var(--border);
-
-            background:
-                rgba(255,255,255,.04);
-
-            color: #dfe5f5;
-
-            text-decoration: none;
-
-            font-size: 12px;
-
             text-align: center;
+            text-decoration: none;
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,.04);
+            color: white;
+            border-radius: 11px;
+            padding: 10px 6px;
+            font-size: 13px;
         }
 
-        .account-actions a:hover,
-        .account-actions button:hover {
-            background:
-                rgba(255,255,255,.08);
+        .delete-account {
+            width: 100%;
+            margin-top: 9px;
+            border: 1px solid rgba(255,90,90,.25);
+            background: rgba(255,70,70,.05);
+            color: #ff9292;
+            border-radius: 11px;
+            padding: 10px;
         }
 
-        .delete-account-btn {
-            color: #ff8a9a !important;
-            border-color:
-                rgba(255,100,120,.16) !important;
-        }
-
-
-        /* =====================================================
+        /* ==================================================
            MAIN
-           ===================================================== */
+        ================================================== */
 
         .main {
             min-width: 0;
             flex: 1;
-
+            height: 100%;
             display: flex;
             flex-direction: column;
-
             background:
                 radial-gradient(
-                    circle at 50% 0%,
-                    rgba(59,130,246,.08),
+                    circle at 80% 0%,
+                    rgba(59,130,246,.06),
                     transparent 35%
                 ),
-                var(--deep);
+                var(--space);
         }
 
-
-        /* =====================================================
-           TOPBAR
-           ===================================================== */
-
         .topbar {
-            position: sticky;
-            top: 0;
-
-            z-index: 10;
-
-            min-height: 70px;
-
-            padding:
-                0 24px;
-
+            height: 72px;
+            flex: 0 0 72px;
             display: flex;
             align-items: center;
-
-            border-bottom:
-                1px solid var(--border);
-
-            background:
-                rgba(8,11,24,.85);
-
-            backdrop-filter:
-                blur(18px);
+            gap: 12px;
+            padding: 0 24px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(8,11,24,.88);
+            backdrop-filter: blur(16px);
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
 
         .menu-btn {
             display: none;
-
-            border: 0;
-
-            background: transparent;
-
+            width: 40px;
+            height: 40px;
+            border: 1px solid var(--border);
+            border-radius: 11px;
+            background: var(--panel);
             color: white;
-
-            font-size: 22px;
-
-            margin-right: 10px;
         }
 
         .top-title {
             font-weight: 800;
-            font-size: 16px;
         }
 
         .online {
             display: flex;
             align-items: center;
             gap: 6px;
-
-            margin-left: 12px;
-
-            color: #7f8aa5;
-
+            color: #7ee7a5;
             font-size: 12px;
         }
 
         .online-dot {
             width: 7px;
             height: 7px;
-
-            background: #22c55e;
-
             border-radius: 50%;
-
-            box-shadow:
-                0 0 10px
-                #22c55e;
+            background: #4ade80;
+            box-shadow: 0 0 10px #4ade80;
         }
 
-        .tagline {
-            margin-left: auto;
-
-            color: #6f7890;
-
+        .top-subtitle {
+            color: var(--gray);
             font-size: 12px;
         }
 
-
-        /* =====================================================
-           MESSAGES
-           ===================================================== */
-
         .messages {
             flex: 1;
-
             overflow-y: auto;
-
-            scroll-behavior: smooth;
+            padding: 35px 20px 130px;
         }
 
         .messages-inner {
-            width:
-                min(
-                    900px,
-                    calc(100% - 30px)
-                );
-
-            margin:
-                0 auto;
-
-            padding:
-                35px 0 180px;
+            width: 100%;
+            max-width: 900px;
+            margin: auto;
         }
 
         .welcome {
             min-height: 55vh;
-
             display: flex;
-
-            flex-direction: column;
-
             align-items: center;
-
             justify-content: center;
-
             text-align: center;
+            padding: 30px;
+        }
 
-            padding: 30px 15px;
+        .welcome-box {
+            max-width: 600px;
         }
 
         .welcome-logo {
-            width: 72px;
-            height: 72px;
-
-            border-radius: 22px;
-
+            width: 66px;
+            height: 66px;
+            margin: 0 auto 18px;
+            border-radius: 20px;
             display: grid;
-
             place-items: center;
-
-            font-size: 35px;
-
-            font-weight: 900;
-
+            font-size: 38px;
+            font-weight: 800;
             background:
                 linear-gradient(
                     135deg,
                     var(--blue),
                     var(--violet)
                 );
-
-            box-shadow:
-                0 0 60px
-                rgba(59,130,246,.18);
-
-            margin-bottom: 24px;
         }
 
         .welcome h1 {
-            margin:
-                0 0 10px;
-
-            font-size:
-                clamp(
-                    28px,
-                    5vw,
-                    42px
-                );
-
-            letter-spacing:
-                -1.5px;
+            font-size: 34px;
+            margin: 0 0 10px;
         }
 
         .welcome p {
-            margin: 0;
-
             color: var(--gray);
-
-            max-width: 520px;
-
-            line-height: 1.7;
+            margin: 0;
         }
 
+        /* ==================================================
+           MESSAGES
+        ================================================== */
 
-        /* =====================================================
-           MESSAGE LAYOUT
-           ===================================================== */
-
-        .message {
+        .message-row {
             display: flex;
-
-            gap: 12px;
-
-            margin-bottom: 26px;
-
-            align-items: flex-start;
+            margin: 16px 0;
         }
 
-        .avatar {
-            width: 34px;
-            height: 34px;
-
-            flex-shrink: 0;
-
-            border-radius: 10px;
-
-            display: grid;
-            place-items: center;
-
-            font-size: 12px;
-
-            font-weight: 800;
-        }
-
-        .message.assistant .avatar {
-            background:
-                linear-gradient(
-                    135deg,
-                    var(--blue),
-                    var(--violet)
-                );
-        }
-
-        .message.user {
+        .message-row.user {
             justify-content: flex-end;
         }
 
-        .message.user .avatar {
-            order: 2;
+        .message-row.assistant {
+            justify-content: flex-start;
+        }
 
+        .message {
+            max-width: min(78%, 720px);
+        }
+
+        .message-bubble {
+            padding: 13px 16px;
+            border-radius: 18px;
+            line-height: 1.55;
+            font-size: 15px;
+            overflow-wrap: anywhere;
+        }
+
+        .user .message-bubble {
             background:
-                rgba(255,255,255,.1);
-
-            color: #d9deeb;
-        }
-
-        .message-body {
-            min-width: 0;
-
-            line-height: 1.65;
-
-            color: #e8ecf7;
-        }
-
-        /* USER MESSAGE = RIGHT-SIDE BUBBLE */
-
-        .message.user .message-body {
-            order: 1;
-
-            flex: 0 1 auto;
-
-            max-width:
-                min(
-                    78%,
-                    680px
+                linear-gradient(
+                    135deg,
+                    #2563eb,
+                    #5b21b6
                 );
-
-            padding:
-                11px 15px;
-
-            border-radius:
-                16px 16px 4px 16px;
-
-            background:
-                #18203A;
-
-            border:
-                1px solid
-                rgba(255,255,255,.07);
-
-            color: #f4f6fb;
+            border-bottom-right-radius: 5px;
+            color: white;
         }
 
-        /* ASSISTANT MESSAGE = LEFT */
-
-        .message.assistant .message-body {
-            max-width: 100%;
+        .assistant .message-bubble {
+            background: rgba(255,255,255,.055);
+            border: 1px solid var(--border);
+            border-bottom-left-radius: 5px;
         }
 
-        .message-body p:first-child {
-            margin-top: 0;
+        .message-label {
+            color: #7d8499;
+            font-size: 11px;
+            margin-bottom: 5px;
         }
 
-        .message-body p:last-child {
-            margin-bottom: 0;
+        .user .message-label {
+            text-align: right;
         }
 
-        .message-body h1,
-        .message-body h2,
-        .message-body h3 {
-            line-height: 1.3;
-            margin-top: 1.2em;
-        }
-
-        .message-body ul,
-        .message-body ol {
-            padding-left: 24px;
-        }
-
-        .message-body code {
-            background:
-                rgba(255,255,255,.08);
-
-            padding:
-                2px 5px;
-
-            border-radius: 5px;
-
-            font-size: .9em;
-        }
-
-        .message-body pre {
-            overflow-x: auto;
-
-            background: #070a14;
-
-            border:
-                1px solid var(--border);
-
-            padding: 15px;
-
-            border-radius: 11px;
-        }
-
-        .message-body pre code {
-            background: transparent;
-            padding: 0;
-        }
-
-        .message-body blockquote {
-            border-left:
-                3px solid
-                var(--blue);
-
-            margin-left: 0;
-
-            padding-left: 15px;
-
-            color: #aeb7ca;
-        }
-
-        .message-body table {
-            border-collapse: collapse;
-
-            width: 100%;
-
-            margin: 15px 0;
-        }
-
-        .message-body th,
-        .message-body td {
-            border:
-                1px solid var(--border);
-
-            padding:
-                8px 10px;
-
+        .assistant .message-label {
             text-align: left;
         }
 
+        .message-bubble p:first-child {
+            margin-top: 0;
+        }
 
-        /* =====================================================
+        .message-bubble p:last-child {
+            margin-bottom: 0;
+        }
+
+        .message-bubble pre {
+            overflow-x: auto;
+            background: #070a14;
+            padding: 13px;
+            border-radius: 10px;
+        }
+
+        .message-bubble code {
+            font-size: 13px;
+        }
+
+        .message-bubble table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 12px 0;
+        }
+
+        .message-bubble th,
+        .message-bubble td {
+            border: 1px solid var(--border);
+            padding: 7px;
+        }
+
+        /* ==================================================
            COMPOSER
-           ===================================================== */
+        ================================================== */
 
-        .composer-area {
+        .composer-wrap {
             position: absolute;
-
-            bottom: 0;
-
-            left: 280px;
+            left: 290px;
             right: 0;
-
-            padding:
-                20px 20px 24px;
-
-            pointer-events: none;
-
+            bottom: 0;
+            padding: 15px 20px 20px;
             background:
                 linear-gradient(
                     to top,
-                    var(--deep) 55%,
+                    var(--space) 60%,
                     transparent
                 );
         }
 
         .composer {
-            pointer-events: auto;
-
-            width:
-                min(
-                    900px,
-                    100%
-                );
-
-            margin:
-                0 auto;
-
+            max-width: 900px;
+            margin: auto;
             display: flex;
-
             align-items: flex-end;
-
-            gap: 8px;
-
+            gap: 9px;
             padding: 9px;
-
-            border-radius: 17px;
-
-            border:
-                1px solid
-                rgba(255,255,255,.12);
-
-            background:
-                rgba(16,21,43,.94);
-
-            box-shadow:
-                0 15px 50px
-                rgba(0,0,0,.3);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            background: rgba(16,21,43,.94);
+            box-shadow: 0 20px 50px rgba(0,0,0,.25);
         }
 
-        textarea {
+        .composer textarea {
             flex: 1;
-
-            min-width: 0;
-
-            max-height: 180px;
-
+            min-height: 45px;
+            max-height: 150px;
             resize: none;
-
             border: 0;
-
-            outline: none;
-
-            color: white;
-
+            outline: 0;
             background: transparent;
-
-            padding:
-                10px 8px;
-
-            line-height: 1.5;
-        }
-
-        textarea::placeholder {
-            color: #69738b;
-        }
-
-        .composer-btn {
-            width: 42px;
-            height: 42px;
-
-            flex-shrink: 0;
-
-            border: 0;
-
-            border-radius: 11px;
-
             color: white;
+            padding: 11px 8px;
+        }
 
-            background:
-                rgba(255,255,255,.07);
+        .composer textarea::placeholder {
+            color: #737b91;
+        }
 
+        .icon-btn {
+            width: 44px;
+            height: 44px;
+            flex: 0 0 44px;
+            border: 1px solid var(--border);
+            border-radius: 13px;
+            background: rgba(255,255,255,.04);
+            color: #dce3f5;
             display: grid;
-
             place-items: center;
         }
 
-        .composer-btn svg {
-            width: 20px;
-            height: 20px;
-
-            stroke:
-                currentColor;
-
-            fill: none;
-
-            stroke-width: 1.8;
-
-            stroke-linecap: round;
-
-            stroke-linejoin: round;
-        }
-
-        .composer-btn:hover {
-            background:
-                rgba(255,255,255,.13);
+        .icon-btn:hover {
+            background: rgba(255,255,255,.08);
         }
 
         .send-btn {
@@ -861,483 +631,432 @@
                     var(--blue),
                     var(--violet)
                 );
+            border: 0;
         }
-
-        .send-btn:hover {
-            opacity: .9;
-        }
-
-
-        /* =====================================================
-           RECORDING
-           ===================================================== */
 
         .recording {
-            position: fixed;
-
-            z-index: 100;
-
-            left: 50%;
-
-            bottom: 110px;
-
-            transform:
-                translateX(-50%);
-
-            display: none;
-
-            align-items: center;
-
-            gap: 13px;
-
-            padding:
-                12px 16px;
-
-            border:
-                1px solid
-                rgba(255,255,255,.12);
-
-            border-radius: 14px;
-
-            background:
-                rgba(16,21,43,.97);
-
-            box-shadow:
-                0 15px 50px
-                rgba(0,0,0,.4);
-        }
-
-        .recording.active {
-            display: flex;
-        }
-
-        .recording-dot {
-            width: 9px;
-            height: 9px;
-
-            background: #ef4444;
-
-            border-radius: 50%;
-
-            animation:
-                pulse 1s infinite;
+            border-color: rgba(239,68,68,.5);
+            color: #ff7777;
+            animation: pulse 1s infinite;
         }
 
         @keyframes pulse {
-
             50% {
-                transform:
-                    scale(1.35);
-
-                opacity: .5;
+                box-shadow: 0 0 0 7px rgba(239,68,68,.08);
             }
-
         }
 
-        .record-time {
-            min-width: 45px;
-
-            font-variant-numeric:
-                tabular-nums;
-        }
-
-        .record-stop,
-        .record-cancel {
-            border: 0;
-
-            border-radius: 8px;
-
-            padding:
-                7px 10px;
-
-            color: white;
-        }
-
-        .record-stop {
-            background:
-                #ef4444;
-        }
-
-        .record-cancel {
-            background:
-                rgba(255,255,255,.08);
-        }
-
-
-        /* =====================================================
-           DELETE ACCOUNT MODAL
-           ===================================================== */
-
-        .modal-backdrop {
-            position: fixed;
-
-            inset: 0;
-
-            z-index: 200;
-
-            display: none;
-
+        .recording-bar {
+            max-width: 900px;
+            margin: 0 auto 8px;
+            padding: 8px 13px;
+            display: flex;
             align-items: center;
-
-            justify-content: center;
-
-            padding: 20px;
-
-            background:
-                rgba(0,0,0,.68);
-
-            backdrop-filter:
-                blur(6px);
+            justify-content: space-between;
+            border: 1px solid rgba(239,68,68,.25);
+            border-radius: 12px;
+            background: rgba(239,68,68,.06);
+            color: #ff9b9b;
         }
 
-        .modal-backdrop.open {
+        .recording-actions {
             display: flex;
+            gap: 8px;
         }
 
-        .delete-modal {
-            width:
-                min(
-                    420px,
-                    100%
-                );
-
-            padding: 25px;
-
-            border-radius: 18px;
-
-            border:
-                1px solid
-                rgba(255,255,255,.1);
-
-            background:
-                #10152B;
-
-            box-shadow:
-                0 25px 80px
-                rgba(0,0,0,.5);
-        }
-
-        .delete-modal h2 {
-            margin:
-                0 0 8px;
-        }
-
-        .delete-modal p {
-            color: #9CA3AF;
-
-            line-height: 1.6;
-        }
-
-        .delete-modal input {
-            width: 100%;
-
-            padding: 12px;
-
-            border-radius: 10px;
-
-            border:
-                1px solid
-                rgba(255,255,255,.1);
-
-            outline: none;
-
+        .recording-actions button {
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,.05);
             color: white;
-
-            background:
-                rgba(255,255,255,.05);
+            border-radius: 8px;
+            padding: 6px 10px;
         }
 
-        .delete-modal input:focus {
-            border-color:
-                #ef4444;
+        .typing {
+            display: inline-flex;
+            gap: 4px;
+            padding: 7px 2px;
         }
 
-        .modal-actions {
-            display: flex;
-
-            gap: 9px;
-
-            margin-top: 15px;
+        .typing span {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #aeb7ce;
+            animation: bounce 1s infinite;
         }
 
-        .modal-actions button {
-            flex: 1;
-
-            padding: 11px;
-
-            border-radius: 10px;
-
-            border: 0;
-
-            color: white;
+        .typing span:nth-child(2) {
+            animation-delay: .15s;
         }
 
-        .cancel-delete {
-            background:
-                rgba(255,255,255,.08);
+        .typing span:nth-child(3) {
+            animation-delay: .3s;
         }
 
-        .confirm-delete {
-            background:
-                #dc3545;
+        @keyframes bounce {
+            0%, 70%, 100% {
+                transform: translateY(0);
+            }
+            35% {
+                transform: translateY(-5px);
+            }
         }
 
-
-        /* =====================================================
+        /* ==================================================
            MOBILE
-           ===================================================== */
+        ================================================== */
 
         .overlay {
             display: none;
-
-            position: fixed;
-
-            inset: 0;
-
-            z-index: 20;
-
-            background:
-                rgba(0,0,0,.6);
         }
 
         @media (max-width: 800px) {
 
             .sidebar {
                 position: fixed;
-
-                left: 0;
+                left: -300px;
                 top: 0;
                 bottom: 0;
-
-                transform:
-                    translateX(-100%);
-
-                transition:
-                    transform .25s ease;
-
-                box-shadow:
-                    20px 0 60px
-                    rgba(0,0,0,.4);
+                transition: left .22s ease;
+                box-shadow: 20px 0 60px rgba(0,0,0,.4);
             }
 
             .sidebar.open {
-                transform:
-                    translateX(0);
+                left: 0;
             }
 
-            .overlay.open {
+            .overlay {
+                position: fixed;
+                inset: 0;
+                background: rgba(0,0,0,.55);
+                z-index: 15;
+            }
+
+            .overlay.show {
                 display: block;
             }
 
             .menu-btn {
-                display: block;
+                display: grid;
+                place-items: center;
             }
 
             .topbar {
-                padding:
-                    0 14px;
+                padding: 0 14px;
             }
 
-            .tagline {
+            .top-subtitle {
                 display: none;
             }
 
-            .composer-area {
+            .composer-wrap {
                 left: 0;
-
-                padding:
-                    12px 10px 15px;
+                padding: 10px 10px 13px;
             }
 
-            .messages-inner {
-                width:
-                    calc(100% - 20px);
-
-                padding-top: 22px;
+            .messages {
+                padding-left: 11px;
+                padding-right: 11px;
             }
 
             .message {
-                gap: 8px;
-
-                margin-bottom: 22px;
+                max-width: 88%;
             }
 
-            .avatar {
-                width: 31px;
-                height: 31px;
-            }
-
-            .message.user .message-body {
-                max-width: 82%;
-            }
-
-            .welcome {
-                min-height: 65vh;
+            .welcome h1 {
+                font-size: 28px;
             }
         }
-
     </style>
-
 </head>
-
 
 <body>
 
-<div class="app">
-
-
-    <div
-        id="overlay"
-        class="overlay"
-        onclick="closeSidebar()"
-    ></div>
-
-
-    <!-- ======================================================
-         SIDEBAR
-         ====================================================== -->
-
-    <aside
-        id="sidebar"
-        class="sidebar"
-    >
+<div id="authPage" class="auth-page hidden">
+    <div class="auth-card">
 
         <div class="brand">
-
-            <div class="brand-logo">
-                A
+            <div class="logo">A</div>
+            <div>
+                <div class="brand-name">AskOra</div>
+                <div class="tagline">Ask. Get answers.</div>
             </div>
-
-            <div class="brand-name">
-                AskOra
-            </div>
-
         </div>
 
+        <!-- LOGIN -->
+        <div id="loginView">
+            <h1 class="auth-title">Welcome back</h1>
+            <p class="auth-subtitle">
+                Sign in to continue with AskOra.
+            </p>
 
-        <button
-            class="new-chat"
-            onclick="newChat()"
-        >
-            ＋ New chat
-        </button>
+            <form id="loginForm">
+                <div class="field">
+                    <label>Username or email</label>
+                    <input
+                        name="identity"
+                        required
+                        autocomplete="username"
+                    >
+                </div>
 
+                <div class="field">
+                    <label>Password</label>
+                    <input
+                        type="password"
+                        name="password"
+                        required
+                        autocomplete="current-password"
+                    >
+                </div>
 
-        <div class="search-box">
+                <button class="primary-btn">
+                    Sign in
+                </button>
+            </form>
 
-            <input
-                id="chatSearch"
-                type="search"
-                placeholder="Search chats..."
-                oninput="filterChats()"
+            <button
+                class="auth-link"
+                onclick="showAuth('register')"
             >
+                Create an account
+            </button>
 
+            <button
+                class="auth-link"
+                onclick="showAuth('forgot')"
+            >
+                Forgot password?
+            </button>
+
+            <div id="loginMessage" class="auth-message"></div>
         </div>
 
+        <!-- REGISTER -->
+        <div id="registerView" class="hidden">
+            <h1 class="auth-title">Create your account</h1>
+            <p class="auth-subtitle">
+                Start using AskOra.
+            </p>
 
-        <div
-            id="chatList"
-            class="chat-list"
-        >
-            <div class="empty-chats">
-                Loading chats...
+            <form id="registerForm">
+
+                <div class="field">
+                    <label>Username</label>
+                    <input
+                        name="username"
+                        required
+                        autocomplete="username"
+                    >
+                </div>
+
+                <div class="field">
+                    <label>Email</label>
+                    <input
+                        type="email"
+                        name="email"
+                        required
+                        autocomplete="email"
+                    >
+                </div>
+
+                <div class="field">
+                    <label>Password</label>
+                    <input
+                        type="password"
+                        name="password"
+                        minlength="8"
+                        required
+                        autocomplete="new-password"
+                    >
+                </div>
+
+                <button class="primary-btn">
+                    Create account
+                </button>
+            </form>
+
+            <button
+                class="auth-link"
+                onclick="showAuth('login')"
+            >
+                Already have an account?
+            </button>
+
+            <div id="registerMessage" class="auth-message"></div>
+        </div>
+
+        <!-- FORGOT -->
+        <div id="forgotView" class="hidden">
+            <h1 class="auth-title">Reset password</h1>
+            <p class="auth-subtitle">
+                Enter your email and we'll send a reset link.
+            </p>
+
+            <form id="forgotForm">
+
+                <div class="field">
+                    <label>Email</label>
+                    <input
+                        type="email"
+                        name="email"
+                        required
+                        autocomplete="email"
+                    >
+                </div>
+
+                <button class="primary-btn">
+                    Send reset link
+                </button>
+            </form>
+
+            <button
+                class="auth-link"
+                onclick="showAuth('login')"
+            >
+                Back to login
+            </button>
+
+            <div id="forgotMessage" class="auth-message"></div>
+        </div>
+
+        <!-- RESET -->
+        <div id="resetView" class="hidden">
+            <h1 class="auth-title">Choose a new password</h1>
+
+            <form id="resetForm">
+
+                <div class="field">
+                    <label>New password</label>
+                    <input
+                        type="password"
+                        name="password"
+                        minlength="8"
+                        required
+                        autocomplete="new-password"
+                    >
+                </div>
+
+                <button class="primary-btn">
+                    Reset password
+                </button>
+            </form>
+
+            <div id="resetMessage" class="auth-message"></div>
+        </div>
+
+    </div>
+</div>
+
+
+<div id="app" class="app hidden">
+
+    <aside id="sidebar" class="sidebar">
+
+        <div class="sidebar-top">
+
+            <div class="sidebar-brand">
+                <div class="logo">A</div>
+
+                <div>
+                    <div class="brand-name">AskOra</div>
+                    <div class="tagline">
+                        Advanced AI, made simple.
+                    </div>
+                </div>
             </div>
+
+            <button
+                id="newChatBtn"
+                class="new-chat-btn"
+            >
+                ＋ New chat
+            </button>
+
+            <div class="search-box">
+                <input
+                    id="searchChats"
+                    placeholder="Search chats..."
+                >
+            </div>
+
         </div>
 
+        <div id="chatList" class="chat-list"></div>
 
         <div class="account">
 
             <div
                 id="accountName"
                 class="account-name"
-            >
-                Account
-            </div>
+            ></div>
 
             <div
                 id="accountEmail"
                 class="account-email"
-            >
-                ...
-            </div>
-
+            ></div>
 
             <div class="account-actions">
 
-                {% if is_admin %}
-
-                <a href="/admin">
+                <a
+                    id="adminLink"
+                    href="/admin"
+                    class="hidden"
+                >
                     Admin
                 </a>
 
-                {% endif %}
-
-
-                <button
-                    onclick="logout()"
-                >
+                <button id="logoutBtn">
                     Logout
                 </button>
 
             </div>
 
-
-            <div
-                class="account-actions"
+            <button
+                id="deleteAccountBtn"
+                class="delete-account"
             >
-
-                <button
-                    class="delete-account-btn"
-                    onclick="openDeleteAccount()"
-                >
-                    Delete account
-                </button>
-
-            </div>
+                Delete account
+            </button>
 
         </div>
 
     </aside>
 
-
-    <!-- ======================================================
-         MAIN
-         ====================================================== -->
+    <div
+        id="overlay"
+        class="overlay"
+    ></div>
 
     <main class="main">
-
 
         <header class="topbar">
 
             <button
+                id="menuBtn"
                 class="menu-btn"
-                onclick="openSidebar()"
                 aria-label="Open menu"
             >
                 ☰
             </button>
 
+            <div>
+                <div class="top-title">
+                    AskOra
+                </div>
 
-            <div class="top-title">
-                AskOra
+                <div class="online">
+                    <span class="online-dot"></span>
+                    Online
+                </div>
             </div>
 
-
-            <div class="online">
-
-                <span class="online-dot"></span>
-
-                Online
-
-            </div>
-
-
-            <div class="tagline">
+            <div class="top-subtitle">
                 Ask. Get answers.
             </div>
 
         </header>
-
 
         <section
             id="messages"
@@ -1353,108 +1072,116 @@
                     id="welcome"
                     class="welcome"
                 >
+                    <div class="welcome-box">
 
-                    <div class="welcome-logo">
-                        A
+                        <div class="welcome-logo">
+                            A
+                        </div>
+
+                        <h1>
+                            What can I help with?
+                        </h1>
+
+                        <p>
+                            Ask anything. AskOra is ready.
+                        </p>
+
                     </div>
-
-                    <h1>
-                        How can I help?
-                    </h1>
-
-                    <p>
-                        Ask anything. Get clear,
-                        useful answers powered by AI.
-                    </p>
-
                 </div>
 
             </div>
 
         </section>
 
+        <div class="composer-wrap">
 
-        <!-- ==================================================
-             COMPOSER
-             ================================================== -->
+            <div
+                id="recordingBar"
+                class="recording-bar hidden"
+            >
+                <span>
+                    Recording:
+                    <strong id="recordingTime">
+                        00:00
+                    </strong>
+                </span>
 
-        <div class="composer-area">
+                <div class="recording-actions">
 
-            <div class="composer">
+                    <button id="cancelRecordingBtn">
+                        Cancel
+                    </button>
 
+                    <button id="stopRecordingBtn">
+                        Stop
+                    </button>
+
+                </div>
+            </div>
+
+            <form
+                id="composer"
+                class="composer"
+            >
 
                 <textarea
                     id="messageInput"
                     rows="1"
                     placeholder="Message AskOra..."
-                    onkeydown="handleInputKey(event)"
                 ></textarea>
 
-
-                <!-- Professional microphone icon -->
-
+                <!-- Mature microphone icon -->
                 <button
-                    id="voiceBtn"
-                    class="composer-btn"
-                    onclick="startRecording()"
-                    title="Voice input"
+                    type="button"
+                    id="micBtn"
+                    class="icon-btn"
                     aria-label="Voice input"
                 >
-
                     <svg
+                        width="20"
+                        height="20"
                         viewBox="0 0 24 24"
-                        aria-hidden="true"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
                     >
                         <rect
                             x="9"
-                            y="3"
+                            y="2"
                             width="6"
-                            height="11"
+                            height="12"
                             rx="3"
-                        ></rect>
-
-                        <path
-                            d="M5 11a7 7 0 0 0 14 0"
-                        ></path>
-
-                        <path
-                            d="M12 18v3"
-                        ></path>
-
-                        <path
-                            d="M8 21h8"
-                        ></path>
+                        />
+                        <path d="M5 11a7 7 0 0 0 14 0"/>
+                        <path d="M12 18v4"/>
+                        <path d="M8 22h8"/>
                     </svg>
-
                 </button>
-
-
-                <!-- Professional send icon -->
 
                 <button
+                    type="submit"
                     id="sendBtn"
-                    class="composer-btn send-btn"
-                    onclick="sendMessage()"
-                    title="Send"
+                    class="icon-btn send-btn"
                     aria-label="Send"
                 >
-
                     <svg
+                        width="19"
+                        height="19"
                         viewBox="0 0 24 24"
-                        aria-hidden="true"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
                     >
-                        <path
-                            d="M22 2 11 13"
-                        ></path>
-
-                        <path
-                            d="m22 2-7 20-4-9-9-4Z"
-                        ></path>
+                        <path d="M22 2 11 13"/>
+                        <path d="m22 2-7 20-4-9-9-4Z"/>
                     </svg>
-
                 </button>
 
-            </div>
+            </form>
 
         </div>
 
@@ -1463,271 +1190,306 @@
 </div>
 
 
-<!-- =========================================================
-     RECORDING PANEL
-     ========================================================= -->
-
-<div
-    id="recording"
-    class="recording"
->
-
-    <div class="recording-dot"></div>
-
-    <span>
-        Recording
-    </span>
-
-    <span
-        id="recordTime"
-        class="record-time"
-    >
-        00:00
-    </span>
-
-    <button
-        class="record-stop"
-        onclick="stopRecording()"
-    >
-        Stop
-    </button>
-
-    <button
-        class="record-cancel"
-        onclick="cancelRecording()"
-    >
-        Cancel
-    </button>
-
-</div>
-
-
-<!-- =========================================================
-     DELETE ACCOUNT MODAL
-     ========================================================= -->
-
-<div
-    id="deleteModal"
-    class="modal-backdrop"
->
-
-    <div class="delete-modal">
-
-        <h2>
-            Delete account?
-        </h2>
-
-        <p>
-            This permanently deletes your AskOra account,
-            conversations and AskOra activity. This cannot
-            be undone.
-        </p>
-
-        <input
-            id="deletePassword"
-            type="password"
-            placeholder="Enter your password"
-            autocomplete="current-password"
-        >
-
-        <div class="modal-actions">
-
-            <button
-                class="cancel-delete"
-                onclick="closeDeleteAccount()"
-            >
-                Cancel
-            </button>
-
-            <button
-                class="confirm-delete"
-                onclick="deleteAccount()"
-            >
-                Delete permanently
-            </button>
-
-        </div>
-
-    </div>
-
-</div>
-
-
 <script>
+const CSRF = {{ csrf_token|tojson }};
 
-const CSRF =
-    {{ csrf_token|tojson }};
-
+let currentUser = null;
 let chats = [];
-
-let activeChatId = null;
+let currentChatId = null;
 
 let mediaRecorder = null;
-
 let mediaStream = null;
-
 let audioChunks = [];
-
-let recordingStarted = null;
-
-let recordingTimer = null;
-
-
-const messages =
-    document.getElementById(
-        "messages"
-    );
-
-const messagesInner =
-    document.getElementById(
-        "messagesInner"
-    );
-
-const input =
-    document.getElementById(
-        "messageInput"
-    );
-
-const sendBtn =
-    document.getElementById(
-        "sendBtn"
-    );
+let recordingInterval = null;
+let recordingSeconds = 0;
 
 
 /* ============================================================
-   API
-   ============================================================ */
+   AUTH
+============================================================ */
 
-async function api(
-    url,
-    options = {}
-) {
+function hideAllAuthViews() {
+    document.querySelectorAll(
+        "#loginView,#registerView,#forgotView,#resetView"
+    ).forEach(el => el.classList.add("hidden"));
+}
 
-    const headers = {
-        ...(options.headers || {})
-    };
+function showAuth(view) {
+    hideAllAuthViews();
 
-    if (
-        options.method &&
-        options.method !== "GET"
-    ) {
+    const el = document.getElementById(
+        view + "View"
+    );
 
-        headers[
-            "X-CSRF-Token"
-        ] = CSRF;
+    if (el) {
+        el.classList.remove("hidden");
     }
 
-    if (
-        options.body &&
-        !(options.body instanceof FormData)
-    ) {
+    document.getElementById("authPage")
+        .classList.remove("hidden");
 
-        headers[
-            "Content-Type"
-        ] = "application/json";
-    }
+    document.getElementById("app")
+        .classList.add("hidden");
+}
 
-    const response =
-        await fetch(
-            url,
-            {
-                ...options,
-                headers
-            }
+async function authRequest(url, form) {
+
+    const response = await fetch(
+        url,
+        {
+            method: "POST",
+            headers: {
+                "X-CSRF-Token": CSRF
+            },
+            body: new URLSearchParams(
+                new FormData(form)
+            )
+        }
+    );
+
+    return response.json();
+}
+
+
+document.getElementById("loginForm")
+.addEventListener("submit", async e => {
+
+    e.preventDefault();
+
+    const msg =
+        document.getElementById("loginMessage");
+
+    msg.textContent = "";
+
+    try {
+
+        const data = await authRequest(
+            "/login",
+            e.target
         );
 
-    if (
-        response.status === 401
-    ) {
+        if (!data.ok) {
+            msg.textContent =
+                data.error || "Login failed.";
+            return;
+        }
+
+        window.location.href =
+            data.redirect || "/";
+
+    } catch {
+        msg.textContent =
+            "Something went wrong.";
+    }
+});
+
+
+document.getElementById("registerForm")
+.addEventListener("submit", async e => {
+
+    e.preventDefault();
+
+    const msg =
+        document.getElementById(
+            "registerMessage"
+        );
+
+    msg.textContent = "";
+
+    try {
+
+        const data = await authRequest(
+            "/register",
+            e.target
+        );
+
+        if (!data.ok) {
+            msg.textContent =
+                data.error || "Registration failed.";
+            return;
+        }
+
+        window.location.href =
+            data.redirect || "/";
+
+    } catch {
+        msg.textContent =
+            "Something went wrong.";
+    }
+});
+
+
+document.getElementById("forgotForm")
+.addEventListener("submit", async e => {
+
+    e.preventDefault();
+
+    const msg =
+        document.getElementById(
+            "forgotMessage"
+        );
+
+    msg.textContent = "";
+
+    try {
+
+        const data = await authRequest(
+            "/forgot-password",
+            e.target
+        );
+
+        msg.textContent =
+            data.message ||
+            data.error ||
+            "Check your email.";
+
+    } catch {
+        msg.textContent =
+            "Something went wrong.";
+    }
+});
+
+
+document.getElementById("resetForm")
+.addEventListener("submit", async e => {
+
+    e.preventDefault();
+
+    const msg =
+        document.getElementById(
+            "resetMessage"
+        );
+
+    msg.textContent = "";
+
+    const params =
+        new URLSearchParams(
+            window.location.search
+        );
+
+    const token =
+        params.get("token") || "";
+
+    try {
+
+        const data = await authRequest(
+            "/reset-password?token="
+            + encodeURIComponent(token),
+            e.target
+        );
+
+        if (!data.ok) {
+            msg.textContent =
+                data.error ||
+                "Password reset failed.";
+            return;
+        }
 
         window.location.href =
             "/login";
 
-        return null;
+    } catch {
+        msg.textContent =
+            "Something went wrong.";
     }
-
-    const data =
-        await response
-            .json()
-            .catch(
-                () => ({})
-            );
-
-    if (!response.ok) {
-
-        throw new Error(
-            data.error ||
-            "Something went wrong."
-        );
-    }
-
-    return data;
-}
+});
 
 
 /* ============================================================
-   ACCOUNT
-   ============================================================ */
+   APP INIT
+============================================================ */
 
-async function loadAccount() {
+async function initApp() {
 
     try {
 
-        const user =
-            await api(
-                "/api/me"
-            );
+        const response =
+            await fetch("/api/me");
 
-        if (!user) return;
+        if (!response.ok) {
+            showAuth(
+                window.location.pathname === "/register"
+                    ? "register"
+                    : "login"
+            );
+            return;
+        }
+
+        const data =
+            await response.json();
+
+        currentUser =
+            data.user;
+
+        document.getElementById(
+            "authPage"
+        ).classList.add("hidden");
+
+        document.getElementById(
+            "app"
+        ).classList.remove("hidden");
 
         document.getElementById(
             "accountName"
         ).textContent =
-            user.username;
+            currentUser.username;
 
         document.getElementById(
             "accountEmail"
         ).textContent =
-            user.email;
+            currentUser.email;
 
-    } catch (error) {
+        if (currentUser.is_admin) {
+            document.getElementById(
+                "adminLink"
+            ).classList.remove("hidden");
+        }
 
-        console.error(error);
+        await loadChats();
+
+        if (!currentChatId) {
+            await createNewChat();
+        }
+
+    } catch {
+        showAuth("login");
     }
 }
 
 
 /* ============================================================
    CHATS
-   ============================================================ */
+============================================================ */
 
 async function loadChats() {
 
-    try {
+    const response =
+        await fetch("/api/chats");
 
-        chats =
-            await api(
-                "/api/chats"
-            );
+    if (!response.ok) {
+        return;
+    }
 
-        renderChatList();
+    const data =
+        await response.json();
 
-    } catch (error) {
+    chats =
+        data.chats || [];
 
-        console.error(error);
+    renderChats();
 
-        document.getElementById(
-            "chatList"
-        ).innerHTML = `
-            <div class="empty-chats">
-                Could not load chats.
-            </div>
-        `;
+    if (chats.length) {
+        currentChatId =
+            chats[0].id;
+
+        await loadMessages(
+            currentChatId
+        );
     }
 }
 
 
-function renderChatList() {
+function renderChats() {
 
     const list =
         document.getElementById(
@@ -1736,826 +1498,731 @@ function renderChatList() {
 
     const search =
         document.getElementById(
-            "chatSearch"
-        )
-        .value
+            "searchChats"
+        ).value
         .trim()
         .toLowerCase();
 
-    const filtered =
-        chats.filter(
-            chat =>
-                chat.title
-                    .toLowerCase()
-                    .includes(search)
-        );
+    list.innerHTML = "";
 
-    if (!filtered.length) {
-
-        list.innerHTML = `
-            <div class="empty-chats">
-                No chats found.
-            </div>
-        `;
-
-        return;
-    }
-
-    list.innerHTML =
-        filtered.map(
-            chat => `
-
-                <div
-                    class="chat-item ${
-                        Number(chat.id)
-                        === Number(activeChatId)
-                            ? "active"
-                            : ""
-                    }"
-                >
-
-                    <button
-                        class="chat-open"
-                        onclick="openChat(${chat.id})"
-                    >
-                        ${escapeHtml(
-                            chat.title
-                        )}
-                    </button>
-
-                    <button
-                        class="chat-delete"
-                        onclick="deleteChat(
-                            ${chat.id},
-                            event
-                        )"
-                        title="Delete chat"
-                    >
-                        ×
-                    </button>
-
-                </div>
-            `
+    chats
+        .filter(chat =>
+            (chat.title || "")
+                .toLowerCase()
+                .includes(search)
         )
-        .join("");
+        .forEach(chat => {
+
+            const item =
+                document.createElement("div");
+
+            item.className =
+                "chat-item"
+                + (
+                    chat.id === currentChatId
+                        ? " active"
+                        : ""
+                );
+
+            const title =
+                document.createElement("div");
+
+            title.className =
+                "chat-title";
+
+            title.textContent =
+                chat.title || "New chat";
+
+            const deleteBtn =
+                document.createElement("button");
+
+            deleteBtn.className =
+                "delete-chat";
+
+            deleteBtn.textContent =
+                "×";
+
+            deleteBtn.title =
+                "Delete chat";
+
+            deleteBtn.onclick =
+                async event => {
+
+                    event.stopPropagation();
+
+                    if (!confirm(
+                        "Delete this conversation?"
+                    )) {
+                        return;
+                    }
+
+                    await deleteChat(
+                        chat.id
+                    );
+                };
+
+            item.appendChild(title);
+            item.appendChild(deleteBtn);
+
+            item.onclick =
+                async () => {
+
+                    currentChatId =
+                        chat.id;
+
+                    renderChats();
+
+                    await loadMessages(
+                        chat.id
+                    );
+
+                    closeSidebar();
+                };
+
+            list.appendChild(item);
+        });
 }
 
 
-function filterChats() {
+async function createNewChat() {
 
-    renderChatList();
-}
-
-
-async function newChat() {
-
-    try {
-
-        const chat =
-            await api(
-                "/api/chats",
-                {
-                    method: "POST",
-
-                    body:
-                        JSON.stringify({
-                            title:
-                                "New chat"
-                        })
-                }
-            );
-
-        activeChatId =
-            chat.id;
-
-        clearMessages();
-
-        await loadChats();
-
-        closeSidebar();
-
-        input.focus();
-
-    } catch (error) {
-
-        alert(
-            error.message
-        );
-    }
-}
-
-
-async function openChat(
-    chatId
-) {
-
-    try {
-
-        const data =
-            await api(
-                `/api/chats/${chatId}/messages`
-            );
-
-        activeChatId =
-            chatId;
-
-        clearMessages();
-
-        for (
-            const message
-            of data.messages
-        ) {
-
-            appendMessage(
-                message.role,
-                message.content
-            );
-        }
-
-        renderChatList();
-
-        closeSidebar();
-
-        scrollToBottom();
-
-    } catch (error) {
-
-        alert(
-            error.message
-        );
-    }
-}
-
-
-async function deleteChat(
-    chatId,
-    event
-) {
-
-    event.stopPropagation();
-
-    if (
-        !confirm(
-            "Delete this conversation?"
-        )
-    ) {
-        return;
-    }
-
-    try {
-
-        await api(
-            `/api/chats/${chatId}`,
+    const response =
+        await fetch(
+            "/api/chats",
             {
-                method: "DELETE"
+                method: "POST",
+                headers: {
+                    "X-CSRF-Token": CSRF
+                }
             }
         );
 
-        if (
-            Number(activeChatId)
-            === Number(chatId)
-        ) {
-
-            activeChatId =
-                null;
-
-            clearMessages();
-        }
-
-        await loadChats();
-
-    } catch (error) {
-
-        alert(
-            error.message
-        );
+    if (!response.ok) {
+        return;
     }
+
+    const data =
+        await response.json();
+
+    const chat =
+        data.chat;
+
+    chats.unshift(chat);
+
+    currentChatId =
+        chat.id;
+
+    renderChats();
+
+    renderWelcome();
+
+    closeSidebar();
+}
+
+
+async function deleteChat(chatId) {
+
+    const response =
+        await fetch(
+            "/api/chats/" + chatId,
+            {
+                method: "DELETE",
+                headers: {
+                    "X-CSRF-Token": CSRF
+                }
+            }
+        );
+
+    if (!response.ok) {
+        return;
+    }
+
+    chats =
+        chats.filter(
+            chat => chat.id !== chatId
+        );
+
+    if (currentChatId === chatId) {
+        currentChatId =
+            chats.length
+                ? chats[0].id
+                : null;
+
+        if (currentChatId) {
+            await loadMessages(
+                currentChatId
+            );
+        } else {
+            await createNewChat();
+        }
+    }
+
+    renderChats();
 }
 
 
 /* ============================================================
    MESSAGES
-   ============================================================ */
+============================================================ */
 
-function clearMessages() {
+async function loadMessages(chatId) {
 
-    messagesInner.innerHTML = `
+    const response =
+        await fetch(
+            "/api/chats/"
+            + chatId
+            + "/messages"
+        );
 
-        <div
-            id="welcome"
-            class="welcome"
-        >
+    if (!response.ok) {
+        return;
+    }
 
-            <div class="welcome-logo">
-                A
+    const data =
+        await response.json();
+
+    renderMessages(
+        data.messages || []
+    );
+}
+
+
+function renderWelcome() {
+
+    document.getElementById(
+        "messagesInner"
+    ).innerHTML = `
+        <div id="welcome" class="welcome">
+            <div class="welcome-box">
+                <div class="welcome-logo">A</div>
+                <h1>What can I help with?</h1>
+                <p>Ask anything. AskOra is ready.</p>
             </div>
-
-            <h1>
-                How can I help?
-            </h1>
-
-            <p>
-                Ask anything. Get clear,
-                useful answers powered by AI.
-            </p>
-
         </div>
     `;
 }
 
 
-function appendMessage(
+function renderMessages(messages) {
+
+    const inner =
+        document.getElementById(
+            "messagesInner"
+        );
+
+    inner.innerHTML = "";
+
+    if (!messages.length) {
+        renderWelcome();
+        return;
+    }
+
+    messages.forEach(message => {
+
+        addMessageToUI(
+            message.role,
+            message.content
+        );
+    });
+
+    scrollBottom();
+}
+
+
+function addMessageToUI(
     role,
     content
 ) {
 
-    const welcome =
+    const inner =
         document.getElementById(
-            "welcome"
+            "messagesInner"
         );
 
-    if (welcome) {
-        welcome.remove();
-    }
+    const row =
+        document.createElement("div");
 
-    const wrapper =
-        document.createElement(
-            "div"
-        );
+    row.className =
+        "message-row "
+        + role;
 
-    wrapper.className =
-        `message ${role}`;
+    const message =
+        document.createElement("div");
 
+    message.className =
+        "message";
 
-    const avatar =
-        document.createElement(
-            "div"
-        );
+    const label =
+        document.createElement("div");
 
-    avatar.className =
-        "avatar";
+    label.className =
+        "message-label";
 
-    avatar.textContent =
+    label.textContent =
         role === "user"
             ? "You"
-            : "A";
+            : "AskOra";
 
+    const bubble =
+        document.createElement("div");
 
-    const body =
-        document.createElement(
-            "div"
-        );
+    bubble.className =
+        "message-bubble";
 
-    body.className =
-        "message-body";
+    if (role === "assistant") {
 
-
-    if (
-        role === "assistant"
-    ) {
-
-        body.innerHTML =
-            renderMarkdown(
-                content
+        const clean =
+            DOMPurify.sanitize(
+                marked.parse(
+                    content || ""
+                ),
+                {
+                    FORBID_TAGS: [
+                        "img",
+                        "svg",
+                        "iframe",
+                        "object",
+                        "embed",
+                        "video",
+                        "audio",
+                        "source",
+                        "form"
+                    ]
+                }
             );
+
+        bubble.innerHTML =
+            clean;
 
     } else {
 
-        body.textContent =
-            content;
+        bubble.textContent =
+            content || "";
     }
 
+    message.appendChild(label);
+    message.appendChild(bubble);
 
-    wrapper.appendChild(
-        avatar
-    );
+    row.appendChild(message);
 
-    wrapper.appendChild(
-        body
-    );
-
-    messagesInner.appendChild(
-        wrapper
-    );
-
-    return wrapper;
+    inner.appendChild(row);
 }
 
 
-function appendTyping() {
+function addTyping() {
 
-    const welcome =
+    const inner =
         document.getElementById(
-            "welcome"
+            "messagesInner"
         );
 
-    if (welcome) {
-        welcome.remove();
-    }
+    const row =
+        document.createElement("div");
 
-    const wrapper =
-        document.createElement(
-            "div"
-        );
+    row.id =
+        "typingRow";
 
-    wrapper.className =
-        "message assistant";
+    row.className =
+        "message-row assistant";
 
-    wrapper.id =
-        "typingMessage";
+    row.innerHTML = `
+        <div class="message">
+            <div class="message-label">
+                AskOra
+            </div>
 
-    wrapper.innerHTML = `
-
-        <div class="avatar">
-            A
-        </div>
-
-        <div class="message-body">
-
-            <span
-                style="
-                    color:#7f8aa5;
-                    font-size:13px;
-                "
-            >
-                AskOra is thinking...
-            </span>
-
+            <div class="message-bubble">
+                <div class="typing">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
         </div>
     `;
 
-    messagesInner.appendChild(
-        wrapper
-    );
+    inner.appendChild(row);
 
-    scrollToBottom();
+    scrollBottom();
 }
 
 
 function removeTyping() {
 
-    const element =
+    const typing =
         document.getElementById(
-            "typingMessage"
+            "typingRow"
         );
 
-    if (element) {
-        element.remove();
+    if (typing) {
+        typing.remove();
     }
 }
 
 
-function scrollToBottom() {
+function scrollBottom() {
 
-    requestAnimationFrame(
-        () => {
+    const messages =
+        document.getElementById(
+            "messages"
+        );
 
-            messages.scrollTop =
-                messages.scrollHeight;
-
-        }
-    );
+    messages.scrollTop =
+        messages.scrollHeight;
 }
 
 
 /* ============================================================
-   MARKDOWN
-   ============================================================ */
+   SEND MESSAGE
+============================================================ */
 
-function renderMarkdown(
-    text
-) {
-
-    const html =
-        marked.parse(
-            text,
-            {
-                breaks: true,
-                gfm: true
-            }
-        );
-
-    return DOMPurify.sanitize(
-        html,
-        {
-            FORBID_TAGS: [
-                "img",
-                "svg",
-                "iframe",
-                "object",
-                "embed",
-                "video",
-                "audio",
-                "source",
-                "form"
-            ],
-
-            FORBID_ATTR: [
-                "style",
-                "src",
-                "srcset",
-                "onerror",
-                "onclick"
-            ]
-        }
-    );
-}
-
-
-function escapeHtml(
-    value
-) {
-
-    return String(value)
-        .replaceAll(
-            "&",
-            "&amp;"
-        )
-        .replaceAll(
-            "<",
-            "&lt;"
-        )
-        .replaceAll(
-            ">",
-            "&gt;"
-        )
-        .replaceAll(
-            '"',
-            "&quot;"
-        )
-        .replaceAll(
-            "'",
-            "&#039;"
-        );
-}
-
-
-/* ============================================================
-   SEND
-   ============================================================ */
-
-async function sendMessage() {
-
-    const message =
-        input.value.trim();
-
-    if (!message) return;
-
-    input.value = "";
-
-    resizeTextarea();
-
-    appendMessage(
-        "user",
-        message
-    );
-
-    appendTyping();
-
-    sendBtn.disabled =
-        true;
-
-    try {
-
-        const data =
-            await api(
-                "/api/chat",
-                {
-                    method: "POST",
-
-                    body:
-                        JSON.stringify({
-                            chat_id:
-                                activeChatId,
-
-                            message:
-                                message
-                        })
-                }
-            );
-
-        removeTyping();
-
-        activeChatId =
-            data.chat_id;
-
-        appendMessage(
-            "assistant",
-            data.answer
-        );
-
-        await loadChats();
-
-        scrollToBottom();
-
-    } catch (error) {
-
-        removeTyping();
-
-        appendMessage(
-            "assistant",
-            `⚠️ ${error.message}`
-        );
-
-    } finally {
-
-        sendBtn.disabled =
-            false;
-
-        input.focus();
-    }
-}
-
-
-/* ============================================================
-   INPUT
-   ============================================================ */
-
-function handleInputKey(
-    event
-) {
-
-    if (
-        event.key === "Enter"
-        &&
-        !event.shiftKey
-    ) {
+document.getElementById(
+    "composer"
+).addEventListener(
+    "submit",
+    async event => {
 
         event.preventDefault();
 
-        sendMessage();
+        const input =
+            document.getElementById(
+                "messageInput"
+            );
+
+        const message =
+            input.value.trim();
+
+        if (!message || !currentChatId) {
+            return;
+        }
+
+        input.value = "";
+        input.style.height = "45px";
+
+        const welcome =
+            document.getElementById(
+                "welcome"
+            );
+
+        if (welcome) {
+            welcome.remove();
+        }
+
+        addMessageToUI(
+            "user",
+            message
+        );
+
+        scrollBottom();
+
+        addTyping();
+
+        try {
+
+            const response =
+                await fetch(
+                    "/api/chat",
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type":
+                                "application/json",
+                            "X-CSRF-Token":
+                                CSRF
+                        },
+                        body: JSON.stringify({
+                            chat_id:
+                                currentChatId,
+                            message:
+                                message
+                        })
+                    }
+                );
+
+            const data =
+                await response.json();
+
+            removeTyping();
+
+            if (!data.ok) {
+                addMessageToUI(
+                    "assistant",
+                    data.error ||
+                    "Something went wrong."
+                );
+                return;
+            }
+
+            addMessageToUI(
+                "assistant",
+                data.answer
+            );
+
+            const chat =
+                chats.find(
+                    c =>
+                        c.id ===
+                        currentChatId
+                );
+
+            if (chat && data.chat_title) {
+                chat.title =
+                    data.chat_title;
+            }
+
+            renderChats();
+
+            scrollBottom();
+
+        } catch {
+
+            removeTyping();
+
+            addMessageToUI(
+                "assistant",
+                "Sorry, something went wrong."
+            );
+        }
     }
-
-    setTimeout(
-        resizeTextarea,
-        0
-    );
-}
+);
 
 
-function resizeTextarea() {
+/* ============================================================
+   TEXTAREA
+============================================================ */
 
-    input.style.height =
-        "auto";
+document.getElementById(
+    "messageInput"
+).addEventListener(
+    "input",
+    function() {
 
-    input.style.height =
-        Math.min(
-            input.scrollHeight,
-            180
-        ) + "px";
-}
+        this.style.height =
+            "45px";
+
+        this.style.height =
+            Math.min(
+                this.scrollHeight,
+                150
+            ) + "px";
+    }
+);
+
+
+document.getElementById(
+    "messageInput"
+).addEventListener(
+    "keydown",
+    event => {
+
+        if (
+            event.key === "Enter"
+            && !event.shiftKey
+        ) {
+            event.preventDefault();
+
+            document.getElementById(
+                "composer"
+            ).requestSubmit();
+        }
+    }
+);
 
 
 /* ============================================================
    VOICE
-   ============================================================ */
+============================================================ */
+
+document.getElementById(
+    "micBtn"
+).addEventListener(
+    "click",
+    startRecording
+);
+
 
 async function startRecording() {
 
-    if (!navigator.mediaDevices) {
-
-        alert(
-            "Your browser does not support microphone access."
-        );
-
+    if (!currentChatId) {
         return;
     }
 
     try {
 
         mediaStream =
-            await navigator
-                .mediaDevices
+            await navigator.mediaDevices
                 .getUserMedia({
                     audio: true
                 });
-
-        audioChunks = [];
 
         mediaRecorder =
             new MediaRecorder(
                 mediaStream
             );
 
+        audioChunks = [];
+
         mediaRecorder.ondataavailable =
             event => {
 
-                if (
-                    event.data.size > 0
-                ) {
-
+                if (event.data.size > 0) {
                     audioChunks.push(
                         event.data
                     );
                 }
             };
 
-
         mediaRecorder.onstop =
-            async () => {
-
-                const blob =
-                    new Blob(
-                        audioChunks,
-                        {
-                            type:
-                                mediaRecorder.mimeType
-                                ||
-                                "audio/webm"
-                        }
-                    );
-
-                cleanupRecording();
-
-                if (
-                    !blob.size
-                    ||
-                    blob.size < 100
-                ) {
-                    return;
-                }
-
-                await sendVoice(
-                    blob
-                );
-            };
-
+            sendRecording;
 
         mediaRecorder.start();
 
-        recordingStarted =
-            Date.now();
+        recordingSeconds = 0;
 
-        document
-            .getElementById(
-                "recording"
-            )
-            .classList.add(
-                "active"
-            );
+        updateRecordingTime();
 
-        updateRecordingTimer();
-
-        recordingTimer =
+        recordingInterval =
             setInterval(
-                updateRecordingTimer,
+                () => {
+
+                    recordingSeconds++;
+
+                    updateRecordingTime();
+
+                },
                 1000
             );
 
-    } catch (error) {
+        document.getElementById(
+            "recordingBar"
+        ).classList.remove("hidden");
 
-        console.error(error);
+        document.getElementById(
+            "micBtn"
+        ).classList.add("recording");
+
+    } catch {
 
         alert(
-            "Microphone permission was not granted."
+            "Microphone permission is required."
         );
     }
 }
 
 
-function updateRecordingTimer() {
-
-    if (!recordingStarted) {
-        return;
-    }
-
-    const elapsed =
-        Math.floor(
-            (
-                Date.now()
-                -
-                recordingStarted
-            ) / 1000
-        );
+function updateRecordingTime() {
 
     const minutes =
         String(
             Math.floor(
-                elapsed / 60
+                recordingSeconds / 60
             )
-        ).padStart(
-            2,
-            "0"
-        );
+        ).padStart(2, "0");
 
     const seconds =
         String(
-            elapsed % 60
-        ).padStart(
-            2,
-            "0"
-        );
+            recordingSeconds % 60
+        ).padStart(2, "0");
 
     document.getElementById(
-        "recordTime"
+        "recordingTime"
     ).textContent =
-        `${minutes}:${seconds}`;
+        minutes + ":" + seconds;
 }
 
 
-function stopRecording() {
+document.getElementById(
+    "stopRecordingBtn"
+).addEventListener(
+    "click",
+    () => {
 
-    if (
-        mediaRecorder
-        &&
-        mediaRecorder.state
-        !== "inactive"
-    ) {
-
-        mediaRecorder.stop();
+        if (
+            mediaRecorder &&
+            mediaRecorder.state !== "inactive"
+        ) {
+            mediaRecorder.stop();
+        }
     }
-}
+);
 
 
-function cancelRecording() {
+document.getElementById(
+    "cancelRecordingBtn"
+).addEventListener(
+    "click",
+    () => {
 
-    if (
-        mediaRecorder
-        &&
-        mediaRecorder.state
-        !== "inactive"
-    ) {
+        if (
+            mediaRecorder &&
+            mediaRecorder.state !== "inactive"
+        ) {
+            mediaRecorder.onstop = null;
+            mediaRecorder.stop();
+        }
 
-        mediaRecorder.onstop =
-            null;
-
-        mediaRecorder.stop();
+        cleanupRecording();
     }
-
-    cleanupRecording();
-}
+);
 
 
 function cleanupRecording() {
 
-    if (recordingTimer) {
+    clearInterval(
+        recordingInterval
+    );
 
-        clearInterval(
-            recordingTimer
-        );
-
-        recordingTimer =
-            null;
-    }
+    recordingInterval = null;
 
     if (mediaStream) {
 
         mediaStream
             .getTracks()
-            .forEach(
-                track =>
-                    track.stop()
+            .forEach(track =>
+                track.stop()
             );
 
-        mediaStream =
-            null;
+        mediaStream = null;
     }
 
-    mediaRecorder =
-        null;
-
-    recordingStarted =
-        null;
-
-    audioChunks = [];
-
-    document
-        .getElementById(
-            "recording"
-        )
-        .classList.remove(
-            "active"
-        );
+    document.getElementById(
+        "recordingBar"
+    ).classList.add("hidden");
 
     document.getElementById(
-        "recordTime"
-    ).textContent =
-        "00:00";
+        "micBtn"
+    ).classList.remove("recording");
 }
 
 
-async function sendVoice(
-    blob
-) {
+async function sendRecording() {
 
-    appendTyping();
+    const blob =
+        new Blob(
+            audioChunks,
+            {
+                type:
+                    "audio/webm"
+            }
+        );
+
+    cleanupRecording();
 
     const formData =
         new FormData();
 
     formData.append(
-        "audio",
-        blob,
-        "recording.webm"
+        "chat_id",
+        currentChatId
     );
 
-    if (activeChatId) {
+    formData.append(
+        "audio",
+        blob,
+        "voice.webm"
+    );
 
-        formData.append(
-            "chat_id",
-            activeChatId
-        );
-    }
+    addTyping();
 
     try {
 
@@ -2564,261 +2231,257 @@ async function sendVoice(
                 "/api/voice",
                 {
                     method: "POST",
-
                     headers: {
                         "X-CSRF-Token":
                             CSRF
                     },
-
-                    body:
-                        formData
+                    body: formData
                 }
             );
-
-        if (
-            response.status
-            === 401
-        ) {
-
-            window.location.href =
-                "/login";
-
-            return;
-        }
 
         const data =
             await response.json();
 
-        if (!response.ok) {
-
-            throw new Error(
-                data.error
-                ||
-                "Voice request failed."
-            );
-        }
-
         removeTyping();
 
-        activeChatId =
-            data.chat_id;
+        if (!data.ok) {
 
-        appendMessage(
+            addMessageToUI(
+                "assistant",
+                data.error ||
+                "Voice processing failed."
+            );
+
+            return;
+        }
+
+        const welcome =
+            document.getElementById(
+                "welcome"
+            );
+
+        if (welcome) {
+            welcome.remove();
+        }
+
+        addMessageToUI(
             "user",
-            data.transcription
+            data.transcript
         );
 
-        appendMessage(
+        addMessageToUI(
             "assistant",
             data.answer
         );
 
-        await loadChats();
+        const chat =
+            chats.find(
+                c =>
+                    c.id ===
+                    currentChatId
+            );
 
-        scrollToBottom();
+        if (chat && data.chat_title) {
+            chat.title =
+                data.chat_title;
+        }
 
-    } catch (error) {
+        renderChats();
+
+        scrollBottom();
+
+    } catch {
 
         removeTyping();
 
-        appendMessage(
+        addMessageToUI(
             "assistant",
-            `⚠️ ${error.message}`
+            "Sorry, something went wrong with voice input."
         );
     }
 }
 
 
 /* ============================================================
-   DELETE ACCOUNT
-   ============================================================ */
+   NEW CHAT
+============================================================ */
 
-function openDeleteAccount() {
-
-    document
-        .getElementById(
-            "deleteModal"
-        )
-        .classList.add(
-            "open"
-        );
-
-    document
-        .getElementById(
-            "deletePassword"
-        )
-        .value = "";
-
-    setTimeout(
-        () => {
-
-            document
-                .getElementById(
-                    "deletePassword"
-                )
-                .focus();
-
-        },
-        100
-    );
-}
-
-
-function closeDeleteAccount() {
-
-    document
-        .getElementById(
-            "deleteModal"
-        )
-        .classList.remove(
-            "open"
-        );
-}
-
-
-async function deleteAccount() {
-
-    const password =
-        document
-            .getElementById(
-                "deletePassword"
-            )
-            .value;
-
-    if (!password) {
-
-        alert(
-            "Enter your password to continue."
-        );
-
-        return;
-    }
-
-    const confirmed =
-        confirm(
-            "This will permanently delete your AskOra account and all your conversations. Continue?"
-        );
-
-    if (!confirmed) {
-        return;
-    }
-
-    try {
-
-        await api(
-            "/api/account/delete",
-            {
-                method: "POST",
-
-                body:
-                    JSON.stringify({
-                        password:
-                            password
-                    })
-            }
-        );
-
-        window.location.href =
-            "/register";
-
-    } catch (error) {
-
-        alert(
-            error.message
-        );
-    }
-}
+document.getElementById(
+    "newChatBtn"
+).addEventListener(
+    "click",
+    createNewChat
+);
 
 
 /* ============================================================
-   MOBILE SIDEBAR
-   ============================================================ */
+   SEARCH
+============================================================ */
 
-function openSidebar() {
-
-    document
-        .getElementById(
-            "sidebar"
-        )
-        .classList.add(
-            "open"
-        );
-
-    document
-        .getElementById(
-            "overlay"
-        )
-        .classList.add(
-            "open"
-        );
-}
-
-
-function closeSidebar() {
-
-    document
-        .getElementById(
-            "sidebar"
-        )
-        .classList.remove(
-            "open"
-        );
-
-    document
-        .getElementById(
-            "overlay"
-        )
-        .classList.remove(
-            "open"
-        );
-}
+document.getElementById(
+    "searchChats"
+).addEventListener(
+    "input",
+    renderChats
+);
 
 
 /* ============================================================
    LOGOUT
-   ============================================================ */
+============================================================ */
 
-async function logout() {
+document.getElementById(
+    "logoutBtn"
+).addEventListener(
+    "click",
+    async () => {
 
-    try {
-
-        await api(
+        await fetch(
             "/logout",
             {
-                method: "POST"
+                method: "POST",
+                headers: {
+                    "X-CSRF-Token": CSRF
+                }
             }
         );
 
         window.location.href =
             "/login";
-
-    } catch (error) {
-
-        alert(
-            error.message
-        );
     }
-}
+);
 
 
 /* ============================================================
-   INIT
-   ============================================================ */
+   DELETE ACCOUNT
+============================================================ */
 
-async function init() {
+document.getElementById(
+    "deleteAccountBtn"
+).addEventListener(
+    "click",
+    async () => {
 
-    resizeTextarea();
+        const first =
+            confirm(
+                "Delete your AskOra account permanently?"
+            );
 
-    await loadAccount();
+        if (!first) {
+            return;
+        }
 
-    await loadChats();
+        const password =
+            prompt(
+                "Enter your password to confirm account deletion:"
+            );
 
-    input.focus();
+        if (!password) {
+            return;
+        }
+
+        const response =
+            await fetch(
+                "/api/account/delete",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+                        "X-CSRF-Token":
+                            CSRF
+                    },
+                    body: JSON.stringify({
+                        password
+                    })
+                }
+            );
+
+        const data =
+            await response.json();
+
+        if (!data.ok) {
+            alert(
+                data.error ||
+                "Account deletion failed."
+            );
+
+            return;
+        }
+
+        window.location.href =
+            "/login";
+    }
+);
+
+
+/* ============================================================
+   MOBILE SIDEBAR
+============================================================ */
+
+const sidebar =
+    document.getElementById(
+        "sidebar"
+    );
+
+const overlay =
+    document.getElementById(
+        "overlay"
+    );
+
+
+function openSidebar() {
+
+    sidebar.classList.add("open");
+    overlay.classList.add("show");
 }
 
 
-init();
+function closeSidebar() {
 
+    sidebar.classList.remove("open");
+    overlay.classList.remove("show");
+}
+
+
+document.getElementById(
+    "menuBtn"
+).addEventListener(
+    "click",
+    openSidebar
+);
+
+
+overlay.addEventListener(
+    "click",
+    closeSidebar
+);
+
+
+/* ============================================================
+   ROUTING
+============================================================ */
+
+const path =
+    window.location.pathname;
+
+if (path === "/login") {
+    showAuth("login");
+
+} else if (path === "/register") {
+    showAuth("register");
+
+} else if (path === "/forgot-password") {
+    showAuth("forgot");
+
+} else if (
+    path === "/reset-password"
+) {
+    showAuth("reset");
+
+} else {
+    initApp();
+}
 </script>
 
 </body>
