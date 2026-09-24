@@ -1,45 +1,27 @@
-# Environment variables
 .env
 .env.*
 !.env.example
 
-# Python
 __pycache__/
 *.py[cod]
-*$py.class
 *.so
 
-# Virtual environments
-venv/
+*.log
+
 .venv/
+venv/
 env/
 ENV/
 
-# IDE
 .vscode/
 .idea/
 
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-
-# Local databases
-*.db
-*.sqlite
-*.sqlite3
-
-# Testing/cache
 .pytest_cache/
 .mypy_cache/
 .coverage
 htmlcov/
 
-# Temporary files
-*.tmp
-*.temp
+.DS_Store
+Thumbs.db
 
-# Uploads
 uploads/
