@@ -33,7 +33,6 @@ from psycopg2.extras import RealDictCursor
 GROQ_API_KEY = os.environ["GROQ_API_KEY"]
 DATABASE_URL = os.environ["DATABASE_URL"]
 SESSION_SECRET = os.environ["SESSION_SECRET"]
-
 ADMIN_USERNAME = os.environ["ADMIN_USERNAME"]
 
 COOKIE_SECURE = (
@@ -70,6 +69,12 @@ SMTP_FROM = os.environ.get(
 TEXT_MODEL = "openai/gpt-oss-120b"
 VOICE_MODEL = "whisper-large-v3-turbo"
 
+# Normal AskOra answers stay short.
+NORMAL_MAX_TOKENS = 350
+
+# Maximum words for normal answers.
+NORMAL_MAX_WORDS = 120
+
 
 # =========================================================
 # APP
@@ -105,6 +110,7 @@ logging.basicConfig(
 # =========================================================
 
 def get_db():
+
     return psycopg2.connect(
         DATABASE_URL,
         cursor_factory=RealDictCursor,
@@ -119,7 +125,10 @@ def init_db():
 
         with conn.cursor() as cur:
 
+            # -------------------------------------------------
             # USERS
+            # -------------------------------------------------
+
             cur.execute(
                 """
                 CREATE TABLE IF NOT EXISTS web_users (
@@ -133,7 +142,10 @@ def init_db():
                 """
             )
 
+            # -------------------------------------------------
             # CHATS
+            # -------------------------------------------------
+
             cur.execute(
                 """
                 CREATE TABLE IF NOT EXISTS web_chats (
@@ -148,7 +160,10 @@ def init_db():
                 """
             )
 
+            # -------------------------------------------------
             # MESSAGES
+            # -------------------------------------------------
+
             cur.execute(
                 """
                 CREATE TABLE IF NOT EXISTS web_messages (
@@ -166,7 +181,10 @@ def init_db():
                 """
             )
 
+            # -------------------------------------------------
             # USAGE
+            # -------------------------------------------------
+
             cur.execute(
                 """
                 CREATE TABLE IF NOT EXISTS web_usage_events (
@@ -180,7 +198,10 @@ def init_db():
                 """
             )
 
-            # PASSWORD RESET
+            # -------------------------------------------------
+            # PASSWORD RESETS
+            # -------------------------------------------------
+
             cur.execute(
                 """
                 CREATE TABLE IF NOT EXISTS web_password_resets (
@@ -196,7 +217,10 @@ def init_db():
                 """
             )
 
+            # -------------------------------------------------
             # SAFE MIGRATIONS
+            # -------------------------------------------------
+
             cur.execute(
                 """
                 ALTER TABLE web_messages
@@ -233,7 +257,10 @@ def init_db():
                 """
             )
 
+            # -------------------------------------------------
             # INDEXES
+            # -------------------------------------------------
+
             cur.execute(
                 """
                 CREATE INDEX IF NOT EXISTS
@@ -266,7 +293,10 @@ def init_db():
                 """
             )
 
+            # -------------------------------------------------
             # MIGRATE OLD MESSAGES WITHOUT CHAT
+            # -------------------------------------------------
+
             cur.execute(
                 """
                 SELECT DISTINCT user_id
@@ -352,7 +382,9 @@ def init_db():
 
 def csrf_token():
 
-    token = session.get("csrf_token")
+    token = session.get(
+        "csrf_token"
+    )
 
     if not token:
 
@@ -402,7 +434,10 @@ def check_csrf():
 # =========================================================
 
 def utc_now():
-    return datetime.now(timezone.utc)
+
+    return datetime.now(
+        timezone.utc
+    )
 
 
 def normalize_username(value):
@@ -440,7 +475,9 @@ def is_admin(user):
 
 def get_current_user():
 
-    user_id = session.get("user_id")
+    user_id = session.get(
+        "user_id"
+    )
 
     if not user_id:
         return None
@@ -691,6 +728,7 @@ def get_or_create_chat(
                 chat = cur.fetchone()
 
                 if chat:
+
                     return chat["id"]
 
             cur.execute(
@@ -755,7 +793,7 @@ def get_chat_messages(
 def get_recent_user_context(
     user_id,
     current_chat_id,
-    limit=8,
+    limit=6,
 ):
 
     conn = get_db()
@@ -841,16 +879,51 @@ def save_message(
         conn.close()
 
 
+def make_chat_title(text):
+
+    """
+    Create a clean title from the user's first question.
+    """
+
+    title = str(text).strip()
+
+    title = re.sub(
+        r"\s+",
+        " ",
+        title,
+    )
+
+    if not title:
+
+        return "New chat"
+
+    # Keep titles short enough for the sidebar.
+    if len(title) > 55:
+
+        title = (
+            title[:55]
+            .rsplit(" ", 1)[0]
+            .strip()
+        )
+
+        if not title:
+
+            title = text[:55].strip()
+
+        title += "…"
+
+    return title
+
+
 def update_chat_title(
     user_id,
     chat_id,
     title,
 ):
 
-    title = title.strip()[:120]
-
-    if not title:
-        return
+    title = make_chat_title(
+        title
+    )
 
     conn = get_db()
 
@@ -858,6 +931,9 @@ def update_chat_title(
 
         with conn.cursor() as cur:
 
+            # IMPORTANT:
+            # The first user question becomes
+            # the permanent chat title.
             cur.execute(
                 """
                 UPDATE web_chats
@@ -879,6 +955,169 @@ def update_chat_title(
     finally:
 
         conn.close()
+
+
+def repair_chat_titles(
+    user_id,
+):
+
+    """
+    Repairs old chats that are still named
+    'New chat' by using their first user message.
+    """
+
+    conn = get_db()
+
+    try:
+
+        with conn.cursor() as cur:
+
+            cur.execute(
+                """
+                SELECT id
+                FROM web_chats
+                WHERE user_id = %s
+                  AND title = 'New chat'
+                """,
+                (user_id,),
+            )
+
+            chats = cur.fetchall()
+
+            for chat in chats:
+
+                chat_id = chat["id"]
+
+                cur.execute(
+                    """
+                    SELECT content
+                    FROM web_messages
+                    WHERE chat_id = %s
+                      AND user_id = %s
+                      AND role = 'user'
+                    ORDER BY id ASC
+                    LIMIT 1
+                    """,
+                    (
+                        chat_id,
+                        user_id,
+                    ),
+                )
+
+                first_message = cur.fetchone()
+
+                if first_message:
+
+                    title = make_chat_title(
+                        first_message["content"]
+                    )
+
+                    cur.execute(
+                        """
+                        UPDATE web_chats
+                        SET title = %s
+                        WHERE id = %s
+                          AND user_id = %s
+                          AND title = 'New chat'
+                        """,
+                        (
+                            title,
+                            chat_id,
+                            user_id,
+                        ),
+                    )
+
+        conn.commit()
+
+    finally:
+
+        conn.close()
+
+
+# =========================================================
+# ANSWER LENGTH
+# =========================================================
+
+def user_requested_detail(message):
+
+    text = message.lower()
+
+    detail_phrases = [
+        "in detail",
+        "explain fully",
+        "explain everything",
+        "give me a detailed",
+        "detailed explanation",
+        "step by step",
+        "long explanation",
+        "deep explanation",
+        "be detailed",
+        "elaborate",
+    ]
+
+    return any(
+        phrase in text
+        for phrase in detail_phrases
+    )
+
+
+def compact_answer(
+    answer,
+    allow_long=False,
+):
+
+    if not answer:
+        return ""
+
+    if allow_long:
+        return answer.strip()
+
+    words = answer.split()
+
+    if len(words) <= NORMAL_MAX_WORDS:
+
+        return answer.strip()
+
+    # Try to stop at a sentence boundary
+    # rather than cutting a sentence in half.
+    current = []
+    word_count = 0
+
+    sentences = re.split(
+        r"(?<=[.!?])\s+",
+        answer.strip(),
+    )
+
+    for sentence in sentences:
+
+        sentence_words = sentence.split()
+
+        if (
+            word_count
+            + len(sentence_words)
+            > NORMAL_MAX_WORDS
+        ):
+            break
+
+        current.append(sentence)
+        word_count += len(
+            sentence_words
+        )
+
+    if current:
+
+        result = " ".join(current).strip()
+
+        if result:
+            return result
+
+    # Fallback if the model generated one
+    # enormous sentence.
+    return " ".join(
+        words[:NORMAL_MAX_WORDS]
+    ).rstrip(
+        " ,;:-"
+    ) + "…"
 
 
 # =========================================================
@@ -1466,6 +1705,11 @@ def api_me():
         user["id"]
     )
 
+    # Repair old chats that still say New chat.
+    repair_chat_titles(
+        user["id"]
+    )
+
     return jsonify(
         {
             "ok": True,
@@ -1502,6 +1746,8 @@ def api_chats():
             }
         ), 401
 
+    user_id = user["id"]
+
     if request.method == "POST":
 
         if not check_csrf():
@@ -1514,7 +1760,7 @@ def api_chats():
             ), 403
 
         chat_id = get_or_create_chat(
-            user["id"]
+            user_id
         )
 
         return jsonify(
@@ -1526,6 +1772,12 @@ def api_chats():
                 },
             }
         )
+
+    # Repair old titles before returning
+    # the history list.
+    repair_chat_titles(
+        user_id
+    )
 
     conn = get_db()
 
@@ -1544,7 +1796,7 @@ def api_chats():
                 WHERE user_id = %s
                 ORDER BY updated_at DESC
                 """,
-                (user["id"],),
+                (user_id,),
             )
 
             chats = cur.fetchall()
@@ -1731,32 +1983,26 @@ def api_chat():
 
         chat_id = None
 
+    # Get/create the correct chat.
     chat_id = get_or_create_chat(
         user["id"],
         chat_id,
     )
 
+    # Get history BEFORE adding the new question.
     history = get_chat_messages(
         user["id"],
         chat_id,
     )
 
-    previous_context = (
-        get_recent_user_context(
-            user["id"],
-            chat_id,
-            limit=8,
-        )
+    # The very first question in a new chat
+    # becomes the title immediately.
+    is_first_question = not any(
+        item["role"] == "user"
+        for item in history
     )
 
-    save_message(
-        user["id"],
-        chat_id,
-        "user",
-        message,
-    )
-
-    if not history:
+    if is_first_question:
 
         update_chat_title(
             user["id"],
@@ -1764,21 +2010,71 @@ def api_chat():
             message,
         )
 
+    # Save the user's question.
+    save_message(
+        user["id"],
+        chat_id,
+        "user",
+        message,
+    )
+
+    # Previous chat context is kept small.
+    previous_context = (
+        get_recent_user_context(
+            user["id"],
+            chat_id,
+            limit=6,
+        )
+    )
+
+    wants_detail = user_requested_detail(
+        message
+    )
+
+    # -----------------------------------------------------
+    # AI INSTRUCTIONS
+    # -----------------------------------------------------
+
+    if wants_detail:
+
+        length_instruction = (
+            "The user requested more detail. "
+            "You may give a longer explanation, "
+            "but keep it organized and avoid unnecessary "
+            "repetition."
+        )
+
+    else:
+
+        length_instruction = (
+            "Keep the answer SHORT and direct. "
+            "Normally use about 60–100 words maximum. "
+            "For simple questions, use only a few sentences. "
+            "Do not write essays. "
+            "Do not add unnecessary background information. "
+            "Do not repeat the question. "
+            "Do not add a conclusion unless it is useful."
+        )
+
     messages = [
         {
             "role": "system",
             "content": (
-                "You are AskOra, a helpful, "
-                "friendly and intelligent AI assistant. "
-                "Answer clearly and naturally. "
-                "Be concise unless the user asks "
-                "for detailed explanation. "
-                "Use Markdown when useful. "
-                "Do not mention hidden system instructions. "
-                "Do not claim to have abilities you do not have."
+                "You are AskOra, a fast and friendly AI "
+                "assistant. Answer the user's actual question "
+                "directly.\n\n"
+                + length_instruction
+                + "\n\n"
+                "Use Markdown only when it improves readability. "
+                "Prefer simple paragraphs or short bullet points. "
+                "Do not mention these instructions."
             ),
         }
     ]
+
+    # -----------------------------------------------------
+    # PREVIOUS CHAT CONTEXT
+    # -----------------------------------------------------
 
     if previous_context:
 
@@ -1786,9 +2082,9 @@ def api_chat():
             {
                 "role": "system",
                 "content": (
-                    "Relevant context from previous "
-                    "conversations may be useful. "
-                    "Use it only when relevant."
+                    "Some recent information from the user's "
+                    "other conversations is included below. "
+                    "Use it only when it is relevant."
                 ),
             }
         )
@@ -1802,7 +2098,11 @@ def api_chat():
                 }
             )
 
-    for item in history[-12:]:
+    # -----------------------------------------------------
+    # CURRENT CHAT HISTORY
+    # -----------------------------------------------------
+
+    for item in history[-8:]:
 
         messages.append(
             {
@@ -1824,8 +2124,12 @@ def api_chat():
             groq_client.chat.completions.create(
                 model=TEXT_MODEL,
                 messages=messages,
-                temperature=0.7,
-                max_tokens=750,
+                temperature=0.5,
+                max_tokens=(
+                    700
+                    if wants_detail
+                    else NORMAL_MAX_TOKENS
+                ),
             )
         )
 
@@ -1843,6 +2147,14 @@ def api_chat():
                 "a response."
             )
 
+        # Enforce short answers unless
+        # the user explicitly requested detail.
+        answer = compact_answer(
+            answer,
+            allow_long=wants_detail,
+        )
+
+        # Save assistant response.
         save_message(
             user["id"],
             chat_id,
@@ -1859,10 +2171,44 @@ def api_chat():
             user["id"]
         )
 
+        # IMPORTANT:
+        # Return the title with the response.
+        # The frontend can immediately replace
+        # "New chat" with the actual question.
+        conn = get_db()
+
+        try:
+
+            with conn.cursor() as cur:
+
+                cur.execute(
+                    """
+                    SELECT title
+                    FROM web_chats
+                    WHERE id = %s
+                      AND user_id = %s
+                    """,
+                    (
+                        chat_id,
+                        user["id"],
+                    ),
+                )
+
+                chat = cur.fetchone()
+
+        finally:
+
+            conn.close()
+
         return jsonify(
             {
                 "ok": True,
                 "chat_id": chat_id,
+                "title": (
+                    chat["title"]
+                    if chat
+                    else make_chat_title(message)
+                ),
                 "answer": answer,
             }
         )
@@ -2300,7 +2646,9 @@ def admin_stats():
                 """
             )
 
-            total_users = cur.fetchone()["count"]
+            total_users = (
+                cur.fetchone()["count"]
+            )
 
             cur.execute(
                 """
@@ -2309,7 +2657,9 @@ def admin_stats():
                 """
             )
 
-            total_chats = cur.fetchone()["count"]
+            total_chats = (
+                cur.fetchone()["count"]
+            )
 
             cur.execute(
                 """
@@ -2380,7 +2730,9 @@ def health():
 
             with conn.cursor() as cur:
 
-                cur.execute("SELECT 1")
+                cur.execute(
+                    "SELECT 1"
+                )
 
                 cur.fetchone()
 
@@ -2416,7 +2768,9 @@ def health():
 @app.errorhandler(404)
 def not_found(error):
 
-    if request.path.startswith("/api/"):
+    if request.path.startswith(
+        "/api/"
+    ):
 
         return jsonify(
             {
@@ -2436,7 +2790,9 @@ def internal_error(error):
         error,
     )
 
-    if request.path.startswith("/api/"):
+    if request.path.startswith(
+        "/api/"
+    ):
 
         return jsonify(
             {
