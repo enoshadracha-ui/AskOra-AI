@@ -2,9 +2,9 @@ import os
 import re
 import secrets
 import hashlib
-import smtplib
 import logging
-from datetime import datetime, timezone, timedelta
+import smtplib
+from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 from functools import wraps
 
@@ -13,567 +13,417 @@ from psycopg2.extras import RealDictCursor
 from flask import (
     Flask,
     request,
+    jsonify,
+    render_template,
     redirect,
     url_for,
     session,
-    jsonify,
-    render_template,
-    render_template_string,
 )
-from werkzeug.security import generate_password_hash, check_password_hash
+from flask import Response
 from groq import Groq
+from werkzeug.security import generate_password_hash, check_password_hash
 
 
 # ============================================================
 # CONFIG
 # ============================================================
 
+app = Flask(__name__)
+
+app.secret_key = os.environ["SESSION_SECRET"]
+
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=os.environ.get("COOKIE_SECURE", "true").lower() == "true",
+    PERMANENT_SESSION_LIFETIME=timedelta(days=30),
+)
+
 GROQ_API_KEY = os.environ["GROQ_API_KEY"]
 DATABASE_URL = os.environ["DATABASE_URL"]
 
-SESSION_SECRET = os.environ.get(
-    "SESSION_SECRET",
-    secrets.token_hex(32)
-)
+ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "").strip()
 
-ADMIN_USERNAME = os.environ.get(
-    "ADMIN_USERNAME",
-    "admin"
-).strip().lower()
+SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USERNAME = os.environ.get("SMTP_USERNAME", "").strip()
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "").strip()
+SMTP_FROM = os.environ.get("SMTP_FROM", SMTP_USERNAME).strip()
 
 TEXT_MODEL = "openai/gpt-oss-120b"
 VOICE_MODEL = "whisper-large-v3-turbo"
 
-PORT = int(os.environ.get("PORT", "10000"))
-
-COOKIE_SECURE = os.environ.get(
-    "COOKIE_SECURE",
-    "true"
-).lower() == "true"
-
-SMTP_HOST = os.environ.get(
-    "SMTP_HOST",
-    "smtp.gmail.com"
-)
-
-SMTP_PORT = int(
-    os.environ.get(
-        "SMTP_PORT",
-        "587"
-    )
-)
-
-SMTP_USERNAME = os.environ.get(
-    "SMTP_USERNAME",
-    ""
-)
-
-SMTP_PASSWORD = os.environ.get(
-    "SMTP_PASSWORD",
-    ""
-)
-
-SMTP_FROM = os.environ.get(
-    "SMTP_FROM",
-    SMTP_USERNAME
-)
-
-PASSWORD_RESET_MINUTES = 30
-
-MAX_AUDIO_SIZE = 15 * 1024 * 1024
-
-
-# ============================================================
-# APP
-# ============================================================
-
-app = Flask(__name__)
-
-app.secret_key = SESSION_SECRET
-
-app.config.update(
-    SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SECURE=COOKIE_SECURE,
-    SESSION_COOKIE_SAMESITE="Lax",
-    MAX_CONTENT_LENGTH=20 * 1024 * 1024,
-)
-
-groq_client = Groq(
-    api_key=GROQ_API_KEY
-)
+groq_client = Groq(api_key=GROQ_API_KEY)
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
+logger = logging.getLogger("askora")
+
 
 # ============================================================
-# DATABASE CONNECTION
+# DATABASE
 # ============================================================
 
 def get_db():
-    return psycopg2.connect(
-        DATABASE_URL,
-        sslmode=os.environ.get(
-            "PGSSLMODE",
-            "require"
-        ),
-    )
+    return psycopg2.connect(DATABASE_URL)
 
-
-# ============================================================
-# DATABASE INITIALIZATION
-# ============================================================
 
 def init_db():
-
     conn = get_db()
 
     try:
+        with conn.cursor() as cur:
 
-        cur = conn.cursor()
-
-        # ----------------------------------------------------
-        # USERS
-        # ----------------------------------------------------
-
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS web_users (
-                id BIGSERIAL PRIMARY KEY,
-                username TEXT UNIQUE NOT NULL,
-                email TEXT,
-                password_hash TEXT NOT NULL,
-                first_seen TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                last_seen TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-        """)
-
-        cur.execute("""
-            ALTER TABLE web_users
-            ADD COLUMN IF NOT EXISTS email TEXT
-        """)
-
-        cur.execute("""
-            ALTER TABLE web_users
-            ADD COLUMN IF NOT EXISTS first_seen
-            TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        """)
-
-        cur.execute("""
-            ALTER TABLE web_users
-            ADD COLUMN IF NOT EXISTS last_seen
-            TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        """)
-
-        # Do NOT make this unique.
-        #
-        # Existing databases may contain duplicate/old emails.
-        # New registrations are checked in the application.
-        cur.execute("""
-            CREATE INDEX IF NOT EXISTS
-            idx_web_users_email_lower
-            ON web_users (LOWER(email))
-        """)
-
-        # ----------------------------------------------------
-        # CHATS
-        # ----------------------------------------------------
-
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS web_chats (
-                id BIGSERIAL PRIMARY KEY,
-                user_id BIGINT NOT NULL
-                    REFERENCES web_users(id)
-                    ON DELETE CASCADE,
-                title TEXT NOT NULL DEFAULT 'New chat',
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-        """)
-
-        cur.execute("""
-            CREATE INDEX IF NOT EXISTS
-            idx_web_chats_user_updated
-            ON web_chats(user_id, updated_at DESC)
-        """)
-
-        # ----------------------------------------------------
-        # MESSAGES
-        # ----------------------------------------------------
-
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS web_messages (
-                id BIGSERIAL PRIMARY KEY,
-                chat_id BIGINT,
-                user_id BIGINT,
-                role TEXT NOT NULL,
-                content TEXT NOT NULL,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-        """)
-
-        cur.execute("""
-            ALTER TABLE web_messages
-            ADD COLUMN IF NOT EXISTS chat_id BIGINT
-        """)
-
-        cur.execute("""
-            ALTER TABLE web_messages
-            ADD COLUMN IF NOT EXISTS user_id BIGINT
-        """)
-
-        cur.execute("""
-            ALTER TABLE web_messages
-            ADD COLUMN IF NOT EXISTS created_at
-            TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        """)
-
-        cur.execute("""
-            CREATE INDEX IF NOT EXISTS
-            idx_web_messages_chat
-            ON web_messages(chat_id, created_at)
-        """)
-
-        # ----------------------------------------------------
-        # USAGE
-        # ----------------------------------------------------
-
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS web_usage_events (
-                id BIGSERIAL PRIMARY KEY,
-                user_id BIGINT,
-                event_type TEXT NOT NULL,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-        """)
-
-        cur.execute("""
-            CREATE INDEX IF NOT EXISTS
-            idx_web_usage_events_user
-            ON web_usage_events(user_id)
-        """)
-
-        cur.execute("""
-            CREATE INDEX IF NOT EXISTS
-            idx_web_usage_events_date
-            ON web_usage_events(created_at)
-        """)
-
-        # ----------------------------------------------------
-        # PASSWORD RESETS
-        # ----------------------------------------------------
-
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS web_password_resets (
-                id BIGSERIAL PRIMARY KEY,
-                user_id BIGINT NOT NULL
-                    REFERENCES web_users(id)
-                    ON DELETE CASCADE,
-                token_hash TEXT NOT NULL UNIQUE,
-                expires_at TIMESTAMPTZ NOT NULL,
-                used_at TIMESTAMPTZ,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-        """)
-
-        cur.execute("""
-            CREATE INDEX IF NOT EXISTS
-            idx_web_password_resets_token
-            ON web_password_resets(token_hash)
-        """)
-
-        # ----------------------------------------------------
-        # MIGRATE OLD MESSAGES
-        # ----------------------------------------------------
-        #
-        # If an older version of AskOra stored messages without
-        # a chat_id, preserve them by placing them in a
-        # "Previous chat".
-        #
-        # Nothing is deleted.
-        # ----------------------------------------------------
-
-        cur.execute("""
-            SELECT id
-            FROM web_users
-        """)
-
-        users = cur.fetchall()
-
-        for row in users:
-
-            user_id = row[0]
+            # ------------------------------------------------
+            # USERS
+            # ------------------------------------------------
 
             cur.execute("""
-                SELECT COUNT(*)
-                FROM web_chats
-                WHERE user_id = %s
-            """, (user_id,))
+                CREATE TABLE IF NOT EXISTS web_users (
+                    id BIGSERIAL PRIMARY KEY,
+                    username TEXT UNIQUE NOT NULL,
+                    email TEXT NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    first_seen TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    last_seen TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """)
 
-            chat_count = cur.fetchone()[0]
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_web_users_email
+                ON web_users(email)
+            """)
 
-            if chat_count == 0:
+            # ------------------------------------------------
+            # CHATS
+            # ------------------------------------------------
+
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS web_chats (
+                    id BIGSERIAL PRIMARY KEY,
+                    user_id BIGINT NOT NULL,
+                    title TEXT NOT NULL DEFAULT 'New chat',
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """)
+
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_web_chats_user
+                ON web_chats(user_id)
+            """)
+
+            # ------------------------------------------------
+            # MESSAGES
+            # ------------------------------------------------
+
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS web_messages (
+                    id BIGSERIAL PRIMARY KEY,
+                    chat_id BIGINT,
+                    user_id BIGINT,
+                    role TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """)
+
+            # Safe migration for old installations.
+            cur.execute("""
+                ALTER TABLE web_messages
+                ADD COLUMN IF NOT EXISTS chat_id BIGINT
+            """)
+
+            cur.execute("""
+                ALTER TABLE web_messages
+                ADD COLUMN IF NOT EXISTS user_id BIGINT
+            """)
+
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_web_messages_chat
+                ON web_messages(chat_id)
+            """)
+
+            # ------------------------------------------------
+            # USAGE EVENTS
+            # ------------------------------------------------
+
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS web_usage_events (
+                    id BIGSERIAL PRIMARY KEY,
+                    user_id BIGINT,
+                    event_type TEXT NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """)
+
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_web_usage_events_type
+                ON web_usage_events(event_type)
+            """)
+
+            # ------------------------------------------------
+            # PASSWORD RESET
+            # ------------------------------------------------
+
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS web_password_resets (
+                    id BIGSERIAL PRIMARY KEY,
+                    user_id BIGINT NOT NULL,
+                    token_hash TEXT NOT NULL,
+                    expires_at TIMESTAMPTZ NOT NULL,
+                    used_at TIMESTAMPTZ,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """)
+
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_web_password_resets_token
+                ON web_password_resets(token_hash)
+            """)
+
+            # ------------------------------------------------
+            # MIGRATE OLD WEB MESSAGES
+            # ------------------------------------------------
+            #
+            # If an old installation already has web_messages
+            # with user_id but no chat_id, put those messages
+            # into one "Previous chat".
+            #
+
+            cur.execute("""
+                SELECT DISTINCT user_id
+                FROM web_messages
+                WHERE user_id IS NOT NULL
+                  AND chat_id IS NULL
+            """)
+
+            old_users = cur.fetchall()
+
+            for row in old_users:
+                old_user_id = row[0]
 
                 cur.execute("""
-                    SELECT COUNT(*)
-                    FROM web_messages
+                    SELECT id
+                    FROM web_chats
                     WHERE user_id = %s
-                    AND chat_id IS NULL
-                """, (user_id,))
+                    ORDER BY created_at ASC
+                    LIMIT 1
+                """, (old_user_id,))
 
-                old_messages = cur.fetchone()[0]
+                existing_chat = cur.fetchone()
 
-                if old_messages > 0:
-
+                if existing_chat:
+                    chat_id = existing_chat[0]
+                else:
                     cur.execute("""
                         INSERT INTO web_chats
-                        (user_id, title)
-                        VALUES (%s, %s)
+                            (user_id, title)
+                        VALUES
+                            (%s, %s)
                         RETURNING id
-                    """, (
-                        user_id,
-                        "Previous chat",
-                    ))
+                    """, (old_user_id, "Previous chat"))
 
-                    previous_chat_id = cur.fetchone()[0]
+                    chat_id = cur.fetchone()[0]
 
-                    cur.execute("""
-                        UPDATE web_messages
-                        SET chat_id = %s
-                        WHERE user_id = %s
-                        AND chat_id IS NULL
-                    """, (
-                        previous_chat_id,
-                        user_id,
-                    ))
+                cur.execute("""
+                    UPDATE web_messages
+                    SET chat_id = %s
+                    WHERE user_id = %s
+                      AND chat_id IS NULL
+                """, (chat_id, old_user_id))
 
         conn.commit()
 
-        logging.info(
-            "AskOra database initialized successfully."
-        )
-
-    except Exception:
-
-        conn.rollback()
-
-        logging.exception(
-            "Database initialization failed."
-        )
-
-        raise
-
     finally:
-
-        cur.close()
         conn.close()
 
 
 # ============================================================
-# SECURITY HELPERS
+# HELPERS
 # ============================================================
 
-def get_csrf_token():
-
-    if "csrf_token" not in session:
-
-        session["csrf_token"] = (
-            secrets.token_urlsafe(32)
-        )
-
-    return session["csrf_token"]
+def utc_now():
+    return datetime.now(timezone.utc)
 
 
-def check_csrf():
-
-    token = request.headers.get(
-        "X-CSRF-Token"
-    )
-
-    if not token:
-
-        token = request.form.get(
-            "csrf_token"
-        )
-
-    saved = session.get(
-        "csrf_token"
-    )
-
-    if not token or not saved:
-
-        return False
-
-    return secrets.compare_digest(
-        token,
-        saved
-    )
-
-
-def current_user():
-
-    user_id = session.get(
-        "user_id"
-    )
-
-    if not user_id:
-
-        return None
-
+def get_user_by_id(user_id):
     conn = get_db()
 
     try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT *
+                FROM web_users
+                WHERE id = %s
+            """, (user_id,))
 
-        cur = conn.cursor(
-            cursor_factory=RealDictCursor
-        )
-
-        cur.execute("""
-            SELECT
-                id,
-                username,
-                email,
-                first_seen,
-                last_seen
-            FROM web_users
-            WHERE id = %s
-        """, (user_id,))
-
-        return cur.fetchone()
-
+            return cur.fetchone()
     finally:
+        conn.close()
 
-        cur.close()
+
+def get_user_by_login(value):
+    conn = get_db()
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT *
+                FROM web_users
+                WHERE LOWER(username) = LOWER(%s)
+                   OR LOWER(email) = LOWER(%s)
+                LIMIT 1
+            """, (value, value))
+
+            return cur.fetchone()
+    finally:
         conn.close()
 
 
 def touch_user(user_id):
-
     conn = get_db()
 
     try:
-
-        cur = conn.cursor()
-
-        cur.execute("""
-            UPDATE web_users
-            SET last_seen = NOW()
-            WHERE id = %s
-        """, (user_id,))
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE web_users
+                SET last_seen = NOW()
+                WHERE id = %s
+            """, (user_id,))
 
         conn.commit()
 
     finally:
-
-        cur.close()
         conn.close()
 
 
-def is_admin(user):
+def log_event(user_id, event_type):
+    conn = get_db()
 
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO web_usage_events
+                    (user_id, event_type)
+                VALUES
+                    (%s, %s)
+            """, (user_id, event_type))
+
+        conn.commit()
+
+    finally:
+        conn.close()
+
+
+def current_user():
+    user_id = session.get("user_id")
+
+    if not user_id:
+        return None
+
+    return get_user_by_id(user_id)
+
+
+def is_admin_user(user):
     if not user:
-
         return False
 
-    return (
-        user["username"].lower()
-        == ADMIN_USERNAME
-    )
+    if not ADMIN_USERNAME:
+        return False
+
+    return user["username"].lower() == ADMIN_USERNAME.lower()
 
 
-def login_required(func):
-
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-
+def login_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
         if not session.get("user_id"):
-
             if request.path.startswith("/api/"):
-
                 return jsonify({
-                    "error": "Login required."
+                    "error": "Authentication required."
                 }), 401
 
-            return redirect(
-                url_for("login")
-            )
+            return redirect(url_for("login"))
 
-        return func(*args, **kwargs)
+        return view(*args, **kwargs)
 
-    return wrapper
+    return wrapped
 
 
-def admin_required(func):
-
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-
+def admin_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
         user = current_user()
 
-        if not user or not is_admin(user):
-
+        if not user or not is_admin_user(user):
             if request.path.startswith("/api/"):
-
                 return jsonify({
-                    "error": "Unauthorized."
+                    "error": "Administrator access required."
                 }), 403
 
-            return "Unauthorized", 403
+            return redirect(url_for("index"))
 
-        return func(*args, **kwargs)
+        return view(*args, **kwargs)
 
-    return wrapper
+    return wrapped
 
 
-# ============================================================
-# VALIDATION
-# ============================================================
+def csrf_token():
+    token = session.get("csrf_token")
+
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session["csrf_token"] = token
+
+    return token
+
+
+def verify_csrf():
+    token = request.headers.get("X-CSRF-Token")
+
+    if not token:
+        token = request.form.get("csrf_token")
+
+    return bool(token and token == session.get("csrf_token"))
+
+
+@app.context_processor
+def inject_template_values():
+    user = current_user()
+
+    return {
+        "csrf_token": csrf_token(),
+        "current_user": user,
+        "is_admin": is_admin_user(user),
+    }
+
+
+def clean_username(username):
+    return username.strip()
+
 
 def valid_username(username):
-
-    return bool(
-        re.fullmatch(
-            r"[A-Za-z0-9_]{3,32}",
-            username or ""
-        )
-    )
+    return bool(re.fullmatch(r"[A-Za-z0-9_.-]{3,32}", username))
 
 
 def valid_email(email):
-
     return bool(
         re.fullmatch(
             r"[^@\s]+@[^@\s]+\.[^@\s]+",
-            email or ""
+            email,
         )
     )
 
 
-def clean_title(text):
-
-    text = re.sub(
-        r"\s+",
-        " ",
-        (text or "").strip()
-    )
-
-    if not text:
-
-        return "New chat"
-
-    if len(text) > 45:
-
-        return (
-            text[:45].rstrip()
-            + "..."
-        )
-
-    return text
+def valid_password(password):
+    return len(password) >= 8
 
 
 def hash_reset_token(token):
-
     return hashlib.sha256(
         token.encode("utf-8")
     ).hexdigest()
@@ -583,43 +433,29 @@ def hash_reset_token(token):
 # EMAIL
 # ============================================================
 
-def send_password_reset_email(
-    email,
-    username,
-    reset_url
-):
-
-    if (
-        not SMTP_USERNAME
-        or not SMTP_PASSWORD
-        or not SMTP_FROM
-    ):
-
-        logging.error(
-            "SMTP is not configured."
+def send_reset_email(email, reset_url):
+    if not SMTP_USERNAME or not SMTP_PASSWORD or not SMTP_FROM:
+        logger.warning(
+            "SMTP is not configured. Password reset email was not sent."
         )
-
         return False
 
     message = EmailMessage()
 
-    message["Subject"] = (
-        "Reset your AskOra password"
-    )
-
+    message["Subject"] = "AskOra password reset"
     message["From"] = SMTP_FROM
     message["To"] = email
 
     message.set_content(
-        f"""Hello {username},
+        f"""Hello,
 
-We received a request to reset your AskOra password.
+Someone requested a password reset for your AskOra account.
 
-Use this link to create a new password:
+Use this link to reset your password:
 
 {reset_url}
 
-This link expires in {PASSWORD_RESET_MINUTES} minutes.
+This link expires in 30 minutes.
 
 If you did not request this, you can safely ignore this email.
 
@@ -628,354 +464,77 @@ Ask. Get answers.
 """
     )
 
-    try:
+    with smtplib.SMTP(
+        SMTP_HOST,
+        SMTP_PORT,
+        timeout=20,
+    ) as server:
 
-        with smtplib.SMTP(
-            SMTP_HOST,
-            SMTP_PORT,
-            timeout=30
-        ) as smtp:
+        server.starttls()
 
-            smtp.ehlo()
-
-            smtp.starttls()
-
-            smtp.ehlo()
-
-            smtp.login(
-                SMTP_USERNAME,
-                SMTP_PASSWORD
-            )
-
-            smtp.send_message(
-                message
-            )
-
-        logging.info(
-            "Password reset email sent."
+        server.login(
+            SMTP_USERNAME,
+            SMTP_PASSWORD,
         )
 
-        return True
+        server.send_message(message)
 
-    except Exception:
-
-        logging.exception(
-            "Password reset email failed."
-        )
-
-        return False
+    return True
 
 
 # ============================================================
-# AUTH PAGE STYLE
+# AI
 # ============================================================
 
-AUTH_STYLE = """
-<style>
-
-* {
-    box-sizing: border-box;
-}
-
-html,
-body {
-    margin: 0;
-    min-height: 100%;
-}
-
-body {
-    min-height: 100vh;
-
-    background:
-        radial-gradient(
-            circle at 15% 10%,
-            rgba(59,130,246,.20),
-            transparent 30%
-        ),
-        radial-gradient(
-            circle at 85% 20%,
-            rgba(124,58,237,.18),
-            transparent 30%
-        ),
-        linear-gradient(
-            145deg,
-            #080b18,
-            #10152b
-        );
-
-    color: #f5f7ff;
-
-    font-family:
-        Inter,
-        -apple-system,
-        BlinkMacSystemFont,
-        "Segoe UI",
-        sans-serif;
-
-    display: flex;
-    justify-content: center;
-    align-items: center;
-
-    padding: 24px;
-}
-
-.auth-card {
-
-    width: 100%;
-    max-width: 430px;
-
-    background:
-        rgba(16,21,43,.88);
-
-    border:
-        1px solid rgba(255,255,255,.08);
-
-    border-radius: 24px;
-
-    padding: 32px;
-
-    box-shadow:
-        0 30px 90px rgba(0,0,0,.45);
-
-    backdrop-filter:
-        blur(20px);
-}
-
-.logo {
-
-    width: 54px;
-    height: 54px;
-
-    border-radius: 16px;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    font-size: 26px;
-    font-weight: 900;
-
-    margin-bottom: 20px;
-
-    background:
-        linear-gradient(
-            135deg,
-            #3b82f6,
-            #7c3aed
-        );
-
-    box-shadow:
-        0 12px 35px
-        rgba(59,130,246,.25);
-}
-
-h1 {
-
-    margin:
-        0 0 8px;
-
-    font-size: 28px;
-
-    letter-spacing:
-        -.5px;
-}
-
-.subtitle {
-
-    color: #9ca3af;
-
-    margin-bottom: 25px;
-
-    line-height: 1.5;
-}
-
-label {
-
-    display: block;
-
-    margin:
-        15px 0 7px;
-
-    color: #d7dbea;
-
-    font-size: 14px;
-}
-
-input {
-
-    width: 100%;
-
-    border:
-        1px solid
-        rgba(255,255,255,.10);
-
-    background:
-        #080b18;
-
-    color: white;
-
-    padding:
-        14px 15px;
-
-    border-radius: 12px;
-
-    outline: none;
-
-    font-size: 15px;
-}
-
-input:focus {
-
-    border-color:
-        #3b82f6;
-
-    box-shadow:
-        0 0 0 3px
-        rgba(59,130,246,.12);
-}
-
-button {
-
-    width: 100%;
-
-    margin-top: 22px;
-
-    border: 0;
-
-    border-radius: 12px;
-
-    padding: 14px;
-
-    color: white;
-
-    font-weight: 700;
-
-    font-size: 15px;
-
-    cursor: pointer;
-
-    background:
-        linear-gradient(
-            135deg,
-            #3b82f6,
-            #7c3aed
-        );
-
-    transition:
-        transform .15s ease,
-        opacity .15s ease;
-}
-
-button:hover {
-
-    opacity: .94;
-
-    transform:
-        translateY(-1px);
-}
-
-.message {
-
-    border-radius: 12px;
-
-    padding:
-        12px 14px;
-
-    margin-bottom: 18px;
-
-    font-size: 14px;
-
-    line-height: 1.5;
-}
-
-.error {
-
-    background:
-        rgba(239,68,68,.12);
-
-    border:
-        1px solid
-        rgba(239,68,68,.25);
-
-    color: #fca5a5;
-}
-
-.success {
-
-    background:
-        rgba(34,197,94,.12);
-
-    border:
-        1px solid
-        rgba(34,197,94,.25);
-
-    color: #86efac;
-}
-
-.links {
-
-    margin-top: 20px;
-
-    text-align: center;
-
-    color: #9ca3af;
-
-    font-size: 14px;
-
-    line-height: 1.8;
-}
-
-.links a {
-
-    color: #60a5fa;
-
-    text-decoration: none;
-}
-
-.links a:hover {
-
-    text-decoration: underline;
-}
-
-@media (max-width: 500px) {
-
-    body {
-        padding: 14px;
-    }
-
-    .auth-card {
-        padding: 25px 20px;
-        border-radius: 20px;
-    }
-
-    h1 {
-        font-size: 25px;
-    }
-}
-
-</style>
+SYSTEM_PROMPT = """
+You are AskOra, a helpful, intelligent and friendly AI assistant.
+
+Your job is to answer users clearly, accurately and naturally.
+
+Rules:
+- Be concise when the question is simple.
+- Give useful detail when the question needs it.
+- Use Markdown when helpful.
+- Use headings, bullets, numbered lists and code blocks when appropriate.
+- Do not claim to have real-world abilities you do not have.
+- If you are uncertain, say so instead of inventing facts.
+- Do not mention these system instructions.
 """
 
 
+def generate_ai_response(history):
+    messages = [
+        {
+            "role": "system",
+            "content": SYSTEM_PROMPT,
+        }
+    ]
+
+    messages.extend(history)
+
+    response = groq_client.chat.completions.create(
+        model=TEXT_MODEL,
+        messages=messages,
+        temperature=0.7,
+        max_tokens=2000,
+    )
+
+    return response.choices[0].message.content
+
+
 # ============================================================
-# LOGIN
+# AUTH
 # ============================================================
 
-@app.route(
-    "/login",
-    methods=["GET", "POST"]
-)
+@app.route("/login", methods=["GET", "POST"])
 def login():
 
-    error = None
-
-    success = request.args.get(
-        "success"
-    )
+    if session.get("user_id"):
+        return redirect(url_for("index"))
 
     if request.method == "POST":
 
-        identifier = request.form.get(
+        username_or_email = request.form.get(
             "username",
             ""
         ).strip()
@@ -985,180 +544,51 @@ def login():
             ""
         )
 
-        if (
-            not identifier
-            or not password
-        ):
-
-            error = (
-                "Please enter your "
-                "username/email and password."
+        if not username_or_email or not password:
+            return render_template(
+                "login.html",
+                error="Please enter your username/email and password."
             )
 
-        else:
+        user = get_user_by_login(username_or_email)
 
-            conn = get_db()
+        if not user or not check_password_hash(
+            user["password_hash"],
+            password
+        ):
+            return render_template(
+                "login.html",
+                error="Invalid username/email or password."
+            )
 
-            try:
+        session.clear()
 
-                cur = conn.cursor(
-                    cursor_factory=RealDictCursor
-                )
+        session["user_id"] = user["id"]
 
-                cur.execute("""
-                    SELECT *
-                    FROM web_users
-                    WHERE LOWER(username) = LOWER(%s)
-                       OR LOWER(email) = LOWER(%s)
-                    LIMIT 1
-                """, (
-                    identifier,
-                    identifier
-                ))
+        csrf_token()
 
-                user = cur.fetchone()
+        session.permanent = True
 
-                if (
-                    user
-                    and check_password_hash(
-                        user["password_hash"],
-                        password
-                    )
-                ):
+        touch_user(user["id"])
 
-                    session.clear()
+        return redirect(url_for("index"))
 
-                    session["user_id"] = (
-                        user["id"]
-                    )
-
-                    session["csrf_token"] = (
-                        secrets.token_urlsafe(32)
-                    )
-
-                    cur.execute("""
-                        UPDATE web_users
-                        SET last_seen = NOW()
-                        WHERE id = %s
-                    """, (
-                        user["id"],
-                    ))
-
-                    conn.commit()
-
-                    return redirect(
-                        url_for("home")
-                    )
-
-                error = (
-                    "Incorrect username/email "
-                    "or password."
-                )
-
-            finally:
-
-                cur.close()
-                conn.close()
-
-    return render_template_string(
-        AUTH_STYLE + """
-        <div class="auth-card">
-
-            <div class="logo">A</div>
-
-            <h1>Welcome back</h1>
-
-            <div class="subtitle">
-                Sign in to continue using AskOra.
-            </div>
-
-            {% if error %}
-                <div class="message error">
-                    {{ error }}
-                </div>
-            {% endif %}
-
-            {% if success %}
-                <div class="message success">
-                    {{ success }}
-                </div>
-            {% endif %}
-
-            <form method="POST">
-
-                <label>
-                    Username or email
-                </label>
-
-                <input
-                    name="username"
-                    type="text"
-                    autocomplete="username"
-                    placeholder="Username or email"
-                    required
-                >
-
-                <label>
-                    Password
-                </label>
-
-                <input
-                    name="password"
-                    type="password"
-                    autocomplete="current-password"
-                    placeholder="Password"
-                    required
-                >
-
-                <button type="submit">
-                    Log in
-                </button>
-
-            </form>
-
-            <div class="links">
-                <a href="/forgot-password">
-                    Forgot password?
-                </a>
-            </div>
-
-            <div class="links">
-                Don't have an account?
-                <a href="/register">
-                    Create one
-                </a>
-            </div>
-
-        </div>
-        """,
-        error=error,
-        success=success
-    )
+    return render_template("login.html")
 
 
-# ============================================================
-# REGISTER
-# ============================================================
-
-@app.route(
-    "/register",
-    methods=["GET", "POST"]
-)
+@app.route("/register", methods=["GET", "POST"])
 def register():
 
-    error = None
-
-    username_value = ""
-    email_value = ""
+    if session.get("user_id"):
+        return redirect(url_for("index"))
 
     if request.method == "POST":
 
-        username_value = request.form.get(
-            "username",
-            ""
-        ).strip()
+        username = clean_username(
+            request.form.get("username", "")
+        )
 
-        email_value = request.form.get(
+        email = request.form.get(
             "email",
             ""
         ).strip().lower()
@@ -1168,265 +598,105 @@ def register():
             ""
         )
 
-        confirm_password = request.form.get(
-            "confirm_password",
-            ""
-        )
-
-        if not valid_username(
-            username_value
-        ):
-
-            error = (
-                "Username must be 3–32 characters "
-                "and can only contain letters, "
-                "numbers and underscores."
-            )
-
-        elif not valid_email(
-            email_value
-        ):
-
-            error = (
-                "Please enter a valid email address."
-            )
-
-        elif len(password) < 8:
-
-            error = (
-                "Password must be at least 8 characters."
-            )
-
-        elif password != confirm_password:
-
-            error = (
-                "Passwords do not match."
-            )
-
-        else:
-
-            conn = get_db()
-
-            try:
-
-                cur = conn.cursor(
-                    cursor_factory=RealDictCursor
+        if not valid_username(username):
+            return render_template(
+                "register.html",
+                error=(
+                    "Username must be 3–32 characters and can only "
+                    "contain letters, numbers, dots, underscores and hyphens."
                 )
+            )
+
+        if not valid_email(email):
+            return render_template(
+                "register.html",
+                error="Please enter a valid email address."
+            )
+
+        if not valid_password(password):
+            return render_template(
+                "register.html",
+                error="Password must be at least 8 characters."
+            )
+
+        conn = get_db()
+
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
 
                 cur.execute("""
                     SELECT id
                     FROM web_users
-                    WHERE LOWER(username)
-                        = LOWER(%s)
-                    LIMIT 1
-                """, (
-                    username_value,
-                ))
+                    WHERE LOWER(username) = LOWER(%s)
+                """, (username,))
 
                 if cur.fetchone():
-
-                    error = (
-                        "That username is already in use."
+                    return render_template(
+                        "register.html",
+                        error="That username is already taken."
                     )
 
-                else:
+                cur.execute("""
+                    SELECT id
+                    FROM web_users
+                    WHERE LOWER(email) = LOWER(%s)
+                """, (email,))
 
-                    cur.execute("""
-                        SELECT id
-                        FROM web_users
-                        WHERE LOWER(email)
-                            = LOWER(%s)
-                        LIMIT 1
-                    """, (
-                        email_value,
-                    ))
+                if cur.fetchone():
+                    return render_template(
+                        "register.html",
+                        error="That email is already registered."
+                    )
 
-                    if cur.fetchone():
+                cur.execute("""
+                    INSERT INTO web_users
+                        (username, email, password_hash)
+                    VALUES
+                        (%s, %s, %s)
+                    RETURNING id
+                """, (
+                    username,
+                    email,
+                    generate_password_hash(password),
+                ))
 
-                        error = (
-                            "That email is already registered."
-                        )
+                user = cur.fetchone()
 
-                    else:
+            conn.commit()
 
-                        password_hash = (
-                            generate_password_hash(
-                                password
-                            )
-                        )
+        finally:
+            conn.close()
 
-                        cur.execute("""
-                            INSERT INTO web_users
-                            (
-                                username,
-                                email,
-                                password_hash
-                            )
-                            VALUES (%s, %s, %s)
-                            RETURNING id
-                        """, (
-                            username_value,
-                            email_value,
-                            password_hash
-                        ))
+        session.clear()
 
-                        user_id = (
-                            cur.fetchone()["id"]
-                        )
+        session["user_id"] = user["id"]
 
-                        cur.execute("""
-                            INSERT INTO web_chats
-                            (
-                                user_id,
-                                title
-                            )
-                            VALUES (%s, %s)
-                        """, (
-                            user_id,
-                            "New chat"
-                        ))
+        csrf_token()
 
-                        conn.commit()
+        session.permanent = True
 
-                        return redirect(
-                            url_for(
-                                "login",
-                                success=(
-                                    "Account created successfully. "
-                                    "You can now log in."
-                                )
-                            )
-                        )
+        log_event(user["id"], "registration")
 
-            except psycopg2.IntegrityError:
+        return redirect(url_for("index"))
 
-                conn.rollback()
-
-                error = (
-                    "That username or email "
-                    "is already registered."
-                )
-
-            except Exception:
-
-                conn.rollback()
-
-                logging.exception(
-                    "Registration failed."
-                )
-
-                error = (
-                    "We couldn't create your account "
-                    "right now. Please try again."
-                )
-
-            finally:
-
-                cur.close()
-                conn.close()
-
-    return render_template_string(
-        AUTH_STYLE + """
-        <div class="auth-card">
-
-            <div class="logo">A</div>
-
-            <h1>Create your account</h1>
-
-            <div class="subtitle">
-                Start using AskOra.
-            </div>
-
-            {% if error %}
-                <div class="message error">
-                    {{ error }}
-                </div>
-            {% endif %}
-
-            <form method="POST">
-
-                <label>
-                    Username
-                </label>
-
-                <input
-                    name="username"
-                    type="text"
-                    value="{{ username_value }}"
-                    autocomplete="username"
-                    placeholder="Choose a username"
-                    required
-                >
-
-                <label>
-                    Email
-                </label>
-
-                <input
-                    name="email"
-                    type="email"
-                    value="{{ email_value }}"
-                    autocomplete="email"
-                    placeholder="you@example.com"
-                    required
-                >
-
-                <label>
-                    Password
-                </label>
-
-                <input
-                    name="password"
-                    type="password"
-                    autocomplete="new-password"
-                    placeholder="At least 8 characters"
-                    required
-                >
-
-                <label>
-                    Confirm password
-                </label>
-
-                <input
-                    name="confirm_password"
-                    type="password"
-                    autocomplete="new-password"
-                    placeholder="Enter your password again"
-                    required
-                >
-
-                <button type="submit">
-                    Create account
-                </button>
-
-            </form>
-
-            <div class="links">
-                Already have an account?
-                <a href="/login">
-                    Log in
-                </a>
-            </div>
-
-        </div>
-        """,
-        error=error,
-        username_value=username_value,
-        email_value=email_value
-    )
+    return render_template("register.html")
 
 
-# ============================================================
-# FORGOT PASSWORD
-# ============================================================
+@app.route("/logout", methods=["POST"])
+def logout():
 
-@app.route(
-    "/forgot-password",
-    methods=["GET", "POST"]
-)
+    if not verify_csrf():
+        return jsonify({
+            "error": "Invalid CSRF token."
+        }), 403
+
+    session.clear()
+
+    return redirect(url_for("login"))
+
+
+@app.route("/forgot-password", methods=["GET", "POST"])
 def forgot_password():
-
-    message = None
 
     if request.method == "POST":
 
@@ -1435,170 +705,80 @@ def forgot_password():
             ""
         ).strip().lower()
 
-        message = (
+        generic_message = (
             "If an account exists for that email, "
             "a password reset link has been sent."
         )
 
-        if valid_email(email):
+        if not valid_email(email):
+            return render_template(
+                "forgot_password.html",
+                message=generic_message,
+            )
 
-            conn = get_db()
+        conn = get_db()
 
-            try:
-
-                cur = conn.cursor(
-                    cursor_factory=RealDictCursor
-                )
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
 
                 cur.execute("""
-                    SELECT
-                        id,
-                        username,
-                        email
+                    SELECT *
                     FROM web_users
-                    WHERE LOWER(email)
-                        = LOWER(%s)
+                    WHERE LOWER(email) = LOWER(%s)
                     LIMIT 1
-                """, (
-                    email,
-                ))
+                """, (email,))
 
                 user = cur.fetchone()
 
                 if user:
 
-                    token = (
-                        secrets.token_urlsafe(48)
-                    )
+                    token = secrets.token_urlsafe(48)
 
-                    token_hash = (
-                        hash_reset_token(token)
-                    )
+                    token_hash = hash_reset_token(token)
 
-                    expires_at = (
-                        datetime.now(timezone.utc)
-                        + timedelta(
-                            minutes=PASSWORD_RESET_MINUTES
-                        )
-                    )
-
-                    # Invalidate previous reset links.
-                    cur.execute("""
-                        UPDATE web_password_resets
-                        SET used_at = NOW()
-                        WHERE user_id = %s
-                        AND used_at IS NULL
-                    """, (
-                        user["id"],
-                    ))
+                    expires_at = utc_now() + timedelta(minutes=30)
 
                     cur.execute("""
                         INSERT INTO web_password_resets
-                        (
-                            user_id,
-                            token_hash,
-                            expires_at
-                        )
-                        VALUES (%s, %s, %s)
+                            (user_id, token_hash, expires_at)
+                        VALUES
+                            (%s, %s, %s)
                     """, (
                         user["id"],
                         token_hash,
-                        expires_at
+                        expires_at,
                     ))
-
-                    conn.commit()
 
                     reset_url = url_for(
                         "reset_password",
                         token=token,
-                        _external=True
+                        _external=True,
                     )
 
-                    send_password_reset_email(
-                        user["email"],
-                        user["username"],
-                        reset_url
-                    )
+                    try:
+                        send_reset_email(
+                            user["email"],
+                            reset_url,
+                        )
+                    except Exception:
+                        logger.exception(
+                            "Could not send password reset email."
+                        )
 
-            except Exception:
+            conn.commit()
 
-                conn.rollback()
+        finally:
+            conn.close()
 
-                logging.exception(
-                    "Forgot password request failed."
-                )
+        return render_template(
+            "forgot_password.html",
+            message=generic_message,
+        )
 
-            finally:
-
-                cur.close()
-                conn.close()
-
-        else:
-
-            message = (
-                "If an account exists for that email, "
-                "a password reset link has been sent."
-            )
-
-    return render_template_string(
-        AUTH_STYLE + """
-        <div class="auth-card">
-
-            <div class="logo">A</div>
-
-            <h1>Forgot password?</h1>
-
-            <div class="subtitle">
-                Enter the email connected to your
-                AskOra account.
-            </div>
-
-            {% if message %}
-                <div class="message success">
-                    {{ message }}
-                </div>
-            {% endif %}
-
-            <form method="POST">
-
-                <label>
-                    Email
-                </label>
-
-                <input
-                    name="email"
-                    type="email"
-                    autocomplete="email"
-                    placeholder="you@example.com"
-                    required
-                >
-
-                <button type="submit">
-                    Send reset link
-                </button>
-
-            </form>
-
-            <div class="links">
-                <a href="/login">
-                    Back to login
-                </a>
-            </div>
-
-        </div>
-        """,
-        message=message
-    )
+    return render_template("forgot_password.html")
 
 
-# ============================================================
-# RESET PASSWORD
-# ============================================================
-
-@app.route(
-    "/reset-password",
-    methods=["GET", "POST"]
-)
+@app.route("/reset-password", methods=["GET", "POST"])
 def reset_password():
 
     token = request.args.get(
@@ -1607,215 +787,99 @@ def reset_password():
     ).strip()
 
     if not token:
-
-        return (
-            "Invalid reset link.",
-            400
+        return render_template(
+            "reset_password.html",
+            error="Invalid or missing reset token."
         )
 
-    token_hash = hash_reset_token(
-        token
-    )
+    token_hash = hash_reset_token(token)
 
     conn = get_db()
 
     try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
 
-        cur = conn.cursor(
-            cursor_factory=RealDictCursor
-        )
+            cur.execute("""
+                SELECT *
+                FROM web_password_resets
+                WHERE token_hash = %s
+                  AND used_at IS NULL
+                  AND expires_at > NOW()
+                ORDER BY created_at DESC
+                LIMIT 1
+            """, (token_hash,))
 
-        cur.execute("""
-            SELECT
-                id,
-                user_id,
-                expires_at,
-                used_at
-            FROM web_password_resets
-            WHERE token_hash = %s
-            LIMIT 1
-        """, (
-            token_hash,
-        ))
+            reset = cur.fetchone()
 
-        reset = cur.fetchone()
-
-        if not reset:
-
-            return (
-                "Invalid or expired reset link.",
-                400
-            )
-
-        if reset["used_at"]:
-
-            return (
-                "This reset link has already been used.",
-                400
-            )
-
-        if (
-            reset["expires_at"]
-            <= datetime.now(timezone.utc)
-        ):
-
-            return (
-                "This reset link has expired.",
-                400
-            )
-
-        error = None
-
-        if request.method == "POST":
-
-            password = request.form.get(
-                "password",
-                ""
-            )
-
-            confirm_password = request.form.get(
-                "confirm_password",
-                ""
-            )
-
-            if len(password) < 8:
-
-                error = (
-                    "Password must be at least 8 characters."
+            if not reset:
+                return render_template(
+                    "reset_password.html",
+                    error="This reset link is invalid or has expired."
                 )
 
-            elif password != confirm_password:
+            if request.method == "POST":
 
-                error = (
-                    "Passwords do not match."
+                password = request.form.get(
+                    "password",
+                    ""
                 )
 
-            else:
+                confirm_password = request.form.get(
+                    "confirm_password",
+                    ""
+                )
 
-                password_hash = (
-                    generate_password_hash(
-                        password
+                if not valid_password(password):
+                    return render_template(
+                        "reset_password.html",
+                        error="Password must be at least 8 characters.",
+                        token=token,
                     )
-                )
+
+                if password != confirm_password:
+                    return render_template(
+                        "reset_password.html",
+                        error="The passwords do not match.",
+                        token=token,
+                    )
 
                 cur.execute("""
                     UPDATE web_users
-                    SET password_hash = %s,
-                        last_seen = NOW()
+                    SET password_hash = %s
                     WHERE id = %s
                 """, (
-                    password_hash,
-                    reset["user_id"]
+                    generate_password_hash(password),
+                    reset["user_id"],
                 ))
 
                 cur.execute("""
                     UPDATE web_password_resets
                     SET used_at = NOW()
                     WHERE id = %s
-                """, (
-                    reset["id"],
-                ))
+                """, (reset["id"],))
 
                 conn.commit()
 
-                return redirect(
-                    url_for(
-                        "login",
-                        success=(
-                            "Your password has been reset. "
-                            "You can now log in."
-                        )
-                    )
-                )
-
-        return render_template_string(
-            AUTH_STYLE + """
-            <div class="auth-card">
-
-                <div class="logo">A</div>
-
-                <h1>Set a new password</h1>
-
-                <div class="subtitle">
-                    Choose a new password for your
-                    AskOra account.
-                </div>
-
-                {% if error %}
-                    <div class="message error">
-                        {{ error }}
-                    </div>
-                {% endif %}
-
-                <form method="POST">
-
-                    <label>
-                        New password
-                    </label>
-
-                    <input
-                        name="password"
-                        type="password"
-                        autocomplete="new-password"
-                        placeholder="At least 8 characters"
-                        required
-                    >
-
-                    <label>
-                        Confirm password
-                    </label>
-
-                    <input
-                        name="confirm_password"
-                        type="password"
-                        autocomplete="new-password"
-                        placeholder="Enter it again"
-                        required
-                    >
-
-                    <button type="submit">
-                        Reset password
-                    </button>
-
-                </form>
-
-            </div>
-            """,
-            error=error
-        )
+                return redirect(url_for("login"))
 
     finally:
-
-        cur.close()
         conn.close()
 
-
-# ============================================================
-# HOME
-# ============================================================
-
-@app.route("/")
-def home():
-
-    user = current_user()
-
-    if not user:
-
-        return redirect(
-            url_for("login")
-        )
-
     return render_template(
-        "index.html",
-        user=user,
-        csrf_token=get_csrf_token(),
-        is_admin=is_admin(user)
+        "reset_password.html",
+        token=token,
     )
 
 
 # ============================================================
-# CURRENT USER
+# MAIN APP
 # ============================================================
+
+@app.route("/")
+@login_required
+def index():
+    return render_template("index.html")
+
 
 @app.route("/api/me")
 @login_required
@@ -1827,229 +891,177 @@ def api_me():
         "id": user["id"],
         "username": user["username"],
         "email": user["email"],
-        "is_admin": is_admin(user)
+        "is_admin": is_admin_user(user),
     })
 
 
 # ============================================================
-# LOGOUT
+# CHATS
 # ============================================================
 
-@app.route(
-    "/logout",
-    methods=["POST"]
-)
-def logout():
-
-    if not check_csrf():
-
-        return jsonify({
-            "error": "Invalid request."
-        }), 403
-
-    session.clear()
-
-    return redirect(
-        url_for("login")
-    )
-
-
-# ============================================================
-# GET CHATS
-# ============================================================
-
-@app.route(
-    "/api/chats",
-    methods=["GET"]
-)
+@app.route("/api/chats", methods=["GET"])
 @login_required
 def get_chats():
 
-    user = current_user()
+    user_id = session["user_id"]
 
     conn = get_db()
 
     try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
 
-        cur = conn.cursor(
-            cursor_factory=RealDictCursor
-        )
+            cur.execute("""
+                SELECT
+                    c.id,
+                    c.title,
+                    c.created_at,
+                    c.updated_at,
+                    COUNT(m.id) AS message_count
+                FROM web_chats c
+                LEFT JOIN web_messages m
+                    ON m.chat_id = c.id
+                WHERE c.user_id = %s
+                GROUP BY
+                    c.id,
+                    c.title,
+                    c.created_at,
+                    c.updated_at
+                ORDER BY c.updated_at DESC
+            """, (user_id,))
 
-        cur.execute("""
-            SELECT
-                id,
-                title,
-                created_at,
-                updated_at
-            FROM web_chats
-            WHERE user_id = %s
-            ORDER BY updated_at DESC
-        """, (
-            user["id"],
-        ))
-
-        chats = cur.fetchall()
-
-        return jsonify([
-            {
-                "id": row["id"],
-                "title": row["title"],
-                "created_at": row[
-                    "created_at"
-                ].isoformat(),
-                "updated_at": row[
-                    "updated_at"
-                ].isoformat()
-            }
-            for row in chats
-        ])
+            chats = cur.fetchall()
 
     finally:
-
-        cur.close()
         conn.close()
 
+    return jsonify([
+        {
+            "id": chat["id"],
+            "title": chat["title"],
+            "message_count": int(chat["message_count"]),
+            "created_at": chat["created_at"].isoformat(),
+            "updated_at": chat["updated_at"].isoformat(),
+        }
+        for chat in chats
+    ])
 
-# ============================================================
-# CREATE CHAT
-# ============================================================
 
-@app.route(
-    "/api/chats",
-    methods=["POST"]
-)
+@app.route("/api/chats", methods=["POST"])
 @login_required
 def create_chat():
 
-    if not check_csrf():
-
+    if not verify_csrf():
         return jsonify({
-            "error": "Invalid request."
+            "error": "Invalid CSRF token."
         }), 403
 
-    user = current_user()
+    user_id = session["user_id"]
+
+    data = request.get_json(silent=True) or {}
+
+    title = str(
+        data.get("title", "New chat")
+    ).strip()[:100]
+
+    if not title:
+        title = "New chat"
 
     conn = get_db()
 
     try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
 
-        cur = conn.cursor(
-            cursor_factory=RealDictCursor
-        )
-
-        cur.execute("""
-            INSERT INTO web_chats
-            (
+            cur.execute("""
+                INSERT INTO web_chats
+                    (user_id, title)
+                VALUES
+                    (%s, %s)
+                RETURNING *
+            """, (
                 user_id,
-                title
-            )
-            VALUES (%s, %s)
-            RETURNING
-                id,
                 title,
-                created_at,
-                updated_at
-        """, (
-            user["id"],
-            "New chat"
-        ))
+            ))
 
-        chat = cur.fetchone()
+            chat = cur.fetchone()
 
         conn.commit()
 
-        return jsonify({
-            "id": chat["id"],
-            "title": chat["title"],
-            "created_at": chat[
-                "created_at"
-            ].isoformat(),
-            "updated_at": chat[
-                "updated_at"
-            ].isoformat()
-        })
-
     finally:
-
-        cur.close()
         conn.close()
 
+    return jsonify({
+        "id": chat["id"],
+        "title": chat["title"],
+    }), 201
 
-# ============================================================
-# GET CHAT MESSAGES
-# ============================================================
 
 @app.route(
     "/api/chats/<int:chat_id>/messages",
     methods=["GET"]
 )
 @login_required
-def get_chat_messages(chat_id):
+def get_messages(chat_id):
 
-    user = current_user()
+    user_id = session["user_id"]
 
     conn = get_db()
 
     try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
 
-        cur = conn.cursor(
-            cursor_factory=RealDictCursor
-        )
+            cur.execute("""
+                SELECT id, title
+                FROM web_chats
+                WHERE id = %s
+                  AND user_id = %s
+            """, (
+                chat_id,
+                user_id,
+            ))
 
-        cur.execute("""
-            SELECT id
-            FROM web_chats
-            WHERE id = %s
-            AND user_id = %s
-        """, (
-            chat_id,
-            user["id"]
-        ))
+            chat = cur.fetchone()
 
-        if not cur.fetchone():
+            if not chat:
+                return jsonify({
+                    "error": "Chat not found."
+                }), 404
 
-            return jsonify({
-                "error": "Chat not found."
-            }), 404
+            cur.execute("""
+                SELECT
+                    id,
+                    role,
+                    content,
+                    created_at
+                FROM web_messages
+                WHERE chat_id = %s
+                  AND user_id = %s
+                ORDER BY created_at ASC, id ASC
+            """, (
+                chat_id,
+                user_id,
+            ))
 
-        cur.execute("""
-            SELECT
-                id,
-                role,
-                content,
-                created_at
-            FROM web_messages
-            WHERE chat_id = %s
-            AND user_id = %s
-            ORDER BY created_at ASC, id ASC
-        """, (
-            chat_id,
-            user["id"]
-        ))
-
-        messages = cur.fetchall()
-
-        return jsonify([
-            {
-                "id": row["id"],
-                "role": row["role"],
-                "content": row["content"],
-                "created_at": row[
-                    "created_at"
-                ].isoformat()
-            }
-            for row in messages
-        ])
+            messages = cur.fetchall()
 
     finally:
-
-        cur.close()
         conn.close()
 
+    return jsonify({
+        "chat": {
+            "id": chat["id"],
+            "title": chat["title"],
+        },
+        "messages": [
+            {
+                "id": message["id"],
+                "role": message["role"],
+                "content": message["content"],
+                "created_at": message["created_at"].isoformat(),
+            }
+            for message in messages
+        ],
+    })
 
-# ============================================================
-# DELETE CHAT
-# ============================================================
 
 @app.route(
     "/api/chats/<int:chat_id>",
@@ -2058,952 +1070,686 @@ def get_chat_messages(chat_id):
 @login_required
 def delete_chat(chat_id):
 
-    if not check_csrf():
-
+    if not verify_csrf():
         return jsonify({
-            "error": "Invalid request."
+            "error": "Invalid CSRF token."
         }), 403
 
-    user = current_user()
+    user_id = session["user_id"]
 
     conn = get_db()
 
     try:
+        with conn.cursor() as cur:
 
-        cur = conn.cursor()
+            cur.execute("""
+                SELECT id
+                FROM web_chats
+                WHERE id = %s
+                  AND user_id = %s
+            """, (
+                chat_id,
+                user_id,
+            ))
 
-        # Delete messages first so this works
-        # even if older databases don't have
-        # a foreign-key cascade.
-        cur.execute("""
-            DELETE FROM web_messages
-            WHERE chat_id = %s
-            AND user_id = %s
-        """, (
-            chat_id,
-            user["id"]
-        ))
+            if not cur.fetchone():
+                return jsonify({
+                    "error": "Chat not found."
+                }), 404
 
-        cur.execute("""
-            DELETE FROM web_chats
-            WHERE id = %s
-            AND user_id = %s
-        """, (
-            chat_id,
-            user["id"]
-        ))
+            cur.execute("""
+                DELETE FROM web_messages
+                WHERE chat_id = %s
+                  AND user_id = %s
+            """, (
+                chat_id,
+                user_id,
+            ))
 
-        if cur.rowcount == 0:
-
-            conn.rollback()
-
-            return jsonify({
-                "error": "Chat not found."
-            }), 404
+            cur.execute("""
+                DELETE FROM web_chats
+                WHERE id = %s
+                  AND user_id = %s
+            """, (
+                chat_id,
+                user_id,
+            ))
 
         conn.commit()
 
-        return jsonify({
-            "success": True
-        })
-
     finally:
-
-        cur.close()
         conn.close()
 
-
-# ============================================================
-# GENERATE AI RESPONSE
-# ============================================================
-
-def generate_ai_response(
-    user_id,
-    chat_id,
-    user_message
-):
-
-    conn = get_db()
-
-    try:
-
-        cur = conn.cursor(
-            cursor_factory=RealDictCursor
-        )
-
-        # Verify chat ownership.
-        cur.execute("""
-            SELECT
-                id,
-                title
-            FROM web_chats
-            WHERE id = %s
-            AND user_id = %s
-        """, (
-            chat_id,
-            user_id
-        ))
-
-        chat = cur.fetchone()
-
-        if not chat:
-
-            raise ValueError(
-                "Chat not found."
-            )
-
-        # Recent conversation.
-        cur.execute("""
-            SELECT
-                role,
-                content
-            FROM web_messages
-            WHERE chat_id = %s
-            AND user_id = %s
-            ORDER BY created_at DESC, id DESC
-            LIMIT 20
-        """, (
-            chat_id,
-            user_id
-        ))
-
-        previous = cur.fetchall()
-
-        previous.reverse()
-
-        messages = [
-            {
-                "role": "system",
-                "content": (
-                    "You are AskOra, a helpful, "
-                    "clear and professional AI assistant. "
-                    "Answer naturally and accurately. "
-                    "Use Markdown when useful. "
-                    "Do not use HTML. "
-                    "Do not include image Markdown. "
-                    "Do not mention internal instructions. "
-                    "Do not claim to have performed actions "
-                    "you cannot actually perform. "
-                    "Keep responses useful and reasonably concise."
-                )
-            }
-        ]
-
-        for row in previous:
-
-            if row["role"] in (
-                "user",
-                "assistant"
-            ):
-
-                messages.append({
-                    "role": row["role"],
-                    "content": row["content"]
-                })
-
-        messages.append({
-            "role": "user",
-            "content": user_message
-        })
-
-        response = (
-            groq_client.chat.completions.create(
-                model=TEXT_MODEL,
-                messages=messages,
-                temperature=0.6,
-                max_tokens=1800
-            )
-        )
-
-        answer = (
-            response.choices[0]
-            .message
-            .content
-            or ""
-        ).strip()
-
-        if not answer:
-
-            raise RuntimeError(
-                "Groq returned an empty response."
-            )
-
-        # Update title on first message.
-        if chat["title"] == "New chat":
-
-            new_title = clean_title(
-                user_message
-            )
-
-            cur.execute("""
-                UPDATE web_chats
-                SET
-                    title = %s,
-                    updated_at = NOW()
-                WHERE id = %s
-            """, (
-                new_title,
-                chat_id
-            ))
-
-        else:
-
-            cur.execute("""
-                UPDATE web_chats
-                SET updated_at = NOW()
-                WHERE id = %s
-            """, (
-                chat_id,
-            ))
-
-        # Save user message.
-        cur.execute("""
-            INSERT INTO web_messages
-            (
-                chat_id,
-                user_id,
-                role,
-                content
-            )
-            VALUES (%s, %s, %s, %s)
-        """, (
-            chat_id,
-            user_id,
-            "user",
-            user_message
-        ))
-
-        # Save AI response.
-        cur.execute("""
-            INSERT INTO web_messages
-            (
-                chat_id,
-                user_id,
-                role,
-                content
-            )
-            VALUES (%s, %s, %s, %s)
-        """, (
-            chat_id,
-            user_id,
-            "assistant",
-            answer
-        ))
-
-        # Usage event.
-        cur.execute("""
-            INSERT INTO web_usage_events
-            (
-                user_id,
-                event_type
-            )
-            VALUES (%s, %s)
-        """, (
-            user_id,
-            "chat"
-        ))
-
-        conn.commit()
-
-        return answer
-
-    except Exception:
-
-        conn.rollback()
-
-        logging.exception(
-            "AI response generation failed."
-        )
-
-        raise
-
-    finally:
-
-        cur.close()
-        conn.close()
+    return jsonify({
+        "success": True
+    })
 
 
 # ============================================================
-# CHAT API
+# CHAT MESSAGE
 # ============================================================
 
-@app.route(
-    "/api/chat",
-    methods=["POST"]
-)
+@app.route("/api/chat", methods=["POST"])
 @login_required
 def chat_api():
 
-    if not check_csrf():
-
+    if not verify_csrf():
         return jsonify({
-            "error": "Invalid request."
+            "error": "Invalid CSRF token."
         }), 403
 
-    data = (
-        request.get_json(
-            silent=True
-        )
-        or {}
-    )
+    user_id = session["user_id"]
 
+    data = request.get_json(silent=True) or {}
+
+    chat_id = data.get("chat_id")
     message = str(
-        data.get(
-            "message",
-            ""
-        )
+        data.get("message", "")
     ).strip()
 
-    chat_id = data.get(
-        "chat_id"
-    )
-
     if not message:
-
         return jsonify({
             "error": "Message cannot be empty."
         }), 400
 
     if len(message) > 12000:
-
         return jsonify({
             "error": "Message is too long."
         }), 400
 
-    user = current_user()
-
-    if not user:
-
-        return jsonify({
-            "error": "Login required."
-        }), 401
-
-    # Validate/create chat.
     conn = get_db()
 
     try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
 
-        cur = conn.cursor()
+            # ----------------------------------------------
+            # Create chat if necessary
+            # ----------------------------------------------
 
-        if not chat_id:
-
-            cur.execute("""
-                INSERT INTO web_chats
-                (
+            if chat_id:
+                cur.execute("""
+                    SELECT *
+                    FROM web_chats
+                    WHERE id = %s
+                      AND user_id = %s
+                """, (
+                    chat_id,
                     user_id,
-                    title
-                )
-                VALUES (%s, %s)
-                RETURNING id
-            """, (
-                user["id"],
-                "New chat"
-            ))
+                ))
 
-            chat_id = cur.fetchone()[0]
+                chat = cur.fetchone()
 
-            conn.commit()
+                if not chat:
+                    return jsonify({
+                        "error": "Chat not found."
+                    }), 404
 
-        else:
+            else:
+                title = message[:60]
 
-            try:
+                cur.execute("""
+                    INSERT INTO web_chats
+                        (user_id, title)
+                    VALUES
+                        (%s, %s)
+                    RETURNING *
+                """, (
+                    user_id,
+                    title,
+                ))
 
-                chat_id = int(
-                    chat_id
-                )
+                chat = cur.fetchone()
 
-            except (
-                ValueError,
-                TypeError
-            ):
+                chat_id = chat["id"]
 
-                return jsonify({
-                    "error": "Invalid chat."
-                }), 400
+            # ----------------------------------------------
+            # Save user message
+            # ----------------------------------------------
 
             cur.execute("""
-                SELECT id
-                FROM web_chats
-                WHERE id = %s
-                AND user_id = %s
+                INSERT INTO web_messages
+                    (chat_id, user_id, role, content)
+                VALUES
+                    (%s, %s, %s, %s)
             """, (
                 chat_id,
-                user["id"]
-            ))
-
-            if not cur.fetchone():
-
-                return jsonify({
-                    "error": "Chat not found."
-                }), 404
-
-    finally:
-
-        cur.close()
-        conn.close()
-
-    try:
-
-        answer = generate_ai_response(
-            user["id"],
-            int(chat_id),
-            message
-        )
-
-        touch_user(
-            user["id"]
-        )
-
-        return jsonify({
-            "chat_id": int(chat_id),
-            "answer": answer
-        })
-
-    except Exception:
-
-        return jsonify({
-            "error": (
-                "Sorry, something went wrong "
-                "while generating the response."
-            )
-        }), 500
-
-
-# ============================================================
-# VOICE API
-# ============================================================
-
-@app.route(
-    "/api/voice",
-    methods=["POST"]
-)
-@login_required
-def voice_api():
-
-    if not check_csrf():
-
-        return jsonify({
-            "error": "Invalid request."
-        }), 403
-
-    audio = request.files.get(
-        "audio"
-    )
-
-    chat_id = request.form.get(
-        "chat_id"
-    )
-
-    if not audio:
-
-        return jsonify({
-            "error": "No audio was received."
-        }), 400
-
-    audio_data = audio.read()
-
-    if not audio_data:
-
-        return jsonify({
-            "error": "The audio file is empty."
-        }), 400
-
-    if len(audio_data) > MAX_AUDIO_SIZE:
-
-        return jsonify({
-            "error": "Audio file is too large."
-        }), 413
-
-    user = current_user()
-
-    if not user:
-
-        return jsonify({
-            "error": "Login required."
-        }), 401
-
-    # Validate/create chat.
-    conn = get_db()
-
-    try:
-
-        cur = conn.cursor()
-
-        if not chat_id:
-
-            cur.execute("""
-                INSERT INTO web_chats
-                (
-                    user_id,
-                    title
-                )
-                VALUES (%s, %s)
-                RETURNING id
-            """, (
-                user["id"],
-                "Voice chat"
-            ))
-
-            chat_id = cur.fetchone()[0]
-
-            conn.commit()
-
-        else:
-
-            try:
-
-                chat_id = int(
-                    chat_id
-                )
-
-            except (
-                ValueError,
-                TypeError
-            ):
-
-                return jsonify({
-                    "error": "Invalid chat."
-                }), 400
-
-            cur.execute("""
-                SELECT id
-                FROM web_chats
-                WHERE id = %s
-                AND user_id = %s
-            """, (
-                chat_id,
-                user["id"]
-            ))
-
-            if not cur.fetchone():
-
-                return jsonify({
-                    "error": "Chat not found."
-                }), 404
-
-    finally:
-
-        cur.close()
-        conn.close()
-
-    try:
-
-        filename = (
-            audio.filename
-            or "voice.webm"
-        )
-
-        mimetype = (
-            audio.mimetype
-            or "audio/webm"
-        )
-
-        transcription = (
-            groq_client
-            .audio
-            .transcriptions
-            .create(
-                file=(
-                    filename,
-                    audio_data,
-                    mimetype
-                ),
-                model=VOICE_MODEL,
-                response_format="text"
-            )
-        )
-
-        if isinstance(
-            transcription,
-            str
-        ):
-
-            transcript = (
-                transcription.strip()
-            )
-
-        elif hasattr(
-            transcription,
-            "text"
-        ):
-
-            transcript = (
-                transcription.text
-                or ""
-            ).strip()
-
-        else:
-
-            transcript = str(
-                transcription
-            ).strip()
-
-        if not transcript:
-
-            return jsonify({
-                "error": (
-                    "I couldn't understand "
-                    "the audio."
-                )
-            }), 400
-
-        answer = generate_ai_response(
-            user["id"],
-            int(chat_id),
-            transcript
-        )
-
-        # Separate voice event for admin statistics.
-        conn = get_db()
-
-        try:
-
-            cur = conn.cursor()
-
-            cur.execute("""
-                INSERT INTO web_usage_events
-                (
-                    user_id,
-                    event_type
-                )
-                VALUES (%s, %s)
-            """, (
-                user["id"],
-                "voice"
-            ))
-
-            conn.commit()
-
-        finally:
-
-            cur.close()
-            conn.close()
-
-        touch_user(
-            user["id"]
-        )
-
-        return jsonify({
-            "chat_id": int(chat_id),
-            "transcription": transcript,
-            "answer": answer
-        })
-
-    except Exception:
-
-        logging.exception(
-            "Voice processing failed."
-        )
-
-        return jsonify({
-            "error": (
-                "Sorry, I couldn't process "
-                "that voice message."
-            )
-        }), 500
-
-
-# ============================================================
-# NEW CHAT / RESET
-# ============================================================
-
-@app.route(
-    "/api/reset",
-    methods=["POST"]
-)
-@login_required
-def reset_api():
-
-    if not check_csrf():
-
-        return jsonify({
-            "error": "Invalid request."
-        }), 403
-
-    user = current_user()
-
-    conn = get_db()
-
-    try:
-
-        cur = conn.cursor(
-            cursor_factory=RealDictCursor
-        )
-
-        cur.execute("""
-            INSERT INTO web_chats
-            (
                 user_id,
-                title
-            )
-            VALUES (%s, %s)
-            RETURNING
-                id,
-                title,
-                created_at,
-                updated_at
-        """, (
-            user["id"],
-            "New chat"
-        ))
+                "user",
+                message,
+            ))
 
-        chat = cur.fetchone()
+            # ----------------------------------------------
+            # Get conversation history
+            # ----------------------------------------------
+
+            cur.execute("""
+                SELECT role, content
+                FROM web_messages
+                WHERE chat_id = %s
+                  AND user_id = %s
+                ORDER BY created_at ASC, id ASC
+                LIMIT 30
+            """, (
+                chat_id,
+                user_id,
+            ))
+
+            rows = cur.fetchall()
 
         conn.commit()
 
+    finally:
+        conn.close()
+
+    history = [
+        {
+            "role": row["role"],
+            "content": row["content"],
+        }
+        for row in rows
+    ]
+
+    try:
+        answer = generate_ai_response(history)
+
+    except Exception as error:
+        logger.exception(
+            "Groq chat error: %s",
+            error,
+        )
+
         return jsonify({
-            "id": chat["id"],
-            "title": chat["title"],
-            "created_at": chat[
-                "created_at"
-            ].isoformat(),
-            "updated_at": chat[
-                "updated_at"
-            ].isoformat()
-        })
+            "error": (
+                "AskOra could not generate a response right now. "
+                "Please try again."
+            )
+        }), 500
+
+    # ----------------------------------------------
+    # Save assistant response
+    # ----------------------------------------------
+
+    conn = get_db()
+
+    try:
+        with conn.cursor() as cur:
+
+            cur.execute("""
+                INSERT INTO web_messages
+                    (chat_id, user_id, role, content)
+                VALUES
+                    (%s, %s, %s, %s)
+            """, (
+                chat_id,
+                user_id,
+                "assistant",
+                answer,
+            ))
+
+            cur.execute("""
+                UPDATE web_chats
+                SET updated_at = NOW()
+                WHERE id = %s
+                  AND user_id = %s
+            """, (
+                chat_id,
+                user_id,
+            ))
+
+        conn.commit()
 
     finally:
-
-        cur.close()
         conn.close()
+
+    touch_user(user_id)
+    log_event(user_id, "chat")
+
+    return jsonify({
+        "chat_id": chat_id,
+        "answer": answer,
+    })
 
 
 # ============================================================
-# ADMIN PAGE
+# VOICE
+# ============================================================
+
+@app.route("/api/voice", methods=["POST"])
+@login_required
+def voice_api():
+
+    if not verify_csrf():
+        return jsonify({
+            "error": "Invalid CSRF token."
+        }), 403
+
+    user_id = session["user_id"]
+
+    audio = request.files.get("audio")
+
+    if not audio:
+        return jsonify({
+            "error": "No audio was provided."
+        }), 400
+
+    audio_bytes = audio.read()
+
+    if not audio_bytes:
+        return jsonify({
+            "error": "Audio file is empty."
+        }), 400
+
+    if len(audio_bytes) > 15 * 1024 * 1024:
+        return jsonify({
+            "error": "Audio file is too large."
+        }), 400
+
+    try:
+        transcription = groq_client.audio.transcriptions.create(
+            file=(
+                audio.filename or "recording.webm",
+                audio_bytes,
+            ),
+            model=VOICE_MODEL,
+            response_format="json",
+        )
+
+        text = transcription.text.strip()
+
+    except Exception as error:
+        logger.exception(
+            "Voice transcription error: %s",
+            error,
+        )
+
+        return jsonify({
+            "error": "Voice transcription failed."
+        }), 500
+
+    if not text:
+        return jsonify({
+            "error": "No speech was detected."
+        }), 400
+
+    # --------------------------------------------------------
+    # Find/create chat
+    # --------------------------------------------------------
+
+    chat_id = request.form.get("chat_id")
+
+    conn = get_db()
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+
+            if chat_id:
+                try:
+                    chat_id = int(chat_id)
+                except ValueError:
+                    chat_id = None
+
+            if chat_id:
+
+                cur.execute("""
+                    SELECT *
+                    FROM web_chats
+                    WHERE id = %s
+                      AND user_id = %s
+                """, (
+                    chat_id,
+                    user_id,
+                ))
+
+                chat = cur.fetchone()
+
+                if not chat:
+                    return jsonify({
+                        "error": "Chat not found."
+                    }), 404
+
+            else:
+
+                cur.execute("""
+                    INSERT INTO web_chats
+                        (user_id, title)
+                    VALUES
+                        (%s, %s)
+                    RETURNING *
+                """, (
+                    user_id,
+                    text[:60],
+                ))
+
+                chat = cur.fetchone()
+
+                chat_id = chat["id"]
+
+            # Save transcribed user message.
+
+            cur.execute("""
+                INSERT INTO web_messages
+                    (chat_id, user_id, role, content)
+                VALUES
+                    (%s, %s, %s, %s)
+            """, (
+                chat_id,
+                user_id,
+                "user",
+                text,
+            ))
+
+            # Get history.
+
+            cur.execute("""
+                SELECT role, content
+                FROM web_messages
+                WHERE chat_id = %s
+                  AND user_id = %s
+                ORDER BY created_at ASC, id ASC
+                LIMIT 30
+            """, (
+                chat_id,
+                user_id,
+            ))
+
+            rows = cur.fetchall()
+
+        conn.commit()
+
+    finally:
+        conn.close()
+
+    history = [
+        {
+            "role": row["role"],
+            "content": row["content"],
+        }
+        for row in rows
+    ]
+
+    try:
+        answer = generate_ai_response(history)
+
+    except Exception:
+        logger.exception("Voice AI response error.")
+
+        return jsonify({
+            "error": "AskOra could not generate a response."
+        }), 500
+
+    conn = get_db()
+
+    try:
+        with conn.cursor() as cur:
+
+            cur.execute("""
+                INSERT INTO web_messages
+                    (chat_id, user_id, role, content)
+                VALUES
+                    (%s, %s, %s, %s)
+            """, (
+                chat_id,
+                user_id,
+                "assistant",
+                answer,
+            ))
+
+            cur.execute("""
+                UPDATE web_chats
+                SET updated_at = NOW()
+                WHERE id = %s
+                  AND user_id = %s
+            """, (
+                chat_id,
+                user_id,
+            ))
+
+        conn.commit()
+
+    finally:
+        conn.close()
+
+    touch_user(user_id)
+
+    log_event(user_id, "voice")
+
+    return jsonify({
+        "chat_id": chat_id,
+        "transcription": text,
+        "answer": answer,
+    })
+
+
+# ============================================================
+# RESET CURRENT CHAT
+# ============================================================
+
+@app.route("/api/reset", methods=["POST"])
+@login_required
+def reset_api():
+
+    if not verify_csrf():
+        return jsonify({
+            "error": "Invalid CSRF token."
+        }), 403
+
+    user_id = session["user_id"]
+
+    conn = get_db()
+
+    try:
+        with conn.cursor() as cur:
+
+            cur.execute("""
+                DELETE FROM web_messages
+                WHERE user_id = %s
+            """, (user_id,))
+
+            cur.execute("""
+                DELETE FROM web_chats
+                WHERE user_id = %s
+            """, (user_id,))
+
+        conn.commit()
+
+    finally:
+        conn.close()
+
+    return jsonify({
+        "success": True
+    })
+
+
+# ============================================================
+# ADMIN
 # ============================================================
 
 @app.route("/admin")
 @admin_required
-def admin_page():
-
-    user = current_user()
-
-    return render_template(
-        "admin.html",
-        user=user,
-        csrf_token=get_csrf_token()
-    )
+def admin():
+    return render_template("admin.html")
 
 
-# ============================================================
-# ADMIN STATS
-# ============================================================
-
-@app.route(
-    "/api/admin/stats"
-)
+@app.route("/api/admin/stats")
 @admin_required
 def admin_stats():
 
     conn = get_db()
 
     try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
 
-        cur = conn.cursor(
-            cursor_factory=RealDictCursor
-        )
+            cur.execute("""
+                SELECT COUNT(*) AS count
+                FROM web_users
+            """)
+            total_users = cur.fetchone()["count"]
 
-        # Users
-        cur.execute("""
-            SELECT COUNT(*) AS total
-            FROM web_users
-        """)
+            cur.execute("""
+                SELECT COUNT(*) AS count
+                FROM web_users
+                WHERE first_seen >= CURRENT_DATE
+            """)
+            users_today = cur.fetchone()["count"]
 
-        total_users = cur.fetchone()[
-            "total"
-        ]
+            cur.execute("""
+                SELECT COUNT(*) AS count
+                FROM web_users
+                WHERE last_seen >= CURRENT_DATE
+            """)
+            active_today = cur.fetchone()["count"]
 
-        # Users registered today
-        cur.execute("""
-            SELECT COUNT(*) AS total
-            FROM web_users
-            WHERE first_seen::date = CURRENT_DATE
-        """)
+            cur.execute("""
+                SELECT COUNT(*) AS count
+                FROM web_chats
+            """)
+            total_chats = cur.fetchone()["count"]
 
-        users_today = cur.fetchone()[
-            "total"
-        ]
+            cur.execute("""
+                SELECT COUNT(*) AS count
+                FROM web_messages
+                WHERE role = 'user'
+            """)
+            total_questions = cur.fetchone()["count"]
 
-        # Active users today
-        cur.execute("""
-            SELECT COUNT(*) AS total
-            FROM web_users
-            WHERE last_seen::date = CURRENT_DATE
-        """)
+            cur.execute("""
+                SELECT COUNT(*) AS count
+                FROM web_usage_events
+                WHERE event_type = 'voice'
+            """)
+            voice_requests = cur.fetchone()["count"]
 
-        active_today = cur.fetchone()[
-            "total"
-        ]
+            cur.execute("""
+                SELECT
+                    event_type,
+                    COUNT(*) AS count
+                FROM web_usage_events
+                GROUP BY event_type
+                ORDER BY count DESC
+            """)
+            events = cur.fetchall()
 
-        # Chats
-        cur.execute("""
-            SELECT COUNT(*) AS total
-            FROM web_chats
-        """)
-
-        total_chats = cur.fetchone()[
-            "total"
-        ]
-
-        # Messages
-        cur.execute("""
-            SELECT COUNT(*) AS total
-            FROM web_messages
-        """)
-
-        total_messages = cur.fetchone()[
-            "total"
-        ]
-
-        # Usage events
-        cur.execute("""
-            SELECT
-                event_type,
-                COUNT(*) AS count
-            FROM web_usage_events
-            GROUP BY event_type
-            ORDER BY count DESC
-        """)
-
-        events = cur.fetchall()
-
-        # Recent users
-        cur.execute("""
-            SELECT
-                id,
-                username,
-                email,
-                first_seen,
-                last_seen
-            FROM web_users
-            ORDER BY last_seen DESC
-            LIMIT 100
-        """)
-
-        users = cur.fetchall()
-
-        return jsonify({
-
-            "total_users":
-                total_users,
-
-            "users_today":
-                users_today,
-
-            "active_today":
-                active_today,
-
-            "total_chats":
-                total_chats,
-
-            "total_messages":
-                total_messages,
-
-            "events": [
-                {
-                    "event_type":
-                        row["event_type"],
-                    "count":
-                        row["count"]
-                }
-                for row in events
-            ],
-
-            "users": [
-                {
-                    "id":
-                        row["id"],
-
-                    "username":
-                        row["username"],
-
-                    "email":
-                        row["email"],
-
-                    "first_seen":
-                        row[
-                            "first_seen"
-                        ].isoformat(),
-
-                    "last_seen":
-                        row[
-                            "last_seen"
-                        ].isoformat()
-                }
-                for row in users
-            ]
-        })
+            cur.execute("""
+                SELECT
+                    username,
+                    email,
+                    first_seen,
+                    last_seen
+                FROM web_users
+                ORDER BY first_seen DESC
+                LIMIT 20
+            """)
+            recent_users = cur.fetchall()
 
     finally:
-
-        cur.close()
         conn.close()
+
+    return jsonify({
+        "total_users": int(total_users),
+        "users_today": int(users_today),
+        "active_today": int(active_today),
+        "total_chats": int(total_chats),
+        "total_questions": int(total_questions),
+        "voice_requests": int(voice_requests),
+
+        "events": [
+            {
+                "event_type": event["event_type"],
+                "count": int(event["count"]),
+            }
+            for event in events
+        ],
+
+        "recent_users": [
+            {
+                "username": user["username"],
+                "email": user["email"],
+                "first_seen": user["first_seen"].isoformat(),
+                "last_seen": user["last_seen"].isoformat(),
+            }
+            for user in recent_users
+        ],
+    })
 
 
 # ============================================================
-# HEALTH CHECK
+# HEALTH
 # ============================================================
 
 @app.route("/health")
 def health():
-
-    conn = None
-    cur = None
-
     try:
-
         conn = get_db()
 
-        cur = conn.cursor()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+                cur.fetchone()
 
-        cur.execute(
-            "SELECT 1"
-        )
-
-        cur.fetchone()
-
-        return "OK", 200
-
-    except Exception:
-
-        logging.exception(
-            "Health check failed."
-        )
-
-        return (
-            "Database unavailable",
-            503
-        )
-
-    finally:
-
-        if cur:
-            cur.close()
-
-        if conn:
+        finally:
             conn.close()
 
+        return jsonify({
+            "status": "ok"
+        })
+
+    except Exception:
+        logger.exception("Health check failed.")
+
+        return jsonify({
+            "status": "database_error"
+        }), 500
+
 
 # ============================================================
-# STARTUP DATABASE INITIALIZATION
+# ERROR HANDLERS
 # ============================================================
 
-# IMPORTANT:
-# If the database cannot initialize, we allow the exception
-# to stop the process. Render should then show the real error
-# instead of pretending AskOra is healthy.
+@app.errorhandler(404)
+def not_found(error):
+    if request.path.startswith("/api/"):
+        return jsonify({
+            "error": "Not found."
+        }), 404
+
+    return Response(
+        "Page not found.",
+        status=404,
+        mimetype="text/plain",
+    )
+
+
+@app.errorhandler(500)
+def server_error(error):
+    logger.exception("Server error.")
+
+    if request.path.startswith("/api/"):
+        return jsonify({
+            "error": "Internal server error."
+        }), 500
+
+    return Response(
+        "Something went wrong.",
+        status=500,
+        mimetype="text/plain",
+    )
+
+
+# ============================================================
+# STARTUP
+# ============================================================
 
 init_db()
 
+logger.info("AskOra database initialized.")
+logger.info("AskOra application ready.")
 
-# ============================================================
-# LOCAL DEVELOPMENT
-# ============================================================
 
 if __name__ == "__main__":
+    port = int(os.environ.get("PORT", "10000"))
 
     app.run(
         host="0.0.0.0",
-        port=PORT,
-        debug=False
+        port=port,
+        debug=False,
     )
