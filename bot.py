@@ -1,11 +1,7 @@
 import os
 import re
 import secrets
-import hashlib
-import smtplib
 import logging
-from datetime import datetime, timedelta, timezone
-from email.message import EmailMessage
 from functools import wraps
 
 import psycopg2
@@ -30,7 +26,7 @@ from groq import Groq
 
 
 # ============================================================
-# APP CONFIG
+# ASKORA CONFIG
 # ============================================================
 
 app = Flask(__name__)
@@ -43,39 +39,12 @@ app.config["SESSION_COOKIE_SECURE"] = (
     os.environ.get("COOKIE_SECURE", "true").lower() == "true"
 )
 
-app.config["ADMIN_USERNAME"] = os.environ.get(
-    "ADMIN_USERNAME",
-    "",
-)
-
 DATABASE_URL = os.environ["DATABASE_URL"]
 GROQ_API_KEY = os.environ["GROQ_API_KEY"]
 
-SMTP_HOST = os.environ.get(
-    "SMTP_HOST",
-    "smtp.gmail.com",
-)
-
-SMTP_PORT = int(
-    os.environ.get(
-        "SMTP_PORT",
-        "587",
-    )
-)
-
-SMTP_USERNAME = os.environ.get(
-    "SMTP_USERNAME",
+ADMIN_USERNAME = os.environ.get(
+    "ADMIN_USERNAME",
     "",
-)
-
-SMTP_PASSWORD = os.environ.get(
-    "SMTP_PASSWORD",
-    "",
-)
-
-SMTP_FROM = os.environ.get(
-    "SMTP_FROM",
-    SMTP_USERNAME,
 )
 
 GROQ_MODEL = "openai/gpt-oss-120b"
@@ -181,25 +150,17 @@ def init_db():
             )
 
             # ------------------------------------------------
-            # PASSWORD RESETS
+            # SAFE MIGRATIONS
             # ------------------------------------------------
 
             cur.execute(
                 """
-                CREATE TABLE IF NOT EXISTS web_password_resets (
-                    id BIGSERIAL PRIMARY KEY,
-                    user_id BIGINT NOT NULL,
-                    token_hash TEXT NOT NULL,
-                    expires_at TIMESTAMPTZ NOT NULL,
-                    used_at TIMESTAMPTZ,
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                )
+                ALTER TABLE web_chats
+                ADD COLUMN IF NOT EXISTS
+                updated_at TIMESTAMPTZ
+                NOT NULL DEFAULT NOW()
                 """
             )
-
-            # ------------------------------------------------
-            # SAFE MIGRATIONS
-            # ------------------------------------------------
 
             cur.execute(
                 """
@@ -212,14 +173,6 @@ def init_db():
                 """
                 ALTER TABLE web_messages
                 ADD COLUMN IF NOT EXISTS user_id BIGINT
-                """
-            )
-
-            cur.execute(
-                """
-                ALTER TABLE web_chats
-                ADD COLUMN IF NOT EXISTS updated_at
-                TIMESTAMPTZ NOT NULL DEFAULT NOW()
                 """
             )
 
@@ -274,8 +227,9 @@ def init_db():
 
             old_users = cur.fetchall()
 
-            for row in old_users:
-                user_id = row["user_id"]
+            for old_user in old_users:
+
+                user_id = old_user["user_id"]
 
                 cur.execute(
                     """
@@ -297,7 +251,10 @@ def init_db():
                     cur.execute(
                         """
                         INSERT INTO web_chats
-                        (user_id, title)
+                        (
+                            user_id,
+                            title
+                        )
                         VALUES (%s, %s)
                         RETURNING id
                         """,
@@ -403,7 +360,7 @@ def csrf_protected(function):
 
 
 # ============================================================
-# AUTH HELPERS
+# CURRENT USER
 # ============================================================
 
 def current_user():
@@ -416,6 +373,7 @@ def current_user():
 
     try:
         with conn.cursor() as cur:
+
             cur.execute(
                 """
                 SELECT
@@ -459,7 +417,12 @@ def login_required(function):
     return wrapper
 
 
+# ============================================================
+# ADMIN
+# ============================================================
+
 def is_admin(user):
+
     if not user:
         return False
 
@@ -468,10 +431,7 @@ def is_admin(user):
     )
 
     admin_username = normalize_username(
-        app.config.get(
-            "ADMIN_USERNAME",
-            "",
-        )
+        ADMIN_USERNAME
     )
 
     return (
@@ -481,15 +441,42 @@ def is_admin(user):
     )
 
 
+def admin_required(function):
+    @wraps(function)
+    def wrapper(*args, **kwargs):
+
+        user = current_user()
+
+        if not user:
+            return redirect(
+                url_for("login")
+            )
+
+        if not is_admin(user):
+            return (
+                "Forbidden",
+                403,
+            )
+
+        return function(
+            *args,
+            **kwargs
+        )
+
+    return wrapper
+
+
 # ============================================================
 # USER ACTIVITY
 # ============================================================
 
 def touch_user(user_id):
+
     conn = get_db()
 
     try:
         with conn.cursor() as cur:
+
             cur.execute(
                 """
                 UPDATE web_users
@@ -505,15 +492,23 @@ def touch_user(user_id):
         conn.close()
 
 
-def log_event(user_id, event_type):
+def log_event(
+    user_id,
+    event_type,
+):
+
     conn = get_db()
 
     try:
         with conn.cursor() as cur:
+
             cur.execute(
                 """
                 INSERT INTO web_usage_events
-                (user_id, event_type)
+                (
+                    user_id,
+                    event_type
+                )
                 VALUES (%s, %s)
                 """,
                 (
@@ -535,6 +530,7 @@ def log_event(user_id, event_type):
 @app.route("/")
 @login_required
 def home():
+
     user = current_user()
 
     return render_template(
@@ -575,7 +571,10 @@ def login():
         "",
     )
 
-    if not username_or_email or not password:
+    if (
+        not username_or_email
+        or not password
+    ):
         return render_template(
             "login.html",
             error=(
@@ -588,6 +587,7 @@ def login():
 
     try:
         with conn.cursor() as cur:
+
             cur.execute(
                 """
                 SELECT *
@@ -636,7 +636,9 @@ def login():
         secrets.token_urlsafe(32)
     )
 
-    touch_user(user["id"])
+    touch_user(
+        user["id"]
+    )
 
     return redirect(
         url_for("home")
@@ -685,7 +687,9 @@ def register():
     if not username:
         return render_template(
             "register.html",
-            error="Username is required.",
+            error=(
+                "Username is required."
+            ),
         )
 
     if not re.match(
@@ -704,7 +708,9 @@ def register():
     if not email or "@" not in email:
         return render_template(
             "register.html",
-            error="Enter a valid email address.",
+            error=(
+                "Enter a valid email address."
+            ),
         )
 
     if len(password) < 8:
@@ -831,7 +837,9 @@ def api_me():
             }
         )
 
-    touch_user(user["id"])
+    touch_user(
+        user["id"]
+    )
 
     return jsonify(
         {
@@ -849,319 +857,6 @@ def api_me():
 
 
 # ============================================================
-# FORGOT PASSWORD
-# ============================================================
-
-@app.route(
-    "/forgot-password",
-    methods=["GET", "POST"],
-)
-def forgot_password():
-
-    if request.method == "GET":
-        return render_template(
-            "forgot_password.html"
-        )
-
-    email = normalize_email(
-        request.form.get(
-            "email",
-            "",
-        )
-    )
-
-    if not email:
-        return render_template(
-            "forgot_password.html",
-            error="Enter your email address.",
-        )
-
-    conn = get_db()
-
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT id, username, email
-                FROM web_users
-                WHERE LOWER(email) = LOWER(%s)
-                LIMIT 1
-                """,
-                (email,),
-            )
-
-            user = cur.fetchone()
-
-    finally:
-        conn.close()
-
-    if not user:
-        return render_template(
-            "forgot_password.html",
-            message=(
-                "If an account exists for that email, "
-                "a reset code has been sent."
-            ),
-        )
-
-    code = f"{secrets.randbelow(1000000):06d}"
-
-    token_hash = hashlib.sha256(
-        code.encode()
-    ).hexdigest()
-
-    expires_at = (
-        datetime.now(timezone.utc)
-        + timedelta(minutes=10)
-    )
-
-    conn = get_db()
-
-    try:
-        with conn.cursor() as cur:
-
-            cur.execute(
-                """
-                UPDATE web_password_resets
-                SET used_at = NOW()
-                WHERE user_id = %s
-                AND used_at IS NULL
-                """,
-                (user["id"],),
-            )
-
-            cur.execute(
-                """
-                INSERT INTO web_password_resets
-                (
-                    user_id,
-                    token_hash,
-                    expires_at
-                )
-                VALUES (%s, %s, %s)
-                """,
-                (
-                    user["id"],
-                    token_hash,
-                    expires_at,
-                ),
-            )
-
-        conn.commit()
-
-    finally:
-        conn.close()
-
-    try:
-        send_reset_email(
-            user["email"],
-            code,
-        )
-
-    except Exception as error:
-
-        logger.exception(
-            "Password reset email failed: %s",
-            error,
-        )
-
-        return render_template(
-            "forgot_password.html",
-            error=(
-                "We couldn't send the reset email "
-                "right now. Please try again later."
-            ),
-        )
-
-    return render_template(
-        "forgot_password.html",
-        message=(
-            "A 6-digit reset code has been "
-            "sent to your email."
-        ),
-    )
-
-
-# ============================================================
-# RESET PASSWORD
-# ============================================================
-
-@app.route(
-    "/reset-password",
-    methods=["GET", "POST"],
-)
-def reset_password():
-
-    if request.method == "GET":
-        return render_template(
-            "reset_password.html"
-        )
-
-    email = normalize_email(
-        request.form.get(
-            "email",
-            "",
-        )
-    )
-
-    code = request.form.get(
-        "code",
-        "",
-    ).strip()
-
-    password = request.form.get(
-        "password",
-        "",
-    )
-
-    if (
-        not email
-        or not re.match(
-            r"^\d{6}$",
-            code,
-        )
-        or len(password) < 8
-    ):
-        return render_template(
-            "reset_password.html",
-            error=(
-                "Enter your email, 6-digit code "
-                "and a password of at least "
-                "8 characters."
-            ),
-        )
-
-    code_hash = hashlib.sha256(
-        code.encode()
-    ).hexdigest()
-
-    conn = get_db()
-
-    try:
-        with conn.cursor() as cur:
-
-            cur.execute(
-                """
-                SELECT
-                    r.id,
-                    r.user_id
-                FROM web_password_resets r
-                JOIN web_users u
-                    ON u.id = r.user_id
-                WHERE LOWER(u.email) = LOWER(%s)
-                AND r.token_hash = %s
-                AND r.used_at IS NULL
-                AND r.expires_at > NOW()
-                ORDER BY r.created_at DESC
-                LIMIT 1
-                """,
-                (
-                    email,
-                    code_hash,
-                ),
-            )
-
-            reset = cur.fetchone()
-
-            if not reset:
-                return render_template(
-                    "reset_password.html",
-                    error=(
-                        "Invalid or expired "
-                        "reset code."
-                    ),
-                )
-
-            password_hash = (
-                generate_password_hash(
-                    password
-                )
-            )
-
-            cur.execute(
-                """
-                UPDATE web_users
-                SET password_hash = %s
-                WHERE id = %s
-                """,
-                (
-                    password_hash,
-                    reset["user_id"],
-                ),
-            )
-
-            cur.execute(
-                """
-                UPDATE web_password_resets
-                SET used_at = NOW()
-                WHERE id = %s
-                """,
-                (reset["id"],),
-            )
-
-        conn.commit()
-
-    finally:
-        conn.close()
-
-    return redirect(
-        url_for("login")
-    )
-
-
-# ============================================================
-# EMAIL
-# ============================================================
-
-def send_reset_email(recipient, code):
-
-    if not SMTP_USERNAME or not SMTP_PASSWORD:
-        raise RuntimeError(
-            "SMTP is not configured."
-        )
-
-    message = EmailMessage()
-
-    message["Subject"] = (
-        "AskOra password reset code"
-    )
-
-    message["From"] = SMTP_FROM
-    message["To"] = recipient
-
-    message.set_content(
-        f"""
-Your AskOra password reset code is:
-
-{code}
-
-This code expires in 10 minutes.
-
-If you did not request a password reset,
-you can ignore this email.
-
-— AskOra
-""".strip()
-    )
-
-    with smtplib.SMTP(
-        SMTP_HOST,
-        SMTP_PORT,
-    ) as server:
-
-        server.starttls()
-
-        server.login(
-            SMTP_USERNAME,
-            SMTP_PASSWORD,
-        )
-
-        server.send_message(
-            message
-        )
-
-
-# ============================================================
 # CHATS
 # ============================================================
 
@@ -1174,6 +869,10 @@ def chats_api():
 
     user = current_user()
     user_id = user["id"]
+
+    # --------------------------------------------------------
+    # GET CHATS
+    # --------------------------------------------------------
 
     if request.method == "GET":
 
@@ -1224,7 +923,9 @@ def chats_api():
             }
         )
 
-    # POST = new chat
+    # --------------------------------------------------------
+    # CREATE CHAT
+    # --------------------------------------------------------
 
     if not require_csrf():
         return jsonify(
@@ -1309,7 +1010,10 @@ def chats_api():
 # CHAT OWNERSHIP
 # ============================================================
 
-def user_owns_chat(user_id, chat_id):
+def user_owns_chat(
+    user_id,
+    chat_id,
+):
 
     conn = get_db()
 
@@ -1507,10 +1211,13 @@ def make_chat_title(message):
 
 
 # ============================================================
-# COMPACT AI ANSWER
+# COMPACT ANSWER
 # ============================================================
 
-def compact_answer(answer, detailed=False):
+def compact_answer(
+    answer,
+    detailed=False,
+):
 
     if not answer:
         return (
@@ -1552,7 +1259,7 @@ def compact_answer(answer, detailed=False):
 
 
 # ============================================================
-# AI RESPONSE
+# AI
 # ============================================================
 
 def generate_ai_answer(
@@ -1564,23 +1271,24 @@ def generate_ai_answer(
     system_prompt = """
 You are AskOra, a helpful AI assistant.
 
-Your job is to answer clearly, naturally and accurately.
+Answer clearly, accurately and naturally.
 
 Keep normal answers concise and useful.
+
 Do not unnecessarily repeat the user's question.
 
-Use Markdown when it genuinely improves readability.
+Use Markdown when it improves readability.
 
 If the user asks for a simple explanation,
 explain it simply.
 
 If the user asks for detailed information,
-you may provide more detail.
+provide more detail.
 
 Do not claim to have performed actions
 you cannot actually perform.
 
-Be friendly but do not use excessive filler.
+Be friendly without excessive filler.
 """.strip()
 
     messages = [
@@ -1593,7 +1301,6 @@ Be friendly but do not use excessive filler.
     for item in history[-12:]:
 
         role = item.get("role")
-
         content = item.get(
             "content",
             "",
@@ -1673,7 +1380,9 @@ def api_chat():
         )
     ).strip()
 
-    chat_id = body.get("chat_id")
+    chat_id = body.get(
+        "chat_id"
+    )
 
     if not message:
         return jsonify(
@@ -1696,8 +1405,9 @@ def api_chat():
         ), 400
 
     try:
-        chat_id = int(chat_id)
-
+        chat_id = int(
+            chat_id
+        )
     except (
         TypeError,
         ValueError,
@@ -1705,7 +1415,7 @@ def api_chat():
         chat_id = None
 
     # --------------------------------------------------------
-    # CREATE OR VERIFY CHAT
+    # FIND OR CREATE CHAT
     # --------------------------------------------------------
 
     conn = get_db()
@@ -1717,7 +1427,9 @@ def api_chat():
 
                 cur.execute(
                     """
-                    SELECT id, title
+                    SELECT
+                        id,
+                        title
                     FROM web_chats
                     WHERE id = %s
                     AND user_id = %s
@@ -1765,10 +1477,11 @@ def api_chat():
                 )
 
                 chat = cur.fetchone()
+
                 chat_id = chat["id"]
 
             # ------------------------------------------------
-            # GET RECENT HISTORY
+            # HISTORY
             # ------------------------------------------------
 
             cur.execute(
@@ -1791,8 +1504,6 @@ def api_chat():
             history_rows = cur.fetchall()
 
             history_rows.reverse()
-
-        conn.commit()
 
     finally:
         conn.close()
@@ -1821,7 +1532,7 @@ def api_chat():
     )
 
     # --------------------------------------------------------
-    # GENERATE AI
+    # AI RESPONSE
     # --------------------------------------------------------
 
     try:
@@ -1850,7 +1561,7 @@ def api_chat():
         ), 500
 
     # --------------------------------------------------------
-    # SAVE MESSAGES
+    # SAVE
     # --------------------------------------------------------
 
     conn = get_db()
@@ -1921,7 +1632,8 @@ def api_chat():
                 cur.execute(
                     """
                     UPDATE web_chats
-                    SET title = %s,
+                    SET
+                        title = %s,
                         updated_at = NOW()
                     WHERE id = %s
                     AND user_id = %s
@@ -1975,7 +1687,7 @@ def api_chat():
 
 
 # ============================================================
-# VOICE TRANSCRIPTION
+# VOICE
 # ============================================================
 
 @app.route(
@@ -2093,7 +1805,7 @@ def api_voice():
 
 
 # ============================================================
-# RESET CURRENT CHAT CONTEXT
+# RESET
 # ============================================================
 
 @app.route(
@@ -2157,14 +1869,6 @@ def delete_account():
 
             cur.execute(
                 """
-                DELETE FROM web_password_resets
-                WHERE user_id = %s
-                """,
-                (user_id,),
-            )
-
-            cur.execute(
-                """
                 DELETE FROM web_users
                 WHERE id = %s
                 """,
@@ -2183,36 +1887,6 @@ def delete_account():
             "ok": True,
         }
     )
-
-
-# ============================================================
-# ADMIN CHECK
-# ============================================================
-
-def admin_required(function):
-
-    @wraps(function)
-    def wrapper(*args, **kwargs):
-
-        user = current_user()
-
-        if not user:
-            return redirect(
-                url_for("login")
-            )
-
-        if not is_admin(user):
-            return (
-                "Forbidden",
-                403,
-            )
-
-        return function(
-            *args,
-            **kwargs
-        )
-
-    return wrapper
 
 
 # ============================================================
@@ -2243,7 +1917,9 @@ def admin_stats():
     try:
         with conn.cursor() as cur:
 
-            # Total users
+            # ----------------------------------------------
+            # TOTAL USERS
+            # ----------------------------------------------
 
             cur.execute(
                 """
@@ -2252,11 +1928,14 @@ def admin_stats():
                 """
             )
 
-            total_users = (
+            total_users = int(
                 cur.fetchone()["count"]
+                or 0
             )
 
-            # Active users today
+            # ----------------------------------------------
+            # ACTIVE USERS TODAY
+            # ----------------------------------------------
 
             cur.execute(
                 """
@@ -2266,11 +1945,14 @@ def admin_stats():
                 """
             )
 
-            active_users_today = (
+            active_users_today = int(
                 cur.fetchone()["count"]
+                or 0
             )
 
-            # New users today
+            # ----------------------------------------------
+            # NEW USERS TODAY
+            # ----------------------------------------------
 
             cur.execute(
                 """
@@ -2280,11 +1962,14 @@ def admin_stats():
                 """
             )
 
-            new_users_today = (
+            new_users_today = int(
                 cur.fetchone()["count"]
+                or 0
             )
 
-            # Total chats
+            # ----------------------------------------------
+            # TOTAL CHATS
+            # ----------------------------------------------
 
             cur.execute(
                 """
@@ -2293,11 +1978,14 @@ def admin_stats():
                 """
             )
 
-            total_chats = (
+            total_chats = int(
                 cur.fetchone()["count"]
+                or 0
             )
 
-            # Total questions
+            # ----------------------------------------------
+            # TOTAL QUESTIONS
+            # ----------------------------------------------
 
             cur.execute(
                 """
@@ -2307,11 +1995,14 @@ def admin_stats():
                 """
             )
 
-            total_questions = (
+            total_questions = int(
                 cur.fetchone()["count"]
+                or 0
             )
 
-            # Voice requests
+            # ----------------------------------------------
+            # VOICE REQUESTS
+            # ----------------------------------------------
 
             cur.execute(
                 """
@@ -2321,32 +2012,37 @@ def admin_stats():
                 """
             )
 
-            voice_requests = (
+            voice_requests = int(
                 cur.fetchone()["count"]
+                or 0
             )
 
     finally:
         conn.close()
 
+    # Return both the stats object and direct fields.
+    # This makes the frontend more tolerant of
+    # different dashboard implementations.
+
     return jsonify(
         {
             "ok": True,
+
             "stats": {
                 "total_users": total_users,
-                "active_users_today": (
-                    active_users_today
-                ),
+                "active_users_today": active_users_today,
                 "total_chats": total_chats,
-                "total_questions": (
-                    total_questions
-                ),
-                "voice_requests": (
-                    voice_requests
-                ),
-                "new_users_today": (
-                    new_users_today
-                ),
+                "total_questions": total_questions,
+                "voice_requests": voice_requests,
+                "new_users_today": new_users_today,
             },
+
+            "total_users": total_users,
+            "active_users_today": active_users_today,
+            "total_chats": total_chats,
+            "total_questions": total_questions,
+            "voice_requests": voice_requests,
+            "new_users_today": new_users_today,
         }
     )
 
@@ -2416,9 +2112,7 @@ def internal_error(error):
         return jsonify(
             {
                 "ok": False,
-                "error": (
-                    "Internal server error."
-                ),
+                "error": "Internal server error.",
             }
         ), 500
 
@@ -2429,7 +2123,7 @@ def internal_error(error):
 
 
 # ============================================================
-# STARTUP
+# DATABASE STARTUP
 # ============================================================
 
 try:
@@ -2437,7 +2131,7 @@ try:
     init_db()
 
     logger.info(
-        "AskOra database initialized."
+        "AskOra database initialized successfully."
     )
 
 except Exception as error:
