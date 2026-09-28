@@ -1,2741 +1,3482 @@
-import os
-import re
-import secrets
-import hashlib
-import smtplib
-import logging
-from datetime import datetime, timedelta, timezone
-from email.message import EmailMessage
-from functools import wraps
-
-import psycopg2
-from psycopg2.extras import RealDictCursor
-from flask import (
-    Flask,
-    request,
-    jsonify,
-    session,
-    redirect,
-    url_for,
-    render_template,
-)
-from werkzeug.security import generate_password_hash, check_password_hash
-from groq import Groq
-
-
-# ============================================================
-# APP CONFIG
-# ============================================================
-
-app = Flask(__name__)
-
-app.secret_key = os.environ["SESSION_SECRET"]
-
-app.config["SESSION_COOKIE_HTTPONLY"] = True
-app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-app.config["SESSION_COOKIE_SECURE"] = (
-    os.environ.get("COOKIE_SECURE", "true").lower() == "true"
-)
-
-app.config["ADMIN_USERNAME"] = os.environ.get(
-    "ADMIN_USERNAME",
-    ""
-)
-
-
-DATABASE_URL = os.environ["DATABASE_URL"]
-GROQ_API_KEY = os.environ["GROQ_API_KEY"]
-
-SMTP_HOST = os.environ.get(
-    "SMTP_HOST",
-    "smtp.gmail.com"
-)
-
-SMTP_PORT = int(
-    os.environ.get(
-        "SMTP_PORT",
-        "587"
-    )
-)
-
-SMTP_USERNAME = os.environ.get(
-    "SMTP_USERNAME",
-    ""
-)
-
-SMTP_PASSWORD = os.environ.get(
-    "SMTP_PASSWORD",
-    ""
-)
-
-SMTP_FROM = os.environ.get(
-    "SMTP_FROM",
-    SMTP_USERNAME
-)
-
-
-GROQ_MODEL = "openai/gpt-oss-120b"
-
-GROQ_VOICE_MODEL = (
-    "whisper-large-v3-turbo"
-)
-
-
-groq_client = Groq(
-    api_key=GROQ_API_KEY
-)
-
-
-# ============================================================
-# LOGGING
-# ============================================================
-
-logging.basicConfig(
-    level=logging.INFO,
-    format=(
-        "%(asctime)s "
-        "%(levelname)s "
-        "%(message)s"
-    )
-)
-
-logger = logging.getLogger(__name__)
-
-
-# ============================================================
-# DATABASE
-# ============================================================
-
-def get_db():
-    return psycopg2.connect(
-        DATABASE_URL,
-        cursor_factory=RealDictCursor
-    )
-
-
-def init_db():
-    conn = get_db()
-
-    try:
-        with conn.cursor() as cur:
-
-            # ------------------------------------------------
-            # USERS
-            # ------------------------------------------------
-
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS web_users (
-                    id BIGSERIAL PRIMARY KEY,
-                    username TEXT UNIQUE NOT NULL,
-                    email TEXT NOT NULL,
-                    password_hash TEXT NOT NULL,
-                    first_seen TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                    last_seen TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                )
-                """
-            )
-
-            # ------------------------------------------------
-            # CHATS
-            # ------------------------------------------------
-
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS web_chats (
-                    id BIGSERIAL PRIMARY KEY,
-                    user_id BIGINT NOT NULL,
-                    title TEXT NOT NULL DEFAULT 'New chat',
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                )
-                """
-            )
-
-            # ------------------------------------------------
-            # MESSAGES
-            # ------------------------------------------------
-
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS web_messages (
-                    id BIGSERIAL PRIMARY KEY,
-                    chat_id BIGINT,
-                    user_id BIGINT,
-                    role TEXT NOT NULL,
-                    content TEXT NOT NULL,
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                )
-                """
-            )
-
-            # ------------------------------------------------
-            # USAGE EVENTS
-            # ------------------------------------------------
-
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS web_usage_events (
-                    id BIGSERIAL PRIMARY KEY,
-                    user_id BIGINT,
-                    event_type TEXT NOT NULL,
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                )
-                """
-            )
-
-            # ------------------------------------------------
-            # PASSWORD RESETS
-            # ------------------------------------------------
-
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS web_password_resets (
-                    id BIGSERIAL PRIMARY KEY,
-                    user_id BIGINT NOT NULL,
-                    token_hash TEXT NOT NULL,
-                    expires_at TIMESTAMPTZ NOT NULL,
-                    used_at TIMESTAMPTZ,
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                )
-                """
-            )
-
-            # ------------------------------------------------
-            # SAFE EXISTING-COLUMN MIGRATIONS
-            # ------------------------------------------------
-
-            cur.execute(
-                """
-                ALTER TABLE web_messages
-                ADD COLUMN IF NOT EXISTS chat_id BIGINT
-                """
-            )
-
-            cur.execute(
-                """
-                ALTER TABLE web_messages
-                ADD COLUMN IF NOT EXISTS user_id BIGINT
-                """
-            )
-
-            cur.execute(
-                """
-                ALTER TABLE web_chats
-                ADD COLUMN IF NOT EXISTS updated_at
-                TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                """
-            )
-
-            # ------------------------------------------------
-            # INDEXES
-            # ------------------------------------------------
-
-            cur.execute(
-                """
-                CREATE INDEX IF NOT EXISTS
-                idx_web_chats_user_updated
-                ON web_chats(user_id, updated_at DESC)
-                """
-            )
-
-            cur.execute(
-                """
-                CREATE INDEX IF NOT EXISTS
-                idx_web_messages_chat_created
-                ON web_messages(chat_id, created_at)
-                """
-            )
-
-            cur.execute(
-                """
-                CREATE INDEX IF NOT EXISTS
-                idx_web_messages_user_created
-                ON web_messages(user_id, created_at)
-                """
-            )
-
-            cur.execute(
-                """
-                CREATE INDEX IF NOT EXISTS
-                idx_web_usage_user_created
-                ON web_usage_events(user_id, created_at)
-                """
-            )
-
-            # ------------------------------------------------
-            # OLD MESSAGES WITHOUT CHAT ID
-            #
-            # We do NOT delete them.
-            # We place them into a Previous chat.
-            # ------------------------------------------------
-
-            cur.execute(
-                """
-                SELECT DISTINCT user_id
-                FROM web_messages
-                WHERE user_id IS NOT NULL
-                AND chat_id IS NULL
-                """
-            )
-
-            old_users = cur.fetchall()
-
-            for row in old_users:
-
-                user_id = row["user_id"]
-
-                cur.execute(
-                    """
-                    SELECT id
-                    FROM web_chats
-                    WHERE user_id = %s
-                    ORDER BY created_at ASC
-                    LIMIT 1
-                    """,
-                    (user_id,)
-                )
-
-                existing =
-                cur.fetchone()
-
-                if existing:
-                    chat_id = existing["id"]
-
-                else:
-                    cur.execute(
-                        """
-                        INSERT INTO web_chats
-                        (user_id, title)
-                        VALUES (%s, %s)
-                        RETURNING id
-                        """,
-                        (
-                            user_id,
-                            "Previous chat"
-                        )
-                    )
-
-                    chat_id =
-                        cur.fetchone()["id"]
-
-                cur.execute(
-                    """
-                    UPDATE web_messages
-                    SET chat_id = %s
-                    WHERE user_id = %s
-                    AND chat_id IS NULL
-                    """,
-                    (
-                        chat_id,
-                        user_id
-                    )
-                )
-
-        conn.commit()
-
-    finally:
-        conn.close()
-
-
-# ============================================================
-# NORMALIZATION
-# ============================================================
-
-def normalize_username(value):
-
-    if value is None:
-        return ""
-
-    value = str(value).strip().lower()
-
-    if value.startswith("@"):
-        value = value[1:]
-
-    return value
-
-
-def normalize_email(value):
-
-    if value is None:
-        return ""
-
-    return (
-        str(value)
-        .strip()
-        .lower()
-    )
-
-
-# ============================================================
-# CSRF
-# ============================================================
-
-def csrf_token():
-
-    token = session.get("csrf_token")
-
-    if not token:
-
-        token = secrets.token_urlsafe(32)
-
-        session["csrf_token"] = token
-
-    return token
-
-
-def require_csrf():
-
-    expected =
-        session.get("csrf_token")
-
-    supplied = (
-        request.headers.get(
-            "X-CSRF-Token"
-        )
-        or request.form.get(
-            "csrf_token"
-        )
-    )
-
-    if not expected or not supplied:
-
-        return False
-
-    return secrets.compare_digest(
-        expected,
-        supplied
-    )
-
-
-def csrf_protected(function):
-
-    @wraps(function)
-    def wrapper(*args, **kwargs):
-
-        if not require_csrf():
-
-            return jsonify(
-                {
-                    "ok": False,
-                    "error":
-                        "Invalid security token. "
-                        "Please refresh the page."
-                }
-            ), 403
-
-        return function(
-            *args,
-            **kwargs
-        )
-
-    return wrapper
-
-
-# ============================================================
-# AUTH HELPERS
-# ============================================================
-
-def current_user():
-
-    user_id =
-        session.get("user_id")
-
-    if not user_id:
-        return None
-
-    conn = get_db()
-
-    try:
-
-        with conn.cursor() as cur:
-
-            cur.execute(
-                """
-                SELECT
-                    id,
-                    username,
-                    email,
-                    first_seen,
-                    last_seen
-                FROM web_users
-                WHERE id = %s
-                """,
-                (user_id,)
-            )
-
-            return cur.fetchone()
-
-    finally:
-        conn.close()
-
-
-def login_required(function):
-
-    @wraps(function)
-    def wrapper(*args, **kwargs):
-
-        if not session.get("user_id"):
-
-            if request.path.startswith("/api/"):
-
-                return jsonify(
-                    {
-                        "ok": False,
-                        "error":
-                            "Please log in."
-                    }
-                ), 401
-
-            return redirect(
-                url_for("login")
-            )
-
-        return function(
-            *args,
-            **kwargs
-        )
-
-    return wrapper
-
-
-def is_admin(user):
-
-    if not user:
-        return False
-
-    username =
-        normalize_username(
-            user["username"]
-        )
-
-    admin_username =
-        normalize_username(
-            app.config.get(
-                "ADMIN_USERNAME",
-                ""
-            )
-        )
-
-    return (
-        username != ""
-        and
-        admin_username != ""
-        and
-        username ==
-        admin_username
-    )
-
-
-# ============================================================
-# USER ACTIVITY
-# ============================================================
-
-def touch_user(user_id):
-
-    conn = get_db()
-
-    try:
-
-        with conn.cursor() as cur:
-
-            cur.execute(
-                """
-                UPDATE web_users
-                SET last_seen = NOW()
-                WHERE id = %s
-                """,
-                (user_id,)
-            )
-
-        conn.commit()
-
-    finally:
-        conn.close()
-
-
-def log_event(
-    user_id,
-    event_type
-):
-
-    conn = get_db()
-
-    try:
-
-        with conn.cursor() as cur:
-
-            cur.execute(
-                """
-                INSERT INTO web_usage_events
-                (user_id, event_type)
-                VALUES (%s, %s)
-                """,
-                (
-                    user_id,
-                    event_type
-                )
-            )
-
-        conn.commit()
-
-    finally:
-        conn.close()
-
-
-# ============================================================
-# HOME
-# ============================================================
-
-@app.route("/")
-@login_required
-def home():
-
-    user =
-        current_user()
-
-    return render_template(
-        "index.html",
-        user=user,
-        csrf_token=csrf_token()
-    )
-
-
-# ============================================================
-# LOGIN
-# ============================================================
-
-@app.route(
-    "/login",
-    methods=["GET", "POST"]
-)
-def login():
-
-    if session.get("user_id"):
-
-        return redirect(
-            url_for("home")
-        )
-
-    if request.method == "GET":
-
-        return render_template(
-            "login.html"
-        )
-
-    username_or_email = (
-        request.form.get(
-            "username"
-        )
-        or
-        request.form.get(
-            "email"
-        )
-        or ""
-    ).strip()
-
-    password =
-        request.form.get(
-            "password",
-            ""
-        )
-
-    if (
-        not username_or_email
-        or
-        not password
-    ):
-
-        return render_template(
-            "login.html",
-            error=
-                "Enter your username/email and password."
-        )
-
-    conn = get_db()
-
-    try:
-
-        with conn.cursor() as cur:
-
-            cur.execute(
-                """
-                SELECT *
-                FROM web_users
-                WHERE LOWER(username) = LOWER(%s)
-                   OR LOWER(email) = LOWER(%s)
-                LIMIT 1
-                """,
-                (
-                    username_or_email,
-                    username_or_email
-                )
-            )
-
-            user =
-                cur.fetchone()
-
-    finally:
-        conn.close()
-
-    if not user:
-
-        return render_template(
-            "login.html",
-            error=
-                "Invalid username/email or password."
-        )
-
-    if not check_password_hash(
-        user["password_hash"],
-        password
-    ):
-
-        return render_template(
-            "login.html",
-            error=
-                "Invalid username/email or password."
-        )
-
-    session.clear()
-
-    session["user_id"] =
-        user["id"]
-
-    session["csrf_token"] =
-        secrets.token_urlsafe(32)
-
-    touch_user(
-        user["id"]
-    )
-
-    return redirect(
-        url_for("home")
-    )
-
-
-# ============================================================
-# REGISTER
-# ============================================================
-
-@app.route(
-    "/register",
-    methods=["GET", "POST"]
-)
-def register():
-
-    if session.get("user_id"):
-
-        return redirect(
-            url_for("home")
-        )
-
-    if request.method == "GET":
-
-        return render_template(
-            "register.html"
-        )
-
-    username =
-        normalize_username(
-            request.form.get(
-                "username",
-                ""
-            )
-        )
-
-    email =
-        normalize_email(
-            request.form.get(
-                "email",
-                ""
-            )
-        )
-
-    password =
-        request.form.get(
-            "password",
-            ""
-        )
-
-    if not username:
-
-        return render_template(
-            "register.html",
-            error=
-                "Username is required."
-        )
-
-    if not re.match(
-        r"^[a-z0-9_]{3,30}$",
-        username
-    ):
-
-        return render_template(
-            "register.html",
-            error=
-                "Username must be 3-30 characters and use only letters, numbers and underscores."
-        )
-
-    if not email or "@" not in email:
-
-        return render_template(
-            "register.html",
-            error=
-                "Enter a valid email address."
-        )
-
-    if len(password) < 8:
-
-        return render_template(
-            "register.html",
-            error=
-                "Password must be at least 8 characters."
-        )
-
-    password_hash =
-        generate_password_hash(
-            password
-        )
-
-    conn = get_db()
-
-    try:
-
-        with conn.cursor() as cur:
-
-            cur.execute(
-                """
-                SELECT id
-                FROM web_users
-                WHERE LOWER(username) = LOWER(%s)
-                   OR LOWER(email) = LOWER(%s)
-                LIMIT 1
-                """,
-                (
-                    username,
-                    email
-                )
-            )
-
-            existing =
-                cur.fetchone()
-
-            if existing:
-
-                return render_template(
-                    "register.html",
-                    error=
-                        "Username or email is already in use."
-                )
-
-            cur.execute(
-                """
-                INSERT INTO web_users
-                (
-                    username,
-                    email,
-                    password_hash
-                )
-                VALUES (%s, %s, %s)
-                RETURNING id
-                """,
-                (
-                    username,
-                    email,
-                    password_hash
-                )
-            )
-
-            user_id =
-                cur.fetchone()["id"]
-
-        conn.commit()
-
-    finally:
-        conn.close()
-
-    session.clear()
-
-    session["user_id"] =
-        user_id
-
-    session["csrf_token"] =
-        secrets.token_urlsafe(32)
-
-    return redirect(
-        url_for("home")
-    )
-
-
-# ============================================================
-# LOGOUT
-#
-# IMPORTANT:
-# GET + POST are both allowed.
-#
-# The frontend uses:
-# window.location.href = "/logout"
-#
-# Therefore GET MUST be allowed.
-# ============================================================
-
-@app.route(
-    "/logout",
-    methods=["GET", "POST"]
-)
-def logout():
-
-    session.clear()
-
-    response =
-        redirect(
-            url_for("login")
-        )
-
-    response.delete_cookie(
-        app.config.get(
-            "SESSION_COOKIE_NAME",
-            "session"
-        )
-    )
-
-    return response
-
-
-# ============================================================
-# API ME
-# ============================================================
-
-@app.route("/api/me")
-def api_me():
-
-    user =
-        current_user()
-
-    if not user:
-
-        return jsonify(
-            {
-                "ok": True,
-                "authenticated": False
-            }
-        )
-
-    touch_user(
-        user["id"]
-    )
-
-    return jsonify(
-        {
-            "ok": True,
-            "authenticated": True,
-
-            "csrf_token":
-                csrf_token(),
-
-            "user": {
-                "id":
-                    user["id"],
-
-                "username":
-                    user["username"],
-
-                "email":
-                    user["email"],
-
-                "is_admin":
-                    is_admin(user)
-            }
-        }
-    )
-
-
-# ============================================================
-# FORGOT PASSWORD
-# ============================================================
-
-@app.route(
-    "/forgot-password",
-    methods=["GET", "POST"]
-)
-def forgot_password():
-
-    if request.method == "GET":
-
-        return render_template(
-            "forgot_password.html"
-        )
-
-    email =
-        normalize_email(
-            request.form.get(
-                "email",
-                ""
-            )
-        )
-
-    if not email:
-
-        return render_template(
-            "forgot_password.html",
-            error=
-                "Enter your email address."
-        )
-
-    conn = get_db()
-
-    try:
-
-        with conn.cursor() as cur:
-
-            cur.execute(
-                """
-                SELECT id, username, email
-                FROM web_users
-                WHERE LOWER(email) = LOWER(%s)
-                LIMIT 1
-                """,
-                (email,)
-            )
-
-            user =
-                cur.fetchone()
-
-    finally:
-        conn.close()
-
-    # Always give the same response.
-    # This prevents revealing whether an
-    # email is registered.
-
-    if not user:
-
-        return render_template(
-            "forgot_password.html",
-            message=
-                "If an account exists for that email, a reset code has been sent."
-        )
-
-    code =
-        f"{secrets.randbelow(1000000):06d}"
-
-    token_hash =
-        hashlib.sha256(
-            code.encode()
-        ).hexdigest()
-
-    expires_at =
-        datetime.now(
-            timezone.utc
-        ) + timedelta(
-            minutes=10
-        )
-
-    conn = get_db()
-
-    try:
-
-        with conn.cursor() as cur:
-
-            # Invalidate previous codes.
-
-            cur.execute(
-                """
-                UPDATE web_password_resets
-                SET used_at = NOW()
-                WHERE user_id = %s
-                AND used_at IS NULL
-                """,
-                (user["id"],)
-            )
-
-            cur.execute(
-                """
-                INSERT INTO web_password_resets
-                (
-                    user_id,
-                    token_hash,
-                    expires_at
-                )
-                VALUES (%s, %s, %s)
-                """,
-                (
-                    user["id"],
-                    token_hash,
-                    expires_at
-                )
-            )
-
-        conn.commit()
-
-    finally:
-        conn.close()
-
-    try:
-
-        send_reset_email(
-            user["email"],
-            code
-        )
-
-    except Exception as error:
-
-        logger.exception(
-            "Password reset email failed: %s",
-            error
-        )
-
-        return render_template(
-            "forgot_password.html",
-            error=
-                "We couldn't send the reset email right now. Please try again later."
-        )
-
-    return render_template(
-        "forgot_password.html",
-        message=
-            "A 6-digit reset code has been sent to your email."
-    )
-
-
-# ============================================================
-# RESET PASSWORD
-# ============================================================
-
-@app.route(
-    "/reset-password",
-    methods=["GET", "POST"]
-)
-def reset_password():
-
-    if request.method == "GET":
-
-        return render_template(
-            "reset_password.html"
-        )
-
-    email =
-        normalize_email(
-            request.form.get(
-                "email",
-                ""
-            )
-        )
-
-    code =
-        request.form.get(
-            "code",
-            ""
-        ).strip()
-
-    password =
-        request.form.get(
-            "password",
-            ""
-        )
-
-    if (
-        not email
-        or
-        not re.match(
-            r"^\d{6}$",
-            code
-        )
-        or
-        len(password) < 8
-    ):
-
-        return render_template(
-            "reset_password.html",
-            error=
-                "Enter your email, 6-digit code and a password of at least 8 characters."
-        )
-
-    code_hash =
-        hashlib.sha256(
-            code.encode()
-        ).hexdigest()
-
-    conn = get_db()
-
-    try:
-
-        with conn.cursor() as cur:
-
-            cur.execute(
-                """
-                SELECT
-                    r.id,
-                    r.user_id
-                FROM web_password_resets r
-                JOIN web_users u
-                    ON u.id = r.user_id
-                WHERE LOWER(u.email) = LOWER(%s)
-                AND r.token_hash = %s
-                AND r.used_at IS NULL
-                AND r.expires_at > NOW()
-                ORDER BY r.created_at DESC
-                LIMIT 1
-                """,
-                (
-                    email,
-                    code_hash
-                )
-            )
-
-            reset =
-                cur.fetchone()
-
-            if not reset:
-
-                return render_template(
-                    "reset_password.html",
-                    error=
-                        "Invalid or expired reset code."
-                )
-
-            password_hash =
-                generate_password_hash(
-                    password
-                )
-
-            cur.execute(
-                """
-                UPDATE web_users
-                SET password_hash = %s
-                WHERE id = %s
-                """,
-                (
-                    password_hash,
-                    reset["user_id"]
-                )
-            )
-
-            cur.execute(
-                """
-                UPDATE web_password_resets
-                SET used_at = NOW()
-                WHERE id = %s
-                """,
-                (reset["id"],)
-            )
-
-        conn.commit()
-
-    finally:
-        conn.close()
-
-    return redirect(
-        url_for(
-            "login"
-        )
-    )
-
-
-# ============================================================
-# EMAIL
-# ============================================================
-
-def send_reset_email(
-    recipient,
-    code
-):
-
-    if (
-        not SMTP_USERNAME
-        or
-        not SMTP_PASSWORD
-    ):
-
-        raise RuntimeError(
-            "SMTP is not configured."
-        )
-
-    message =
-        EmailMessage()
-
-    message["Subject"] =
-        "AskOra password reset code"
-
-    message["From"] =
-        SMTP_FROM
-
-    message["To"] =
-        recipient
-
-    message.set_content(
-        f"""
-Your AskOra password reset code is:
-
-{code}
-
-This code expires in 10 minutes.
-
-If you did not request a password reset,
-you can ignore this email.
-
-— AskOra
-""".strip()
-    )
-
-    with smtplib.SMTP(
-        SMTP_HOST,
-        SMTP_PORT
-    ) as server:
-
-        server.starttls()
-
-        server.login(
-            SMTP_USERNAME,
-            SMTP_PASSWORD
-        )
-
-        server.send_message(
-            message
-        )
-
-
-# ============================================================
-# CHATS
-# ============================================================
-
-@app.route(
-    "/api/chats",
-    methods=["GET", "POST"]
-)
-@login_required
-def chats_api():
-
-    user =
-        current_user()
-
-    user_id =
-        user["id"]
-
-    if request.method == "GET":
-
-        conn = get_db()
-
-        try:
-
-            with conn.cursor() as cur:
-
-                cur.execute(
-                    """
-                    SELECT
-                        id,
-                        title,
-                        created_at,
-                        updated_at
-                    FROM web_chats
-                    WHERE user_id = %s
-                    ORDER BY updated_at DESC
-                    """,
-                    (user_id,)
-                )
-
-                rows =
-                    cur.fetchall()
-
-        finally:
-            conn.close()
-
-        return jsonify(
-            {
-                "ok": True,
-                "chats": [
-                    {
-                        "id":
-                            row["id"],
-
-                        "title":
-                            row["title"],
-
-                        "created_at":
-                            row["created_at"].isoformat()
-                            if row["created_at"]
-                            else None,
-
-                        "updated_at":
-                            row["updated_at"].isoformat()
-                            if row["updated_at"]
-                            else None,
-                    }
-
-                    for row in rows
-                ]
-            }
-        )
-
-    # POST = new chat
-
-    if not require_csrf():
-
-        return jsonify(
-            {
-                "ok": False,
-                "error":
-                    "Invalid security token. Please refresh the page."
-            }
-        ), 403
-
-    body =
-        request.get_json(
-            silent=True
-        ) or {}
-
-    title =
-        str(
-            body.get(
-                "title",
-                "New chat"
-            )
-        ).strip()
-
-    if not title:
-        title = "New chat"
-
-    title =
-        title[:120]
-
-    conn = get_db()
-
-    try:
-
-        with conn.cursor() as cur:
-
-            cur.execute(
-                """
-                INSERT INTO web_chats
-                (
-                    user_id,
-                    title
-                )
-                VALUES (%s, %s)
-                RETURNING
-                    id,
-                    title,
-                    created_at,
-                    updated_at
-                """,
-                (
-                    user_id,
-                    title
-                )
-            )
-
-            row =
-                cur.fetchone()
-
-        conn.commit()
-
-    finally:
-        conn.close()
-
-    return jsonify(
-        {
-            "ok": True,
-            "chat": {
-                "id":
-                    row["id"],
-
-                "title":
-                    row["title"],
-
-                "created_at":
-                    row["created_at"].isoformat(),
-
-                "updated_at":
-                    row["updated_at"].isoformat()
-            }
-        }
-    )
-
-
-# ============================================================
-# CHAT OWNERSHIP
-# ============================================================
-
-def user_owns_chat(
-    user_id,
-    chat_id
-):
-
-    conn = get_db()
-
-    try:
-
-        with conn.cursor() as cur:
-
-            cur.execute(
-                """
-                SELECT id
-                FROM web_chats
-                WHERE id = %s
-                AND user_id = %s
-                LIMIT 1
-                """,
-                (
-                    chat_id,
-                    user_id
-                )
-            )
-
-            row =
-                cur.fetchone()
-
-            return bool(row)
-
-    finally:
-        conn.close()
-
-
-# ============================================================
-# CHAT MESSAGES
-# ============================================================
-
-@app.route(
-    "/api/chats/<int:chat_id>/messages"
-)
-@login_required
-def chat_messages(
-    chat_id
-):
-
-    user =
-        current_user()
-
-    if not user_owns_chat(
-        user["id"],
-        chat_id
-    ):
-
-        return jsonify(
-            {
-                "ok": False,
-                "error":
-                    "Chat not found."
-            }
-        ), 404
-
-    conn = get_db()
-
-    try:
-
-        with conn.cursor() as cur:
-
-            cur.execute(
-                """
-                SELECT
-                    id,
-                    role,
-                    content,
-                    created_at
-                FROM web_messages
-                WHERE chat_id = %s
-                AND user_id = %s
-                ORDER BY created_at ASC
-                """,
-                (
-                    chat_id,
-                    user["id"]
-                )
-            )
-
-            rows =
-                cur.fetchall()
-
-    finally:
-        conn.close()
-
-    return jsonify(
-        {
-            "ok": True,
-            "messages": [
-                {
-                    "id":
-                        row["id"],
-
-                    "role":
-                        row["role"],
-
-                    "content":
-                        row["content"],
-
-                    "created_at":
-                        row["created_at"].isoformat()
-                        if row["created_at"]
-                        else None
-                }
-
-                for row in rows
-            ]
-        }
-    )
-
-
-# ============================================================
-# DELETE CHAT
-# ============================================================
-
-@app.route(
-    "/api/chats/<int:chat_id>",
-    methods=["DELETE"]
-)
-@login_required
-@csrf_protected
-def delete_chat(
-    chat_id
-):
-
-    user =
-        current_user()
-
-    user_id =
-        user["id"]
-
-    conn = get_db()
-
-    try:
-
-        with conn.cursor() as cur:
-
-            cur.execute(
-                """
-                SELECT id
-                FROM web_chats
-                WHERE id = %s
-                AND user_id = %s
-                """,
-                (
-                    chat_id,
-                    user_id
-                )
-            )
-
-            chat =
-                cur.fetchone()
-
-            if not chat:
-
-                return jsonify(
-                    {
-                        "ok": False,
-                        "error":
-                            "Chat not found."
-                    }
-                ), 404
-
-            cur.execute(
-                """
-                DELETE FROM web_messages
-                WHERE chat_id = %s
-                AND user_id = %s
-                """,
-                (
-                    chat_id,
-                    user_id
-                )
-            )
-
-            cur.execute(
-                """
-                DELETE FROM web_chats
-                WHERE id = %s
-                AND user_id = %s
-                """,
-                (
-                    chat_id,
-                    user_id
-                )
-            )
-
-        conn.commit()
-
-    finally:
-        conn.close()
-
-    return jsonify(
-        {
-            "ok": True
-        }
-    )
-
-
-# ============================================================
-# CHAT TITLE
-# ============================================================
-
-def make_chat_title(
-    message
-):
-
-    clean =
-        re.sub(
-            r"\s+",
-            " ",
-            message.strip()
-        )
-
-    if not clean:
-        return "New chat"
-
-    return clean[:80]
-
-
-# ============================================================
-# COMPACT AI ANSWER
-# ============================================================
-
-def compact_answer(
-    answer,
-    detailed=False
-):
-
-    if not answer:
-        return (
-            "Sorry, I couldn't generate "
-            "an answer right now."
-        )
-
-    answer =
-        answer.strip()
-
-    max_chars =
-        5000 if detailed else 3000
-
-    if len(answer) <= max_chars:
-        return answer
-
-    shortened =
-        answer[:max_chars]
-
-    last_break =
-        max(
-            shortened.rfind("\n"),
-            shortened.rfind(". "),
-            shortened.rfind("! "),
-            shortened.rfind("? ")
-        )
-
-    if last_break > max_chars * 0.65:
-
-        shortened =
-            shortened[
-                :last_break + 1
-            ]
-
-    return (
-        shortened.rstrip()
-        +
-        "\n\n"
-        "If you want, I can explain this in more detail."
-    )
-
-
-# ============================================================
-# AI RESPONSE
-# ============================================================
-
-def generate_ai_answer(
-    user_message,
-    history,
-    detailed=False
-):
-
-    system_prompt = """
-You are AskOra, a helpful AI assistant.
-
-Your job is to answer clearly, naturally and accurately.
-
-Keep normal answers concise and useful.
-Do not unnecessarily repeat the user's question.
-
-Use Markdown when it genuinely improves readability.
-
-If the user asks for a simple explanation,
-explain it simply.
-
-If the user asks for detailed information,
-you may provide more detail.
-
-Do not claim to have performed actions
-you cannot actually perform.
-
-Be friendly but do not use excessive filler.
-""".strip()
-
-    messages = [
-        {
-            "role":
-                "system",
-
-            "content":
-                system_prompt
-        }
-    ]
-
-    for item in history[-12:]:
-
-        role =
-            item.get(
-                "role"
-            )
-
-        content =
-            item.get(
-                "content",
-                ""
-            )
-
-        if role in (
-            "user",
-            "assistant"
-        ):
-
-            messages.append(
-                {
-                    "role":
-                        role,
-
-                    "content":
-                        content
-                }
-            )
-
-    messages.append(
-        {
-            "role":
-                "user",
-
-            "content":
-                user_message
-        }
-    )
-
-    max_tokens =
-        700 if detailed else 350
-
-    response =
-        groq_client.chat.completions.create(
-            model=GROQ_MODEL,
-            messages=messages,
-            temperature=0.7,
-            max_tokens=max_tokens
-        )
-
-    answer =
-        response.choices[0].message.content
-
-    return compact_answer(
-        answer,
-        detailed=detailed
-    )
-
-
-# ============================================================
-# CHAT API
-# ============================================================
-
-@app.route(
-    "/api/chat",
-    methods=["POST"]
-)
-@login_required
-@csrf_protected
-def api_chat():
-
-    user =
-        current_user()
-
-    user_id =
-        user["id"]
-
-    body =
-        request.get_json(
-            silent=True
-        ) or {}
-
-    message =
-        str(
-            body.get(
-                "message",
-                ""
-            )
-        ).strip()
-
-    chat_id =
-        body.get(
-            "chat_id"
-        )
-
-    if not message:
-
-        return jsonify(
-            {
-                "ok": False,
-                "error":
-                    "Please enter a message."
-            }
-        ), 400
-
-    if len(message) > 12000:
-
-        return jsonify(
-            {
-                "ok": False,
-                "error":
-                    "Your message is too long."
-            }
-        ), 400
-
-    try:
-
-        chat_id =
-            int(chat_id)
-
-    except (
-        TypeError,
-        ValueError
-    ):
-
-        chat_id = None
-
-
-    # --------------------------------------------------------
-    # CREATE CHAT IF NECESSARY
-    # --------------------------------------------------------
-
-    conn = get_db()
-
-    try:
-
-        with conn.cursor() as cur:
-
-            if chat_id:
-
-                cur.execute(
-                    """
-                    SELECT id, title
-                    FROM web_chats
-                    WHERE id = %s
-                    AND user_id = %s
-                    """,
-                    (
-                        chat_id,
-                        user_id
-                    )
-                )
-
-                chat =
-                    cur.fetchone()
-
-                if not chat:
-
-                    return jsonify(
-                        {
-                            "ok": False,
-                            "error":
-                                "Chat not found."
-                        }
-                    ), 404
-
-            else:
-
-                title =
-                    make_chat_title(
-                        message
-                    )
-
-                cur.execute(
-                    """
-                    INSERT INTO web_chats
-                    (
-                        user_id,
-                        title
-                    )
-                    VALUES (%s, %s)
-                    RETURNING
-                        id,
-                        title
-                    """,
-                    (
-                        user_id,
-                        title
-                    )
-                )
-
-                chat =
-                    cur.fetchone()
-
-                chat_id =
-                    chat["id"]
-
-            # ------------------------------------------------
-            # GET RECENT HISTORY
-            # ------------------------------------------------
-
-            cur.execute(
-                """
-                SELECT
-                    role,
-                    content
-                FROM web_messages
-                WHERE chat_id = %s
-                AND user_id = %s
-                ORDER BY created_at DESC
-                LIMIT 12
-                """,
-                (
-                    chat_id,
-                    user_id
-                )
-            )
-
-            history_rows =
-                cur.fetchall()
-
-            history_rows.reverse()
-
-        conn.commit()
-
-    finally:
-        conn.close()
-
-
-    history = [
-        {
-            "role":
-                row["role"],
-
-            "content":
-                row["content"]
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>AskOra — Ask. Get answers.</title>
+
+    <meta
+        name="description"
+        content="AskOra — Advanced AI, made simple."
+    >
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
 
-        for row in history_rows
-    ]
-
-
-    detailed =
-        bool(
-            re.search(
-                r"\b(
-                    detailed|
-                    in detail|
-                    explain fully|
-                    step by step|
-                    deeply|
-                    comprehensive
-                )\b",
-                message,
-                re.IGNORECASE |
-                re.VERBOSE
-            )
-        )
-
-
-    # --------------------------------------------------------
-    # GENERATE AI
-    # --------------------------------------------------------
-
-    try:
-
-        answer =
-            generate_ai_answer(
-                message,
-                history,
-                detailed=detailed
-            )
-
-    except Exception as error:
-
-        logger.exception(
-            "Groq chat error: %s",
-            error
-        )
-
-        return jsonify(
-            {
-                "ok": False,
-                "error":
-                    "Sorry, something went wrong while generating the response."
-            }
-        ), 500
-
-
-    # --------------------------------------------------------
-    # SAVE MESSAGES
-    # --------------------------------------------------------
-
-    conn = get_db()
-
-    try:
-
-        with conn.cursor() as cur:
-
-            cur.execute(
-                """
-                INSERT INTO web_messages
-                (
-                    chat_id,
-                    user_id,
-                    role,
-                    content
-                )
-                VALUES
-                (%s, %s, 'user', %s)
-                """,
-                (
-                    chat_id,
-                    user_id,
-                    message
-                )
-            )
-
-            cur.execute(
-                """
-                INSERT INTO web_messages
-                (
-                    chat_id,
-                    user_id,
-                    role,
-                    content
-                )
-                VALUES
-                (%s, %s, 'assistant', %s)
-                """,
-                (
-                    chat_id,
-                    user_id,
-                    answer
-                )
-            )
-
-            # ------------------------------------------------
-            # FIRST QUESTION BECOMES TITLE
-            # ------------------------------------------------
-
-            cur.execute(
-                """
-                SELECT COUNT(*) AS count
-                FROM web_messages
-                WHERE chat_id = %s
-                AND user_id = %s
-                AND role = 'user'
-                """,
-                (
-                    chat_id,
-                    user_id
-                )
-            )
-
-            count =
-                cur.fetchone()["count"]
-
-            if count == 1:
-
-                title =
-                    make_chat_title(
-                        message
-                    )
-
-                cur.execute(
-                    """
-                    UPDATE web_chats
-                    SET title = %s,
-                        updated_at = NOW()
-                    WHERE id = %s
-                    AND user_id = %s
-                    """,
-                    (
-                        title,
-                        chat_id,
-                        user_id
-                    )
-                )
-
-            else:
-
-                cur.execute(
-                    """
-                    UPDATE web_chats
-                    SET updated_at = NOW()
-                    WHERE id = %s
-                    AND user_id = %s
-                    """,
-                    (
-                        chat_id,
-                        user_id
-                    )
-                )
-
-        conn.commit()
-
-    finally:
-        conn.close()
-
-
-    log_event(
-        user_id,
-        "chat"
-    )
-
-    return jsonify(
-        {
-            "ok": True,
-
-            "chat_id":
-                chat_id,
-
-            "title":
-                make_chat_title(
-                    message
-                )
-                if count == 1
-                else chat["title"],
-
-            "answer":
-                answer
+        :root {
+            --space: #080B18;
+            --midnight: #10152B;
+            --panel: #11172D;
+            --panel-2: #151B34;
+            --blue: #3B82F6;
+            --violet: #7C3AED;
+            --white: #F5F7FF;
+            --gray: #9CA3AF;
+            --gray-2: #687087;
+            --border: rgba(255,255,255,.08);
+            --danger: #EF4444;
         }
-    )
 
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
 
-# ============================================================
-# VOICE TRANSCRIPTION
-# ============================================================
+        body {
+            font-family:
+                Inter,
+                ui-sans-serif,
+                system-ui,
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                sans-serif;
 
-@app.route(
-    "/api/voice",
-    methods=["POST"]
-)
-@login_required
-@csrf_protected
-def api_voice():
-
-    user =
-        current_user()
-
-    user_id =
-        user["id"]
-
-    audio =
-        request.files.get(
-            "audio"
-        )
-
-    if not audio:
-
-        return jsonify(
-            {
-                "ok": False,
-                "error":
-                    "No audio recording was received."
-            }
-        ), 400
-
-    try:
-
-        audio_bytes =
-            audio.read()
-
-        if not audio_bytes:
-
-            return jsonify(
-                {
-                    "ok": False,
-                    "error":
-                        "The recording was empty."
-                }
-            ), 400
-
-        if len(audio_bytes) > 15 * 1024 * 1024:
-
-            return jsonify(
-                {
-                    "ok": False,
-                    "error":
-                        "The recording is too large."
-                }
-            ), 400
-
-
-        # ----------------------------------------------------
-        # Groq Whisper
-        # ----------------------------------------------------
-
-        transcription =
-            groq_client.audio.transcriptions.create(
-                file=(
-                    audio.filename
-                    or "recording.webm",
-                    audio_bytes
+            background:
+                radial-gradient(
+                    circle at 80% 10%,
+                    rgba(59,130,246,.10),
+                    transparent 28%
                 ),
+                radial-gradient(
+                    circle at 20% 90%,
+                    rgba(124,58,237,.08),
+                    transparent 30%
+                ),
+                var(--space);
 
-                model=
-                    GROQ_VOICE_MODEL,
+            color: var(--white);
+        }
 
-                response_format=
-                    "json",
+        button,
+        input,
+        textarea {
+            font: inherit;
+        }
 
-                temperature=0
-            )
+        button {
+            cursor: pointer;
+        }
+
+        /* =====================================================
+           APP
+        ===================================================== */
+
+        .app {
+            display: flex;
+            width: 100%;
+            height: 100vh;
+        }
+
+        /* =====================================================
+           SIDEBAR
+        ===================================================== */
+
+        .sidebar {
+            width: 270px;
+            height: 100%;
+            flex-shrink: 0;
+
+            display: flex;
+            flex-direction: column;
+
+            background:
+                rgba(8,11,24,.96);
+
+            border-right:
+                1px solid var(--border);
+
+            z-index: 20;
+        }
+
+        .sidebar-header {
+            padding: 18px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            margin-bottom: 18px;
+        }
+
+        .brand-logo {
+            width: 36px;
+            height: 36px;
+
+            display: grid;
+            place-items: center;
+
+            border-radius: 11px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    var(--blue),
+                    var(--violet)
+                );
+
+            box-shadow:
+                0 0 24px rgba(59,130,246,.24);
+
+            color: white;
+            font-size: 18px;
+            font-weight: 900;
+        }
+
+        .brand-name {
+            font-size: 18px;
+            font-weight: 800;
+            letter-spacing: -.3px;
+        }
+
+        .new-chat-button {
+            width: 100%;
+            min-height: 44px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+
+            border: 1px solid rgba(255,255,255,.10);
+            border-radius: 12px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    rgba(59,130,246,.18),
+                    rgba(124,58,237,.16)
+                );
+
+            color: var(--white);
+
+            transition:
+                .18s ease;
+        }
+
+        .new-chat-button:hover {
+            background:
+                linear-gradient(
+                    135deg,
+                    rgba(59,130,246,.28),
+                    rgba(124,58,237,.24)
+                );
+
+            transform: translateY(-1px);
+        }
+
+        .search-box {
+            margin: 0 18px 14px;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            height: 40px;
+
+            padding:
+                0 12px 0 37px;
+
+            border:
+                1px solid var(--border);
+
+            border-radius: 10px;
+
+            outline: none;
+
+            background:
+                rgba(255,255,255,.045);
+
+            color: var(--white);
+        }
+
+        .search-box input::placeholder {
+            color: var(--gray-2);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+
+            transform:
+                translateY(-50%);
+
+            color: var(--gray);
+            font-size: 15px;
+        }
+
+        .chat-history-label {
+            padding:
+                0 18px 9px;
+
+            color: var(--gray-2);
+
+            font-size: 11px;
+            font-weight: 700;
+
+            text-transform: uppercase;
+            letter-spacing: .8px;
+        }
+
+        .chat-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 10px 12px;
+        }
+
+        .chat-list::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .chat-list::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,.10);
+            border-radius: 10px;
+        }
+
+        .chat-item {
+            width: 100%;
+            min-height: 43px;
+
+            display: flex;
+            align-items: center;
+
+            padding: 7px 8px 7px 11px;
+
+            border-radius: 9px;
+
+            color: #C8CDDA;
+
+            transition:
+                .15s ease;
+
+            margin-bottom: 3px;
+        }
+
+        .chat-item:hover {
+            background:
+                rgba(255,255,255,.055);
+
+            color: white;
+        }
+
+        .chat-item.active {
+            background:
+                rgba(59,130,246,.12);
+
+            color: white;
+        }
+
+        .chat-item-title {
+            flex: 1;
+
+            min-width: 0;
+
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+
+            font-size: 13px;
+        }
+
+        .delete-chat {
+            width: 27px;
+            height: 27px;
+
+            flex-shrink: 0;
+
+            display: grid;
+            place-items: center;
+
+            border: 0;
+            border-radius: 7px;
+
+            background: transparent;
+
+            color: #697188;
+
+            opacity: 0;
+
+            transition: .15s ease;
+        }
+
+        .chat-item:hover .delete-chat {
+            opacity: 1;
+        }
+
+        .delete-chat:hover {
+            background:
+                rgba(239,68,68,.12);
+
+            color: #F87171;
+        }
+
+        .sidebar-bottom {
+            padding: 10px;
+            border-top: 1px solid var(--border);
+        }
+
+        .side-button {
+            width: 100%;
+            min-height: 39px;
+
+            display: flex;
+            align-items: center;
+            gap: 10px;
+
+            padding:
+                0 10px;
+
+            border: 0;
+            border-radius: 9px;
+
+            background: transparent;
+
+            color: #B8C0D2;
+
+            text-align: left;
+
+            font-size: 13px;
+
+            transition: .15s ease;
+        }
+
+        .side-button:hover {
+            background:
+                rgba(255,255,255,.05);
+
+            color: white;
+        }
+
+        .side-button.danger:hover {
+            color: #F87171;
+            background:
+                rgba(239,68,68,.08);
+        }
+
+        .account-card {
+            margin:
+                7px 4px 4px;
+
+            padding: 10px;
+
+            border:
+                1px solid var(--border);
+
+            border-radius: 11px;
+
+            background:
+                rgba(255,255,255,.025);
+        }
+
+        .account-name {
+            font-size: 13px;
+            font-weight: 700;
+
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .account-email {
+            margin-top: 3px;
+
+            color: var(--gray-2);
+
+            font-size: 11px;
+
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* =====================================================
+           MAIN
+        ===================================================== */
+
+        .main {
+            flex: 1;
+            min-width: 0;
+            height: 100%;
+
+            display: flex;
+            flex-direction: column;
+
+            background:
+                rgba(8,11,24,.62);
+        }
+
+        /* =====================================================
+           TOPBAR
+        ===================================================== */
+
+        .topbar {
+            height: 66px;
+            flex-shrink: 0;
+
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+
+            padding:
+                0 22px;
+
+            border-bottom:
+                1px solid var(--border);
+
+            background:
+                rgba(8,11,24,.82);
+
+            backdrop-filter:
+                blur(18px);
+
+            position: relative;
+            z-index: 10;
+        }
+
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .mobile-menu {
+            display: none;
+
+            width: 38px;
+            height: 38px;
+
+            border: 0;
+            border-radius: 9px;
+
+            background:
+                rgba(255,255,255,.05);
+
+            color: white;
+        }
+
+        .top-brand {
+            min-width: 0;
+        }
+
+        .top-brand-name {
+            font-weight: 800;
+            font-size: 16px;
+        }
+
+        .top-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+
+            margin-top: 2px;
+
+            color: #8F98AA;
+            font-size: 11px;
+        }
+
+        .online-dot {
+            width: 6px;
+            height: 6px;
+
+            border-radius: 50%;
+
+            background: #22C55E;
+
+            box-shadow:
+                0 0 8px rgba(34,197,94,.55);
+        }
+
+        .top-tagline {
+            color: var(--gray-2);
+            font-size: 12px;
+        }
+
+        /* =====================================================
+           CHAT AREA
+        ===================================================== */
+
+        .messages {
+            flex: 1;
+
+            overflow-y: auto;
+
+            padding:
+                34px 20px 160px;
+        }
+
+        .messages::-webkit-scrollbar {
+            width: 7px;
+        }
+
+        .messages::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,.08);
+            border-radius: 10px;
+        }
+
+        .messages-inner {
+            width: min(850px, 100%);
+            margin: 0 auto;
+        }
+
+        .welcome {
+            min-height: calc(100vh - 220px);
+
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+
+            text-align: center;
+
+            padding: 30px 10px;
+        }
+
+        .welcome-logo {
+            width: 62px;
+            height: 62px;
+
+            display: grid;
+            place-items: center;
+
+            border-radius: 19px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    var(--blue),
+                    var(--violet)
+                );
+
+            box-shadow:
+                0 0 40px rgba(59,130,246,.22);
+
+            font-size: 27px;
+            font-weight: 900;
+
+            margin-bottom: 20px;
+        }
+
+        .welcome h1 {
+            font-size:
+                clamp(27px, 5vw, 40px);
+
+            letter-spacing:
+                -1.2px;
+
+            margin-bottom: 9px;
+        }
+
+        .welcome p {
+            max-width: 500px;
+
+            color: var(--gray);
+
+            line-height: 1.65;
+
+            font-size: 14px;
+        }
+
+        .welcome-sub {
+            margin-top: 5px;
+            color: #727B91 !important;
+        }
+
+        .message {
+            display: flex;
+            gap: 14px;
+
+            margin-bottom: 28px;
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message-avatar {
+            width: 30px;
+            height: 30px;
+
+            flex-shrink: 0;
+
+            display: grid;
+            place-items: center;
+
+            border-radius: 9px;
+
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .assistant .message-avatar {
+            background:
+                linear-gradient(
+                    135deg,
+                    var(--blue),
+                    var(--violet)
+                );
+        }
+
+        .user .message-avatar {
+            background:
+                #252C43;
+
+            color: #CBD3E4;
+        }
+
+        .message-body {
+            min-width: 0;
+            max-width: min(720px, 85%);
+        }
+
+        .user .message-body {
+            order: -1;
+        }
+
+        .message-content {
+            color: #E8EBF4;
+
+            font-size: 14px;
+            line-height: 1.7;
+
+            overflow-wrap:
+                anywhere;
+        }
+
+        .user .message-content {
+            padding:
+                10px 14px;
+
+            border-radius:
+                16px 16px 4px 16px;
+
+            background:
+                #202840;
+
+            color: #F3F5FB;
+        }
+
+        .assistant .message-content {
+            padding-top: 1px;
+        }
+
+        .message-content p {
+            margin:
+                0 0 10px;
+        }
+
+        .message-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        .message-content ul,
+        .message-content ol {
+            margin:
+                8px 0 12px 22px;
+        }
+
+        .message-content li {
+            margin-bottom: 5px;
+        }
+
+        .message-content strong {
+            color: #FFFFFF;
+        }
+
+        .message-content code {
+            padding:
+                2px 5px;
+
+            border-radius: 5px;
+
+            background:
+                rgba(255,255,255,.08);
+
+            color: #C9D7FF;
+
+            font-size: 12px;
+        }
+
+        .message-content pre {
+            overflow-x: auto;
+
+            margin:
+                12px 0;
+
+            padding:
+                14px;
+
+            border:
+                1px solid var(--border);
+
+            border-radius: 10px;
+
+            background:
+                #0A0F20;
+        }
+
+        .message-content pre code {
+            padding: 0;
+            background: transparent;
+            color: #DDE5FF;
+        }
+
+        .message-content blockquote {
+            margin:
+                10px 0;
+
+            padding:
+                7px 13px;
+
+            border-left:
+                3px solid var(--blue);
+
+            color: #AEB7CB;
+        }
+
+        .message-content a {
+            color: #70A7FF;
+        }
+
+        /* =====================================================
+           COMPOSER
+        ===================================================== */
+
+        .composer-wrap {
+            position: absolute;
+            left: 270px;
+            right: 0;
+            bottom: 0;
+
+            padding:
+                12px 20px 20px;
+
+            background:
+                linear-gradient(
+                    to top,
+                    var(--space) 65%,
+                    transparent
+                );
+
+            z-index: 15;
+        }
+
+        .composer {
+            width: min(850px, 100%);
+            margin: 0 auto;
+
+            display: flex;
+            align-items: flex-end;
+            gap: 6px;
+
+            padding:
+                7px 8px 7px 12px;
+
+            border:
+                1px solid rgba(255,255,255,.10);
+
+            border-radius: 17px;
+
+            background:
+                rgba(16,21,43,.94);
+
+            box-shadow:
+                0 15px 45px rgba(0,0,0,.32);
+
+            backdrop-filter:
+                blur(18px);
+        }
+
+        #messageInput {
+            flex: 1;
+
+            min-height: 38px;
+            max-height: 160px;
+
+            resize: none;
+
+            border: 0;
+            outline: 0;
+
+            padding:
+                8px 5px;
+
+            background: transparent;
+
+            color: var(--white);
+
+            line-height: 1.45;
+
+            font-size: 14px;
+        }
+
+        #messageInput::placeholder {
+            color: #707A91;
+        }
+
+        .icon-button {
+            width: 38px;
+            height: 38px;
+
+            flex-shrink: 0;
+
+            display: grid;
+            place-items: center;
+
+            border: 0;
+            border-radius: 50%;
+
+            background: transparent;
+
+            color: #AAB2C3;
+
+            font-size: 18px;
+
+            transition:
+                .18s ease;
+        }
+
+        .icon-button:hover {
+            background:
+                #1A2038;
+
+            color: #F5F7FF;
+
+            transform:
+                scale(1.04);
+        }
+
+        .icon-button.recording {
+            background:
+                #EF4444;
+
+            color: white;
+
+            box-shadow:
+                0 0 0 5px
+                rgba(239,68,68,.12);
+
+            animation:
+                micPulse 1.2s infinite;
+        }
+
+        @keyframes micPulse {
+            0%,
+            100% {
+                box-shadow:
+                    0 0 0 5px
+                    rgba(239,68,68,.12);
+            }
+
+            50% {
+                box-shadow:
+                    0 0 0 9px
+                    rgba(239,68,68,.04);
+            }
+        }
+
+        .send-button {
+            width: 38px;
+            height: 38px;
+
+            flex-shrink: 0;
+
+            display: grid;
+            place-items: center;
+
+            border: 0;
+            border-radius: 50%;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    var(--blue),
+                    var(--violet)
+                );
+
+            color: white;
+
+            transition:
+                .18s ease;
+        }
+
+        .send-button:hover {
+            transform:
+                scale(1.05);
+        }
+
+        .send-button:disabled {
+            opacity: .45;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .composer-hint {
+            width: min(850px, 100%);
+            margin: 7px auto 0;
+
+            text-align: center;
+
+            color: #596279;
+
+            font-size: 10px;
+        }
+
+        /* =====================================================
+           RECORDING
+        ===================================================== */
+
+        .recording-bar {
+            position: absolute;
+
+            left: 50%;
+            bottom: 85px;
+
+            transform:
+                translateX(-50%);
+
+            display: none;
+            align-items: center;
+            gap: 11px;
+
+            padding:
+                9px 13px;
+
+            border:
+                1px solid rgba(239,68,68,.22);
+
+            border-radius: 12px;
+
+            background:
+                rgba(25,15,25,.96);
+
+            color: #F5F7FF;
+
+            box-shadow:
+                0 10px 35px rgba(0,0,0,.3);
+
+            z-index: 30;
+        }
+
+        .recording-bar.active {
+            display: flex;
+        }
+
+        .recording-dot {
+            width: 8px;
+            height: 8px;
+
+            border-radius: 50%;
+
+            background: #EF4444;
+
+            animation:
+                recordingBlink 1s infinite;
+        }
+
+        @keyframes recordingBlink {
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: .35;
+            }
+        }
+
+        .recording-time {
+            min-width: 40px;
+
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .cancel-recording {
+            border: 0;
+
+            background: transparent;
+
+            color: #AAB2C3;
+
+            font-size: 12px;
+        }
+
+        .cancel-recording:hover {
+            color: white;
+        }
+
+        /* =====================================================
+           LOADING
+        ===================================================== */
+
+        .typing {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+
+            padding-top: 5px;
+        }
+
+        .typing span {
+            width: 5px;
+            height: 5px;
+
+            border-radius: 50%;
+
+            background: #8C96AC;
+
+            animation:
+                typingDot 1.1s infinite;
+        }
+
+        .typing span:nth-child(2) {
+            animation-delay: .15s;
+        }
+
+        .typing span:nth-child(3) {
+            animation-delay: .30s;
+        }
+
+        @keyframes typingDot {
+            0%,
+            60%,
+            100% {
+                transform:
+                    translateY(0);
+                opacity: .45;
+            }
+
+            30% {
+                transform:
+                    translateY(-4px);
+                opacity: 1;
+            }
+        }
+
+        /* =====================================================
+           MOBILE OVERLAY
+        ===================================================== */
+
+        .sidebar-overlay {
+            display: none;
+
+            position: fixed;
+            inset: 0;
+
+            background:
+                rgba(0,0,0,.55);
+
+            z-index: 19;
+        }
+
+        .sidebar-overlay.active {
+            display: block;
+        }
+
+        /* =====================================================
+           TOAST
+        ===================================================== */
+
+        .toast {
+            position: fixed;
+
+            right: 18px;
+            bottom: 18px;
+
+            max-width: 320px;
+
+            padding:
+                11px 14px;
+
+            border:
+                1px solid var(--border);
+
+            border-radius: 10px;
+
+            background:
+                #171D33;
+
+            color: #F5F7FF;
+
+            font-size: 12px;
+
+            box-shadow:
+                0 10px 35px rgba(0,0,0,.35);
+
+            opacity: 0;
+
+            transform:
+                translateY(10px);
+
+            pointer-events: none;
+
+            transition:
+                .2s ease;
+
+            z-index: 100;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* =====================================================
+           RESPONSIVE
+        ===================================================== */
+
+        @media (max-width: 800px) {
+
+            .sidebar {
+                position: fixed;
+                left: -280px;
+                top: 0;
+                bottom: 0;
+
+                transition:
+                    left .22s ease;
+
+                z-index: 20;
+            }
+
+            .sidebar.open {
+                left: 0;
+            }
+
+            .mobile-menu {
+                display: grid;
+                place-items: center;
+            }
+
+            .composer-wrap {
+                left: 0;
+            }
+
+            .topbar {
+                padding:
+                    0 14px;
+            }
+
+            .messages {
+                padding:
+                    25px 13px 155px;
+            }
+
+            .message-body {
+                max-width: 88%;
+            }
+
+            .top-tagline {
+                display: none;
+            }
+        }
+
+        @media (max-width: 500px) {
+
+            .brand-name {
+                font-size: 17px;
+            }
+
+            .welcome h1 {
+                font-size: 28px;
+            }
+
+            .welcome p {
+                font-size: 13px;
+            }
+
+            .composer-wrap {
+                padding:
+                    9px 9px 13px;
+            }
+
+            .composer-hint {
+                display: none;
+            }
+
+            .message {
+                gap: 9px;
+                margin-bottom: 22px;
+            }
+
+            .message-avatar {
+                width: 27px;
+                height: 27px;
+                border-radius: 8px;
+            }
+
+            .message-content {
+                font-size: 13.5px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="app">
+
+    <!-- =====================================================
+         SIDEBAR
+    ====================================================== -->
+
+    <aside
+        class="sidebar"
+        id="sidebar"
+    >
+
+        <div class="sidebar-header">
+
+            <div class="brand">
+
+                <div class="brand-logo">
+                    A
+                </div>
+
+                <div class="brand-name">
+                    AskOra
+                </div>
+
+            </div>
+
+            <button
+                class="new-chat-button"
+                id="newChatButton"
+                type="button"
+            >
+                <span>＋</span>
+                <span>New chat</span>
+            </button>
+
+        </div>
 
 
-        text =
-            getattr(
-                transcription,
-                "text",
-                ""
-            )
+        <div class="search-box">
 
-        text =
-            str(
-                text or ""
-            ).strip()
+            <span class="search-icon">
+                ⌕
+            </span>
+
+            <input
+                id="searchInput"
+                type="text"
+                placeholder="Search chats..."
+                autocomplete="off"
+            >
+
+        </div>
 
 
-        if not text:
+        <div class="chat-history-label">
+            Chat history
+        </div>
 
-            return jsonify(
-                {
-                    "ok": False,
-                    "error":
-                        "I couldn't understand the recording."
+
+        <div
+            class="chat-list"
+            id="chatList"
+        ></div>
+
+
+        <div class="sidebar-bottom">
+
+            <button
+                class="side-button"
+                id="adminButton"
+                style="display:none"
+                type="button"
+                onclick="window.location.href='/admin'"
+            >
+                ⚙
+                <span>Admin dashboard</span>
+            </button>
+
+
+            <button
+                class="side-button danger"
+                id="deleteAccountButton"
+                type="button"
+            >
+                🗑
+                <span>Delete account</span>
+            </button>
+
+
+            <button
+                class="side-button"
+                type="button"
+                onclick="logout()"
+            >
+                ↪
+                <span>Log out</span>
+            </button>
+
+
+            <div
+                class="account-card"
+                id="accountCard"
+            >
+
+                <div
+                    class="account-name"
+                    id="accountName"
+                >
+                    Account
+                </div>
+
+                <div
+                    class="account-email"
+                    id="accountEmail"
+                >
+                    —
+                </div>
+
+            </div>
+
+        </div>
+
+    </aside>
+
+
+    <div
+        class="sidebar-overlay"
+        id="sidebarOverlay"
+    ></div>
+
+
+    <!-- =====================================================
+         MAIN
+    ====================================================== -->
+
+    <main class="main">
+
+        <header class="topbar">
+
+            <div class="topbar-left">
+
+                <button
+                    class="mobile-menu"
+                    id="mobileMenu"
+                    type="button"
+                    aria-label="Open menu"
+                >
+                    ☰
+                </button>
+
+
+                <div class="top-brand">
+
+                    <div class="top-brand-name">
+                        AskOra
+                    </div>
+
+                    <div class="top-status">
+
+                        <span class="online-dot"></span>
+
+                        <span>
+                            Online
+                        </span>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="top-tagline">
+                Ask. Get answers.
+            </div>
+
+        </header>
+
+
+        <!-- =================================================
+             MESSAGES
+        ================================================== -->
+
+        <section
+            class="messages"
+            id="messages"
+        >
+
+            <div
+                class="messages-inner"
+                id="messagesInner"
+            >
+
+                <div
+                    class="welcome"
+                    id="welcome"
+                >
+
+                    <div class="welcome-logo">
+                        A
+                    </div>
+
+                    <h1>
+                        What can I help you with?
+                    </h1>
+
+                    <p>
+                        Ask questions, learn something new,
+                        brainstorm ideas, or get help with
+                        whatever you're working on.
+                    </p>
+
+                    <p class="welcome-sub">
+                        Advanced AI, made simple.
+                    </p>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- =================================================
+             RECORDING STATUS
+        ================================================== -->
+
+        <div
+            class="recording-bar"
+            id="recordingBar"
+        >
+
+            <span class="recording-dot"></span>
+
+            <span>
+                Recording
+            </span>
+
+            <span
+                class="recording-time"
+                id="recordingTime"
+            >
+                0:00
+            </span>
+
+            <button
+                class="cancel-recording"
+                id="cancelRecording"
+                type="button"
+            >
+                Cancel
+            </button>
+
+        </div>
+
+
+        <!-- =================================================
+             COMPOSER
+        ================================================== -->
+
+        <div class="composer-wrap">
+
+            <div class="composer">
+
+                <textarea
+                    id="messageInput"
+                    rows="1"
+                    placeholder="Message AskOra..."
+                    autocomplete="off"
+                ></textarea>
+
+
+                <button
+                    class="icon-button"
+                    id="micButton"
+                    type="button"
+                    aria-label="Voice input"
+                    title="Voice input"
+                >
+
+                    <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
+                        <rect
+                            x="9"
+                            y="2"
+                            width="6"
+                            height="12"
+                            rx="3"
+                        ></rect>
+
+                        <path
+                            d="M5 10a7 7 0 0 0 14 0"
+                        ></path>
+
+                        <line
+                            x1="12"
+                            y1="19"
+                            x2="12"
+                            y2="22"
+                        ></line>
+
+                        <line
+                            x1="8"
+                            y1="22"
+                            x2="16"
+                            y2="22"
+                        ></line>
+
+                    </svg>
+
+                </button>
+
+
+                <button
+                    class="send-button"
+                    id="sendButton"
+                    type="button"
+                    aria-label="Send message"
+                    title="Send message"
+                >
+
+                    <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2.2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
+                        <line
+                            x1="22"
+                            y1="2"
+                            x2="11"
+                            y2="13"
+                        ></line>
+
+                        <polygon
+                            points="22 2 15 22 11 13 2 9 22 2"
+                        ></polygon>
+
+                    </svg>
+
+                </button>
+
+            </div>
+
+
+            <div class="composer-hint">
+                AskOra can make mistakes. Check important information.
+            </div>
+
+        </div>
+
+    </main>
+
+</div>
+
+
+<div
+    class="toast"
+    id="toast"
+></div>
+
+
+<script>
+    // =========================================================
+    // STATE
+    // =========================================================
+
+    let CSRF = "";
+
+    let currentUser = null;
+
+    let chats = [];
+
+    let currentChatId = null;
+
+    let isSending = false;
+
+    let mediaRecorder = null;
+
+    let audioChunks = [];
+
+    let recordingStartedAt = null;
+
+    let recordingTimer = null;
+
+    let recordingCancelled = false;
+
+
+    // =========================================================
+    // ELEMENTS
+    // =========================================================
+
+    const sidebar =
+        document.getElementById("sidebar");
+
+    const sidebarOverlay =
+        document.getElementById("sidebarOverlay");
+
+    const mobileMenu =
+        document.getElementById("mobileMenu");
+
+    const newChatButton =
+        document.getElementById("newChatButton");
+
+    const searchInput =
+        document.getElementById("searchInput");
+
+    const chatList =
+        document.getElementById("chatList");
+
+    const messages =
+        document.getElementById("messages");
+
+    const messagesInner =
+        document.getElementById("messagesInner");
+
+    const welcome =
+        document.getElementById("welcome");
+
+    const messageInput =
+        document.getElementById("messageInput");
+
+    const sendButton =
+        document.getElementById("sendButton");
+
+    const micButton =
+        document.getElementById("micButton");
+
+    const recordingBar =
+        document.getElementById("recordingBar");
+
+    const recordingTime =
+        document.getElementById("recordingTime");
+
+    const cancelRecording =
+        document.getElementById("cancelRecording");
+
+    const accountName =
+        document.getElementById("accountName");
+
+    const accountEmail =
+        document.getElementById("accountEmail");
+
+    const adminButton =
+        document.getElementById("adminButton");
+
+    const deleteAccountButton =
+        document.getElementById("deleteAccountButton");
+
+    const toast =
+        document.getElementById("toast");
+
+
+    // =========================================================
+    // TOAST
+    // =========================================================
+
+    let toastTimer = null;
+
+    function showToast(text) {
+
+        toast.textContent = text;
+
+        toast.classList.add("show");
+
+        clearTimeout(toastTimer);
+
+        toastTimer =
+            setTimeout(() => {
+                toast.classList.remove("show");
+            }, 2800);
+    }
+
+
+    // =========================================================
+    // API
+    // =========================================================
+
+    async function apiFetch(
+        url,
+        options = {}
+    ) {
+
+        options.headers =
+            options.headers || {};
+
+        if (CSRF) {
+
+            options.headers[
+                "X-CSRF-Token"
+            ] = CSRF;
+        }
+
+        options.credentials =
+            "same-origin";
+
+
+        const response =
+            await fetch(
+                url,
+                options
+            );
+
+
+        let data = null;
+
+        try {
+            data =
+                await response.json();
+        } catch {
+            data = {};
+        }
+
+
+        if (
+            response.status === 401
+        ) {
+
+            window.location.href =
+                "/login";
+
+            return null;
+        }
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.error ||
+                "Something went wrong."
+            );
+        }
+
+
+        return data;
+    }
+
+
+    // =========================================================
+    // INIT
+    // =========================================================
+
+    async function init() {
+
+        try {
+
+            const response =
+                await fetch(
+                    "/api/me",
+                    {
+                        method: "GET",
+                        credentials: "same-origin"
+                    }
+                );
+
+
+            const data =
+                await response.json();
+
+
+            if (
+                !data.authenticated ||
+                !data.user
+            ) {
+
+                window.location.href =
+                    "/login";
+
+                return;
+            }
+
+
+            CSRF =
+                data.csrf_token || "";
+
+            currentUser =
+                data.user;
+
+
+            updateAccountUI();
+
+            await loadChats();
+
+            await createOrLoadInitialChat();
+
+        } catch (error) {
+
+            console.error(error);
+
+            showToast(
+                "Unable to load AskOra."
+            );
+        }
+    }
+
+
+    // =========================================================
+    // ACCOUNT UI
+    // =========================================================
+
+    function updateAccountUI() {
+
+        if (!currentUser) {
+            return;
+        }
+
+
+        accountName.textContent =
+            "@" +
+            currentUser.username;
+
+
+        accountEmail.textContent =
+            currentUser.email;
+
+
+        if (
+            currentUser.is_admin === true
+        ) {
+
+            adminButton.style.display =
+                "flex";
+
+        } else {
+
+            adminButton.style.display =
+                "none";
+        }
+    }
+
+
+    // =========================================================
+    // LOAD CHATS
+    // =========================================================
+
+    async function loadChats() {
+
+        const data =
+            await apiFetch(
+                "/api/chats"
+            );
+
+        if (!data) {
+            return;
+        }
+
+        chats =
+            data.chats || [];
+
+        renderChatList();
+    }
+
+
+    // =========================================================
+    // CHAT LIST
+    // =========================================================
+
+    function renderChatList() {
+
+        const query =
+            searchInput.value
+                .trim()
+                .toLowerCase();
+
+
+        chatList.innerHTML = "";
+
+
+        const filtered =
+            chats.filter(chat => {
+
+                if (!query) {
+                    return true;
                 }
-            ), 400
+
+                return (
+                    chat.title || ""
+                )
+                    .toLowerCase()
+                    .includes(query);
+            });
 
 
-        log_event(
-            user_id,
-            "voice"
-        )
+        if (!filtered.length) {
 
+            const empty =
+                document.createElement(
+                    "div"
+                );
 
-        return jsonify(
-            {
-                "ok": True,
-                "text": text
-            }
-        )
+            empty.style.padding =
+                "15px 10px";
 
+            empty.style.color =
+                "#687087";
 
-    except Exception as error:
+            empty.style.fontSize =
+                "12px";
 
-        logger.exception(
-            "Voice transcription error: %s",
-            error
-        )
+            empty.textContent =
+                query
+                    ? "No chats found."
+                    : "No previous chats.";
 
-        return jsonify(
-            {
-                "ok": False,
-                "error":
-                    "Voice transcription failed. Please try again."
-            }
-        ), 500
+            chatList.appendChild(
+                empty
+            );
 
-
-# ============================================================
-# RESET CURRENT CHAT CONTEXT
-# ============================================================
-
-@app.route(
-    "/api/reset",
-    methods=["POST"]
-)
-@login_required
-@csrf_protected
-def api_reset():
-
-    user =
-        current_user()
-
-    return jsonify(
-        {
-            "ok": True
+            return;
         }
-    )
 
 
-# ============================================================
-# DELETE ACCOUNT
-# ============================================================
+        filtered.forEach(chat => {
 
-@app.route(
-    "/api/account/delete",
-    methods=["POST"]
-)
-@login_required
-@csrf_protected
-def delete_account():
+            const item =
+                document.createElement(
+                    "div"
+                );
 
-    user =
-        current_user()
+            item.className =
+                "chat-item" +
+                (
+                    Number(chat.id) ===
+                    Number(currentChatId)
+                        ? " active"
+                        : ""
+                );
 
-    user_id =
-        user["id"]
 
-    conn = get_db()
+            const title =
+                document.createElement(
+                    "div"
+                );
 
-    try:
+            title.className =
+                "chat-item-title";
 
-        with conn.cursor() as cur:
+            title.textContent =
+                chat.title ||
+                "New chat";
 
-            cur.execute(
-                """
-                DELETE FROM web_messages
-                WHERE user_id = %s
-                """,
-                (user_id,)
-            )
 
-            cur.execute(
-                """
-                DELETE FROM web_chats
-                WHERE user_id = %s
-                """,
-                (user_id,)
-            )
+            const deleteButton =
+                document.createElement(
+                    "button"
+                );
 
-            cur.execute(
-                """
-                DELETE FROM web_usage_events
-                WHERE user_id = %s
-                """,
-                (user_id,)
-            )
+            deleteButton.className =
+                "delete-chat";
 
-            cur.execute(
-                """
-                DELETE FROM web_password_resets
-                WHERE user_id = %s
-                """,
-                (user_id,)
-            )
+            deleteButton.type =
+                "button";
 
-            cur.execute(
-                """
-                DELETE FROM web_users
-                WHERE id = %s
-                """,
-                (user_id,)
-            )
+            deleteButton.title =
+                "Delete chat";
 
-        conn.commit()
+            deleteButton.textContent =
+                "×";
 
-    finally:
-        conn.close()
 
-    session.clear()
+            deleteButton.addEventListener(
+                "click",
+                async event => {
 
-    return jsonify(
-        {
-            "ok": True
+                    event.stopPropagation();
+
+                    await deleteChat(
+                        chat.id
+                    );
+                }
+            );
+
+
+            item.appendChild(title);
+
+            item.appendChild(
+                deleteButton
+            );
+
+
+            item.addEventListener(
+                "click",
+                () => {
+
+                    openChat(
+                        chat.id
+                    );
+
+                    closeSidebar();
+                }
+            );
+
+
+            chatList.appendChild(
+                item
+            );
+
+        });
+    }
+
+
+    // =========================================================
+    // CREATE INITIAL CHAT
+    // =========================================================
+
+    async function createOrLoadInitialChat() {
+
+        if (chats.length) {
+
+            await openChat(
+                chats[0].id
+            );
+
+            return;
         }
-    )
 
 
-# ============================================================
-# ADMIN CHECK
-# ============================================================
+        await createNewChat();
+    }
 
-def admin_required(function):
 
-    @wraps(function)
-    def wrapper(*args, **kwargs):
+    // =========================================================
+    // CREATE NEW CHAT
+    // =========================================================
 
-        user =
-            current_user()
+    async function createNewChat() {
 
-        if not user:
+        try {
 
-            return redirect(
-                url_for("login")
+            const data =
+                await apiFetch(
+                    "/api/chats",
+                    {
+                        method: "POST",
+
+                        headers: {
+                            "Content-Type":
+                                "application/json"
+                        },
+
+                        body:
+                            JSON.stringify({
+                                title:
+                                    "New chat"
+                            })
+                    }
+                );
+
+
+            if (!data) {
+                return;
+            }
+
+
+            const chat =
+                data.chat;
+
+
+            chats.unshift(
+                chat
+            );
+
+
+            currentChatId =
+                chat.id;
+
+
+            renderChatList();
+
+            renderWelcome();
+
+            messageInput.focus();
+
+            closeSidebar();
+
+        } catch (error) {
+
+            console.error(error);
+
+            showToast(
+                error.message
+            );
+        }
+    }
+
+
+    // =========================================================
+    // OPEN CHAT
+    // =========================================================
+
+    async function openChat(
+        chatId
+    ) {
+
+        currentChatId =
+            Number(chatId);
+
+        renderChatList();
+
+        try {
+
+            const data =
+                await apiFetch(
+                    `/api/chats/${chatId}/messages`
+                );
+
+
+            if (!data) {
+                return;
+            }
+
+
+            messagesInner.innerHTML =
+                "";
+
+
+            const chatMessages =
+                data.messages || [];
+
+
+            if (!chatMessages.length) {
+
+                renderWelcome();
+
+                return;
+            }
+
+
+            chatMessages.forEach(
+                message => {
+
+                    appendMessage(
+                        message.role,
+                        message.content
+                    );
+                }
+            );
+
+
+            scrollToBottom();
+
+        } catch (error) {
+
+            console.error(error);
+
+            showToast(
+                error.message
+            );
+        }
+    }
+
+
+    // =========================================================
+    // WELCOME
+    // =========================================================
+
+    function renderWelcome() {
+
+        messagesInner.innerHTML = `
+            <div class="welcome" id="welcome">
+                <div class="welcome-logo">A</div>
+
+                <h1>
+                    What can I help you with?
+                </h1>
+
+                <p>
+                    Ask questions, learn something new,
+                    brainstorm ideas, or get help with
+                    whatever you're working on.
+                </p>
+
+                <p class="welcome-sub">
+                    Advanced AI, made simple.
+                </p>
+            </div>
+        `;
+    }
+
+
+    // =========================================================
+    // APPEND MESSAGE
+    // =========================================================
+
+    function appendMessage(
+        role,
+        content
+    ) {
+
+        const wrapper =
+            document.createElement(
+                "div"
+            );
+
+        wrapper.className =
+            "message " +
+            (
+                role === "user"
+                    ? "user"
+                    : "assistant"
+            );
+
+
+        const avatar =
+            document.createElement(
+                "div"
+            );
+
+        avatar.className =
+            "message-avatar";
+
+        avatar.textContent =
+            role === "user"
+                ? "You"
+                : "A";
+
+
+        const body =
+            document.createElement(
+                "div"
+            );
+
+        body.className =
+            "message-body";
+
+
+        const contentDiv =
+            document.createElement(
+                "div"
+            );
+
+        contentDiv.className =
+            "message-content";
+
+
+        if (
+            role === "assistant"
+        ) {
+
+            contentDiv.innerHTML =
+                renderMarkdown(
+                    content
+                );
+
+        } else {
+
+            contentDiv.textContent =
+                content;
+        }
+
+
+        body.appendChild(
+            contentDiv
+        );
+
+
+        wrapper.appendChild(
+            avatar
+        );
+
+        wrapper.appendChild(
+            body
+        );
+
+
+        messagesInner.appendChild(
+            wrapper
+        );
+
+        return wrapper;
+    }
+
+
+    // =========================================================
+    // TYPING
+    // =========================================================
+
+    function showTyping() {
+
+        const wrapper =
+            document.createElement(
+                "div"
+            );
+
+        wrapper.className =
+            "message assistant";
+
+        wrapper.id =
+            "typingMessage";
+
+
+        const avatar =
+            document.createElement(
+                "div"
+            );
+
+        avatar.className =
+            "message-avatar";
+
+        avatar.textContent =
+            "A";
+
+
+        const body =
+            document.createElement(
+                "div"
+            );
+
+        body.className =
+            "message-body";
+
+
+        body.innerHTML = `
+            <div class="typing">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        `;
+
+
+        wrapper.appendChild(
+            avatar
+        );
+
+        wrapper.appendChild(
+            body
+        );
+
+        messagesInner.appendChild(
+            wrapper
+        );
+
+        scrollToBottom();
+    }
+
+
+    function removeTyping() {
+
+        const typing =
+            document.getElementById(
+                "typingMessage"
+            );
+
+        if (typing) {
+            typing.remove();
+        }
+    }
+
+
+    // =========================================================
+    // MARKDOWN
+    // =========================================================
+
+    function escapeHtml(
+        text
+    ) {
+
+        return String(text)
+            .replace(
+                /&/g,
+                "&amp;"
             )
-
-        if not is_admin(user):
-
-            return (
-                "Forbidden",
-                403
+            .replace(
+                /</g,
+                "&lt;"
             )
-
-        return function(
-            *args,
-            **kwargs
-        )
-
-    return wrapper
-
-
-# ============================================================
-# ADMIN PAGE
-# ============================================================
-
-@app.route("/admin")
-@admin_required
-def admin():
-
-    return render_template(
-        "admin.html"
-    )
-
-
-# ============================================================
-# ADMIN STATS
-# ============================================================
-
-@app.route(
-    "/api/admin/stats"
-)
-@admin_required
-def admin_stats():
-
-    conn = get_db()
-
-    try:
-
-        with conn.cursor() as cur:
-
-            # Total users
-
-            cur.execute(
-                """
-                SELECT COUNT(*) AS count
-                FROM web_users
-                """
+            .replace(
+                />/g,
+                "&gt;"
             )
-
-            total_users =
-                cur.fetchone()["count"]
-
-
-            # Active users today
-
-            cur.execute(
-                """
-                SELECT COUNT(*) AS count
-                FROM web_users
-                WHERE last_seen >= CURRENT_DATE
-                """
+            .replace(
+                /"/g,
+                "&quot;"
             )
-
-            active_users_today =
-                cur.fetchone()["count"]
-
-
-            # New users today
-
-            cur.execute(
-                """
-                SELECT COUNT(*) AS count
-                FROM web_users
-                WHERE first_seen >= CURRENT_DATE
-                """
-            )
-
-            new_users_today =
-                cur.fetchone()["count"]
+            .replace(
+                /'/g,
+                "&#039;"
+            );
+    }
 
 
-            # Total chats
+    function renderInline(
+        text
+    ) {
 
-            cur.execute(
-                """
-                SELECT COUNT(*) AS count
-                FROM web_chats
-                """
-            )
-
-            total_chats =
-                cur.fetchone()["count"]
+        let html =
+            escapeHtml(
+                text
+            );
 
 
-            # Total questions
-
-            cur.execute(
-                """
-                SELECT COUNT(*) AS count
-                FROM web_messages
-                WHERE role = 'user'
-                """
-            )
-
-            total_questions =
-                cur.fetchone()["count"]
+        html =
+            html.replace(
+                /`([^`]+)`/g,
+                "<code>$1</code>"
+            );
 
 
-            # Voice requests
-
-            cur.execute(
-                """
-                SELECT COUNT(*) AS count
-                FROM web_usage_events
-                WHERE event_type = 'voice'
-                """
-            )
-
-            voice_requests =
-                cur.fetchone()["count"]
-
-    finally:
-        conn.close()
+        html =
+            html.replace(
+                /\*\*([^*]+)\*\*/g,
+                "<strong>$1</strong>"
+            );
 
 
-    return jsonify(
-        {
-            "ok": True,
+        html =
+            html.replace(
+                /__([^_]+)__/g,
+                "<strong>$1</strong>"
+            );
 
-            "stats": {
-                "total_users":
-                    total_users,
 
-                "active_users_today":
-                    active_users_today,
+        html =
+            html.replace(
+                /\*([^*]+)\*/g,
+                "<em>$1</em>"
+            );
 
-                "total_chats":
-                    total_chats,
 
-                "total_questions":
-                    total_questions,
+        html =
+            html.replace(
+                /_([^_]+)_/g,
+                "<em>$1</em>"
+            );
 
-                "voice_requests":
-                    voice_requests,
 
-                "new_users_today":
-                    new_users_today
+        html =
+            html.replace(
+                /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+                '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+            );
+
+
+        return html;
+    }
+
+
+    function renderMarkdown(
+        markdown
+    ) {
+
+        if (!markdown) {
+            return "";
+        }
+
+
+        const lines =
+            String(markdown)
+                .replace(
+                    /\r\n/g,
+                    "\n"
+                )
+                .split("\n");
+
+
+        let html = "";
+
+        let inCodeBlock = false;
+
+        let codeBuffer = [];
+
+
+        for (
+            let i = 0;
+            i < lines.length;
+            i++
+        ) {
+
+            const line =
+                lines[i];
+
+
+            if (
+                line.trim().startsWith(
+                    "```"
+                )
+            ) {
+
+                if (!inCodeBlock) {
+
+                    inCodeBlock =
+                        true;
+
+                    codeBuffer = [];
+
+                } else {
+
+                    inCodeBlock =
+                        false;
+
+                    html +=
+                        "<pre><code>" +
+                        escapeHtml(
+                            codeBuffer.join(
+                                "\n"
+                            )
+                        ) +
+                        "</code></pre>";
+
+                    codeBuffer = [];
+                }
+
+                continue;
+            }
+
+
+            if (inCodeBlock) {
+
+                codeBuffer.push(
+                    line
+                );
+
+                continue;
+            }
+
+
+            if (
+                !line.trim()
+            ) {
+
+                continue;
+            }
+
+
+            if (
+                line.startsWith(
+                    "### "
+                )
+            ) {
+
+                html +=
+                    "<p><strong>" +
+                    renderInline(
+                        line.slice(4)
+                    ) +
+                    "</strong></p>";
+
+                continue;
+            }
+
+
+            if (
+                line.startsWith(
+                    "## "
+                )
+            ) {
+
+                html +=
+                    "<p><strong>" +
+                    renderInline(
+                        line.slice(3)
+                    ) +
+                    "</strong></p>";
+
+                continue;
+            }
+
+
+            if (
+                line.startsWith(
+                    "# "
+                )
+            ) {
+
+                html +=
+                    "<p><strong>" +
+                    renderInline(
+                        line.slice(2)
+                    ) +
+                    "</strong></p>";
+
+                continue;
+            }
+
+
+            if (
+                line.startsWith(
+                    "> "
+                )
+            ) {
+
+                html +=
+                    "<blockquote>" +
+                    renderInline(
+                        line.slice(2)
+                    ) +
+                    "</blockquote>";
+
+                continue;
+            }
+
+
+            if (
+                /^[-*]\s+/.test(
+                    line
+                )
+            ) {
+
+                html +=
+                    "<p>• " +
+                    renderInline(
+                        line.replace(
+                            /^[-*]\s+/,
+                            ""
+                        )
+                    ) +
+                    "</p>";
+
+                continue;
+            }
+
+
+            if (
+                /^\d+\.\s+/.test(
+                    line
+                )
+            ) {
+
+                html +=
+                    "<p>" +
+                    renderInline(
+                        line
+                    ) +
+                    "</p>";
+
+                continue;
+            }
+
+
+            html +=
+                "<p>" +
+                renderInline(
+                    line
+                ) +
+                "</p>";
+        }
+
+
+        if (inCodeBlock) {
+
+            html +=
+                "<pre><code>" +
+                escapeHtml(
+                    codeBuffer.join(
+                        "\n"
+                    )
+                ) +
+                "</code></pre>";
+        }
+
+
+        return html;
+    }
+
+
+    // =========================================================
+    // SEND MESSAGE
+    // =========================================================
+
+    async function sendMessage(
+        textOverride = null
+    ) {
+
+        if (isSending) {
+            return;
+        }
+
+
+        const text =
+            (
+                textOverride !== null
+                    ? textOverride
+                    : messageInput.value
+            ).trim();
+
+
+        if (!text) {
+            return;
+        }
+
+
+        if (!currentChatId) {
+
+            await createNewChat();
+
+            if (!currentChatId) {
+                return;
             }
         }
-    )
 
 
-# ============================================================
-# HEALTH
-# ============================================================
+        isSending = true;
 
-@app.route("/health")
-def health():
+        sendButton.disabled =
+            true;
 
-    return jsonify(
-        {
-            "status":
-                "ok",
 
-            "service":
-                "AskOra"
+        if (
+            textOverride === null
+        ) {
+
+            messageInput.value =
+                "";
+
+            autoResize();
         }
-    )
 
 
-# ============================================================
-# ERROR HANDLERS
-# ============================================================
+        const existingWelcome =
+            messagesInner.querySelector(
+                ".welcome"
+            );
 
-@app.errorhandler(404)
-def not_found(error):
+        if (existingWelcome) {
+            existingWelcome.remove();
+        }
 
-    if request.path.startswith(
-        "/api/"
-    ):
 
-        return jsonify(
-            {
-                "ok": False,
-                "error":
-                    "Not found."
+        appendMessage(
+            "user",
+            text
+        );
+
+        scrollToBottom();
+
+        showTyping();
+
+
+        try {
+
+            const data =
+                await apiFetch(
+                    "/api/chat",
+                    {
+                        method: "POST",
+
+                        headers: {
+                            "Content-Type":
+                                "application/json"
+                        },
+
+                        body:
+                            JSON.stringify({
+                                chat_id:
+                                    currentChatId,
+
+                                message:
+                                    text
+                            })
+                    }
+                );
+
+
+            removeTyping();
+
+
+            if (!data) {
+                return;
             }
-        ), 404
-
-    return (
-        "Page not found.",
-        404
-    )
 
 
-@app.errorhandler(405)
-def method_not_allowed(error):
+            appendMessage(
+                "assistant",
+                data.answer
+            );
 
-    if request.path.startswith(
-        "/api/"
-    ):
 
-        return jsonify(
-            {
-                "ok": False,
-                "error":
-                    "Method not allowed."
+            if (data.title) {
+
+                const chat =
+                    chats.find(
+                        item =>
+                            Number(item.id) ===
+                            Number(currentChatId)
+                    );
+
+                if (chat) {
+
+                    chat.title =
+                        data.title;
+                }
             }
-        ), 405
-
-    return (
-        "Method not allowed.",
-        405
-    )
 
 
-@app.errorhandler(500)
-def internal_error(error):
+            await loadChats();
 
-    logger.exception(
-        "Internal server error: %s",
-        error
-    )
+            scrollToBottom();
 
-    if request.path.startswith(
-        "/api/"
-    ):
 
-        return jsonify(
-            {
-                "ok": False,
-                "error":
-                    "Internal server error."
+        } catch (error) {
+
+            removeTyping();
+
+            appendMessage(
+                "assistant",
+                "⚠️ " +
+                error.message
+            );
+
+            scrollToBottom();
+
+        } finally {
+
+            isSending =
+                false;
+
+            sendButton.disabled =
+                false;
+
+            messageInput.focus();
+        }
+    }
+
+
+    // =========================================================
+    // DELETE CHAT
+    // =========================================================
+
+    async function deleteChat(
+        chatId
+    ) {
+
+        const confirmed =
+            confirm(
+                "Delete this chat?"
+            );
+
+        if (!confirmed) {
+            return;
+        }
+
+
+        try {
+
+            await apiFetch(
+                `/api/chats/${chatId}`,
+                {
+                    method: "DELETE"
+                }
+            );
+
+
+            chats =
+                chats.filter(
+                    chat =>
+                        Number(chat.id) !==
+                        Number(chatId)
+                );
+
+
+            if (
+                Number(currentChatId) ===
+                Number(chatId)
+            ) {
+
+                if (chats.length) {
+
+                    await openChat(
+                        chats[0].id
+                    );
+
+                } else {
+
+                    await createNewChat();
+                }
+
+            } else {
+
+                renderChatList();
             }
-        ), 500
-
-    return (
-        "Internal server error.",
-        500
-    )
 
 
-# ============================================================
-# STARTUP
-# ============================================================
+        } catch (error) {
 
-try:
-
-    init_db()
-
-    logger.info(
-        "AskOra database initialized."
-    )
-
-except Exception as error:
-
-    logger.exception(
-        "Database initialization failed: %s",
-        error
-    )
+            showToast(
+                error.message
+            );
+        }
+    }
 
 
-# ============================================================
-# LOCAL DEVELOPMENT
-# ============================================================
+    // =========================================================
+    // VOICE
+    // =========================================================
 
-if __name__ == "__main__":
+    async function startRecording() {
 
-    port =
-        int(
-            os.environ.get(
-                "PORT",
-                "10000"
-            )
-        )
+        if (
+            !navigator.mediaDevices ||
+            !navigator.mediaDevices.getUserMedia
+        ) {
 
-    app.run(
-        host="0.0.0.0",
-        port=port,
-        debug=False
-    )
+            showToast(
+                "Voice recording is not supported on this device."
+            );
+
+            return;
+        }
+
+
+        try {
+
+            const stream =
+                await navigator.mediaDevices.getUserMedia(
+                    {
+                        audio: true
+                    }
+                );
+
+
+            audioChunks = [];
+
+            recordingCancelled =
+                false;
+
+
+            mediaRecorder =
+                new MediaRecorder(
+                    stream
+                );
+
+
+            mediaRecorder.ondataavailable =
+                event => {
+
+                    if (
+                        event.data &&
+                        event.data.size > 0
+                    ) {
+
+                        audioChunks.push(
+                            event.data
+                        );
+                    }
+                };
+
+
+            mediaRecorder.onstop =
+                async () => {
+
+                    stream
+                        .getTracks()
+                        .forEach(
+                            track =>
+                                track.stop()
+                        );
+
+
+                    stopRecordingUI();
+
+
+                    if (
+                        recordingCancelled
+                    ) {
+
+                        audioChunks = [];
+
+                        return;
+                    }
+
+
+                    if (
+                        !audioChunks.length
+                    ) {
+
+                        showToast(
+                            "No audio was recorded."
+                        );
+
+                        return;
+                    }
+
+
+                    const blob =
+                        new Blob(
+                            audioChunks,
+                            {
+                                type:
+                                    mediaRecorder.mimeType ||
+                                    "audio/webm"
+                            }
+                        );
+
+
+                    await sendVoice(
+                        blob
+                    );
+                };
+
+
+            mediaRecorder.start();
+
+            startRecordingUI();
+
+        } catch (error) {
+
+            console.error(error);
+
+            showToast(
+                "Microphone permission was not granted."
+            );
+        }
+    }
+
+
+    function stopRecording() {
+
+        if (
+            mediaRecorder &&
+            mediaRecorder.state !==
+                "inactive"
+        ) {
+
+            mediaRecorder.stop();
+        }
+    }
+
+
+    function cancelRecordingNow() {
+
+        recordingCancelled =
+            true;
+
+        stopRecording();
+    }
+
+
+    function startRecordingUI() {
+
+        micButton.classList.add(
+            "recording"
+        );
+
+        recordingBar.classList.add(
+            "active"
+        );
+
+        recordingStartedAt =
+            Date.now();
+
+        recordingTime.textContent =
+            "0:00";
+
+
+        clearInterval(
+            recordingTimer
+        );
+
+
+        recordingTimer =
+            setInterval(
+                updateRecordingTimer,
+                250
+            );
+    }
+
+
+    function updateRecordingTimer() {
+
+        if (!recordingStartedAt) {
+            return;
+        }
+
+
+        const elapsed =
+            Math.floor(
+                (
+                    Date.now() -
+                    recordingStartedAt
+                ) / 1000
+            );
+
+
+        const minutes =
+            Math.floor(
+                elapsed / 60
+            );
+
+        const seconds =
+            elapsed % 60;
+
+
+        recordingTime.textContent =
+            `${minutes}:${String(seconds).padStart(2, "0")}`;
+    }
+
+
+    function stopRecordingUI() {
+
+        micButton.classList.remove(
+            "recording"
+        );
+
+        recordingBar.classList.remove(
+            "active"
+        );
+
+        clearInterval(
+            recordingTimer
+        );
+
+        recordingTimer =
+            null;
+
+        recordingStartedAt =
+            null;
+    }
+
+
+    async function sendVoice(
+        blob
+    ) {
+
+        try {
+
+            showToast(
+                "Transcribing voice..."
+            );
+
+
+            const formData =
+                new FormData();
+
+
+            formData.append(
+                "audio",
+                blob,
+                "recording.webm"
+            );
+
+
+            const response =
+                await fetch(
+                    "/api/voice",
+                    {
+                        method: "POST",
+
+                        credentials:
+                            "same-origin",
+
+                        headers:
+                            CSRF
+                                ? {
+                                    "X-CSRF-Token":
+                                        CSRF
+                                }
+                                : {},
+
+                        body:
+                            formData
+                    }
+                );
+
+
+            const data =
+                await response.json();
+
+
+            if (
+                response.status === 401
+            ) {
+
+                window.location.href =
+                    "/login";
+
+                return;
+            }
+
+
+            if (!response.ok) {
+
+                throw new Error(
+                    data.error ||
+                    "Voice transcription failed."
+                );
+            }
+
+
+            const text =
+                (
+                    data.text ||
+                    ""
+                ).trim();
+
+
+            if (!text) {
+
+                showToast(
+                    "I couldn't understand the recording."
+                );
+
+                return;
+            }
+
+
+            messageInput.value =
+                text;
+
+            autoResize();
+
+            await sendMessage();
+
+        } catch (error) {
+
+            console.error(error);
+
+            showToast(
+                error.message
+            );
+        }
+    }
+
+
+    // =========================================================
+    // LOGOUT
+    // =========================================================
+
+    function logout() {
+
+        window.location.href =
+            "/logout";
+    }
+
+
+    // =========================================================
+    // DELETE ACCOUNT
+    // =========================================================
+
+    async function deleteAccount() {
+
+        const confirmed =
+            confirm(
+                "Delete your AskOra account and all of your AskOra chats? This cannot be undone."
+            );
+
+
+        if (!confirmed) {
+            return;
+        }
+
+
+        try {
+
+            const data =
+                await apiFetch(
+                    "/api/account/delete",
+                    {
+                        method: "POST"
+                    }
+                );
+
+
+            if (
+                data &&
+                data.ok
+            ) {
+
+                window.location.href =
+                    "/login";
+            }
+
+        } catch (error) {
+
+            showToast(
+                error.message
+            );
+        }
+    }
+
+
+    // =========================================================
+    // MOBILE SIDEBAR
+    // =========================================================
+
+    function openSidebar() {
+
+        sidebar.classList.add(
+            "open"
+        );
+
+        sidebarOverlay.classList.add(
+            "active"
+        );
+    }
+
+
+    function closeSidebar() {
+
+        sidebar.classList.remove(
+            "open"
+        );
+
+        sidebarOverlay.classList.remove(
+            "active"
+        );
+    }
+
+
+    // =========================================================
+    // SCROLL
+    // =========================================================
+
+    function scrollToBottom() {
+
+        requestAnimationFrame(
+            () => {
+
+                messages.scrollTop =
+                    messages.scrollHeight;
+            }
+        );
+    }
+
+
+    // =========================================================
+    // TEXTAREA RESIZE
+    // =========================================================
+
+    function autoResize() {
+
+        messageInput.style.height =
+            "auto";
+
+        messageInput.style.height =
+            Math.min(
+                messageInput.scrollHeight,
+                160
+            ) + "px";
+    }
+
+
+    // =========================================================
+    // EVENTS
+    // =========================================================
+
+    newChatButton.addEventListener(
+        "click",
+        createNewChat
+    );
+
+
+    searchInput.addEventListener(
+        "input",
+        renderChatList
+    );
+
+
+    mobileMenu.addEventListener(
+        "click",
+        openSidebar
+    );
+
+
+    sidebarOverlay.addEventListener(
+        "click",
+        closeSidebar
+    );
+
+
+    sendButton.addEventListener(
+        "click",
+        () => sendMessage()
+    );
+
+
+    micButton.addEventListener(
+        "click",
+        () => {
+
+            if (
+                mediaRecorder &&
+                mediaRecorder.state ===
+                    "recording"
+            ) {
+
+                stopRecording();
+
+            } else {
+
+                startRecording();
+            }
+        }
+    );
+
+
+    cancelRecording.addEventListener(
+        "click",
+        cancelRecordingNow
+    );
+
+
+    deleteAccountButton.addEventListener(
+        "click",
+        deleteAccount
+    );
+
+
+    messageInput.addEventListener(
+        "input",
+        autoResize
+    );
+
+
+    messageInput.addEventListener(
+        "keydown",
+        event => {
+
+            if (
+                event.key === "Enter" &&
+                !event.shiftKey
+            ) {
+
+                event.preventDefault();
+
+                sendMessage();
+            }
+        }
+    );
+
+
+    // =========================================================
+    // START
+    // =========================================================
+
+    init();
+
+</script>
+
+</body>
+</html>
