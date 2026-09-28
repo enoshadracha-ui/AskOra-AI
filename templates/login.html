@@ -12,189 +12,379 @@
     <style>
         * {
             box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
 
         body {
-            margin: 0;
             min-height: 100vh;
-            display: grid;
-            place-items: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             padding: 20px;
             background:
                 radial-gradient(
-                    circle at top,
-                    rgba(59,130,246,.16),
-                    transparent 40%
+                    circle at top left,
+                    rgba(59, 130, 246, 0.18),
+                    transparent 35%
+                ),
+                radial-gradient(
+                    circle at bottom right,
+                    rgba(124, 58, 237, 0.18),
+                    transparent 35%
                 ),
                 #080B18;
             color: #F5F7FF;
             font-family:
                 Inter,
                 system-ui,
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
                 sans-serif;
         }
 
-        .card {
+        .container {
             width: 100%;
-            max-width: 420px;
-            padding: 32px;
-            border: 1px solid rgba(255,255,255,.1);
-            border-radius: 20px;
-            background: rgba(16,21,43,.9);
-            box-shadow: 0 25px 80px rgba(0,0,0,.35);
+            max-width: 430px;
         }
 
         .logo {
-            width: 58px;
-            height: 58px;
-            display: grid;
-            place-items: center;
-            margin-bottom: 20px;
-            border-radius: 17px;
-            font-size: 28px;
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 20px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    rgba(59, 130, 246, 0.95),
+                    rgba(124, 58, 237, 0.95)
+                );
+
+            box-shadow:
+                0 0 35px rgba(59, 130, 246, 0.25),
+                0 0 55px rgba(124, 58, 237, 0.15);
+
+            font-size: 32px;
             font-weight: 900;
-            background: linear-gradient(
-                135deg,
-                #3B82F6,
-                #7C3AED
-            );
         }
 
-        h1 {
-            margin: 0 0 7px;
+        .brand {
+            text-align: center;
+            margin-bottom: 28px;
         }
 
-        .sub {
+        .brand h1 {
+            font-size: 30px;
+            font-weight: 800;
+            letter-spacing: -1px;
+        }
+
+        .brand p {
+            margin-top: 7px;
             color: #9CA3AF;
+            font-size: 14px;
+        }
+
+        .card {
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 24px;
+
+            background:
+                linear-gradient(
+                    145deg,
+                    rgba(16, 21, 43, 0.96),
+                    rgba(8, 11, 24, 0.96)
+                );
+
+            box-shadow:
+                0 25px 70px rgba(0, 0, 0, 0.35);
+        }
+
+        .card h2 {
+            font-size: 22px;
+            margin-bottom: 7px;
+        }
+
+        .subtitle {
+            color: #9CA3AF;
+            font-size: 14px;
             margin-bottom: 25px;
+        }
+
+        .field {
+            margin-bottom: 18px;
         }
 
         label {
             display: block;
-            margin: 15px 0 7px;
+            margin-bottom: 8px;
+            color: #D7DBE8;
             font-size: 13px;
-            color: #c7cede;
+            font-weight: 600;
         }
 
         input {
             width: 100%;
-            padding: 13px;
-            border-radius: 10px;
-            border: 1px solid rgba(255,255,255,.1);
+            height: 50px;
+            padding: 0 15px;
+
+            border: 1px solid rgba(255, 255, 255, 0.10);
+            border-radius: 12px;
+
+            background: #10152B;
+            color: #F5F7FF;
+
             outline: none;
-            color: white;
-            background: rgba(255,255,255,.05);
+            font-size: 15px;
+
+            transition:
+                border-color 0.2s,
+                box-shadow 0.2s;
+        }
+
+        input::placeholder {
+            color: #6B7280;
         }
 
         input:focus {
             border-color: #3B82F6;
+
+            box-shadow:
+                0 0 0 3px rgba(59, 130, 246, 0.12);
+        }
+
+        .error {
+            display: none;
+            margin-bottom: 18px;
+            padding: 12px 14px;
+
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            border-radius: 10px;
+
+            background: rgba(239, 68, 68, 0.10);
+            color: #FCA5A5;
+
+            font-size: 13px;
         }
 
         button {
             width: 100%;
-            margin-top: 20px;
-            padding: 13px;
-            border: 0;
-            border-radius: 10px;
+            height: 50px;
+
+            border: none;
+            border-radius: 12px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #3B82F6,
+                    #7C3AED
+                );
+
             color: white;
+            font-size: 15px;
             font-weight: 700;
-            background: linear-gradient(
-                135deg,
-                #3B82F6,
-                #7C3AED
-            );
+
             cursor: pointer;
+
+            transition:
+                transform 0.15s,
+                opacity 0.15s;
         }
 
-        a {
-            color: #60a5fa;
-            text-decoration: none;
+        button:hover {
+            transform: translateY(-1px);
         }
 
-        .links {
-            margin-top: 20px;
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .register {
+            margin-top: 22px;
             text-align: center;
-            font-size: 14px;
-            line-height: 2;
             color: #9CA3AF;
+            font-size: 14px;
         }
 
-        .error {
-            padding: 11px;
-            margin-bottom: 15px;
-            border-radius: 9px;
-            color: #fecdd3;
-            background: rgba(244,63,94,.1);
-            border: 1px solid rgba(244,63,94,.2);
+        .register a {
+            color: #60A5FA;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .register a:hover {
+            text-decoration: underline;
+        }
+
+        .footer {
+            margin-top: 22px;
+            text-align: center;
+            color: #6B7280;
+            font-size: 12px;
+        }
+
+        @media (max-width: 480px) {
+            .card {
+                padding: 24px 20px;
+            }
+
+            .brand h1 {
+                font-size: 27px;
+            }
         }
     </style>
 </head>
 
 <body>
 
-<div class="card">
+<div class="container">
 
     <div class="logo">A</div>
 
-    <h1>Welcome back</h1>
-
-    <div class="sub">
-        Sign in to your AskOra account.
+    <div class="brand">
+        <h1>AskOra</h1>
+        <p>Ask. Get answers.</p>
     </div>
 
-    {% if error %}
-    <div class="error">
-        {{ error }}
-    </div>
-    {% endif %}
+    <div class="card">
 
-    <form method="POST">
+        <h2>Welcome back</h2>
 
-        <label>
-            Username or email
-        </label>
+        <p class="subtitle">
+            Login to continue using AskOra.
+        </p>
 
-        <input
-            name="username"
-            autocomplete="username"
-            required
-        >
+        <div id="error" class="error"></div>
 
-        <label>
-            Password
-        </label>
+        <form id="loginForm">
 
-        <input
-            type="password"
-            name="password"
-            autocomplete="current-password"
-            required
-        >
+            <div class="field">
+                <label for="login">
+                    Username or Email
+                </label>
 
-        <button type="submit">
-            Login
-        </button>
+                <input
+                    id="login"
+                    name="login"
+                    type="text"
+                    placeholder="Enter your username or email"
+                    autocomplete="username"
+                    required
+                >
+            </div>
 
-    </form>
+            <div class="field">
+                <label for="password">
+                    Password
+                </label>
 
-    <div class="links">
+                <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    placeholder="Enter your password"
+                    autocomplete="current-password"
+                    required
+                >
+            </div>
 
-        <div>
-            <a href="/forgot-password">
-                Forgot password?
-            </a>
-        </div>
+            <button
+                id="loginButton"
+                type="submit"
+            >
+                Login
+            </button>
 
-        <div>
+        </form>
+
+        <div class="register">
             Don't have an account?
-            <a href="/register">
-                Create one
-            </a>
+            <a href="/register">Create one</a>
         </div>
 
+    </div>
+
+    <div class="footer">
+        Advanced AI, made simple.
     </div>
 
 </div>
+
+<script>
+    const form = document.getElementById("loginForm");
+    const button = document.getElementById("loginButton");
+    const errorBox = document.getElementById("error");
+
+    function showError(message) {
+        errorBox.textContent = message;
+        errorBox.style.display = "block";
+    }
+
+    form.addEventListener("submit", async function (event) {
+        event.preventDefault();
+
+        errorBox.style.display = "none";
+
+        const login = document
+            .getElementById("login")
+            .value
+            .trim();
+
+        const password = document
+            .getElementById("password")
+            .value;
+
+        if (!login || !password) {
+            showError("Please enter your login details.");
+            return;
+        }
+
+        button.disabled = true;
+        button.textContent = "Logging in...";
+
+        try {
+            const response = await fetch("/login", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    login: login,
+                    password: password
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.ok) {
+                window.location.href = "/";
+                return;
+            }
+
+            showError(
+                data.error ||
+                "Invalid username/email or password."
+            );
+
+        } catch (error) {
+            showError(
+                "Something went wrong. Please try again."
+            );
+        }
+
+        button.disabled = false;
+        button.textContent = "Login";
+    });
+</script>
 
 </body>
 </html>
