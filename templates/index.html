@@ -2,819 +2,810 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0, viewport-fit=cover"
-    >
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>AskOra — Ask. Get answers.</title>
 
-    <meta
-        name="description"
-        content="AskOra is your simple, fast and friendly AI assistant."
-    >
+    <meta name="description" content="AskOra is your simple, fast and friendly AI assistant.">
 
     <style>
         :root {
-            --bg: #080b18;
-            --panel: #10152b;
-            --panel-2: #141a33;
-            --border: rgba(255,255,255,.08);
-            --text: #f5f7ff;
-            --muted: #9ca3af;
-            --blue: #3b82f6;
-            --violet: #7c3aed;
-            --danger: #ef4444;
-            --success: #22c55e;
-            --shadow: 0 20px 60px rgba(0,0,0,.35);
+            --bg:#080b18;
+            --panel:#10152b;
+            --panel-2:#141a33;
+            --border:rgba(255,255,255,.08);
+            --text:#f5f7ff;
+            --muted:#9ca3af;
+            --blue:#3b82f6;
+            --violet:#7c3aed;
+            --danger:#ef4444;
+            --success:#22c55e;
+            --shadow:0 20px 60px rgba(0,0,0,.35);
         }
 
         * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
+            box-sizing:border-box;
+            margin:0;
+            padding:0;
         }
 
-        html,
-        body {
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
+        html,body {
+            width:100%;
+            height:100%;
+            overflow:hidden;
         }
 
         body {
-            font-family:
-                Inter,
-                ui-sans-serif,
-                system-ui,
-                -apple-system,
-                BlinkMacSystemFont,
-                "Segoe UI",
-                sans-serif;
+            font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
             background:
-                radial-gradient(
-                    circle at top right,
-                    rgba(124,58,237,.12),
-                    transparent 30%
-                ),
-                radial-gradient(
-                    circle at bottom left,
-                    rgba(59,130,246,.10),
-                    transparent 30%
-                ),
+                radial-gradient(circle at top right,rgba(124,58,237,.12),transparent 30%),
+                radial-gradient(circle at bottom left,rgba(59,130,246,.10),transparent 30%),
                 var(--bg);
-            color: var(--text);
+            color:var(--text);
         }
 
-        button,
-        input,
-        textarea {
-            font: inherit;
+        button,input,textarea {
+            font:inherit;
         }
 
         button {
-            cursor: pointer;
+            cursor:pointer;
         }
 
         .app {
-            width: 100%;
-            height: 100%;
-            display: flex;
+            width:100%;
+            height:100%;
+            display:flex;
         }
 
-        /* =========================
-           SIDEBAR
-        ========================= */
+        /* SIDEBAR */
 
         .sidebar {
-            width: 280px;
-            height: 100%;
-            flex-shrink: 0;
-            display: flex;
-            flex-direction: column;
-            background: rgba(10,14,30,.96);
-            border-right: 1px solid var(--border);
-            position: relative;
-            z-index: 50;
+            width:280px;
+            height:100%;
+            flex-shrink:0;
+            display:flex;
+            flex-direction:column;
+            background:rgba(10,14,30,.96);
+            border-right:1px solid var(--border);
+            position:relative;
+            z-index:50;
         }
 
         .brand {
-            padding: 20px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            border-bottom: 1px solid var(--border);
+            padding:20px;
+            display:flex;
+            align-items:center;
+            gap:12px;
+            border-bottom:1px solid var(--border);
+        }
+
+        .logo,.welcome-logo {
+            display:grid;
+            place-items:center;
+            font-weight:900;
+            background:linear-gradient(135deg,var(--blue),var(--violet));
+            box-shadow:0 8px 25px rgba(59,130,246,.25);
         }
 
         .logo {
-            width: 40px;
-            height: 40px;
-            border-radius: 12px;
-            display: grid;
-            place-items: center;
-            font-weight: 900;
-            font-size: 22px;
-            background:
-                linear-gradient(
-                    135deg,
-                    var(--blue),
-                    var(--violet)
-                );
-            box-shadow:
-                0 8px 25px rgba(59,130,246,.25);
+            width:40px;
+            height:40px;
+            border-radius:12px;
+            font-size:22px;
         }
 
         .brand-name {
-            font-size: 18px;
-            font-weight: 800;
+            font-size:18px;
+            font-weight:800;
         }
 
         .brand-subtitle {
-            color: var(--muted);
-            font-size: 11px;
-            margin-top: 2px;
+            color:var(--muted);
+            font-size:11px;
+            margin-top:2px;
         }
 
         .sidebar-content {
-            flex: 1;
-            min-height: 0;
-            padding: 14px;
-            display: flex;
-            flex-direction: column;
+            flex:1;
+            min-height:0;
+            padding:14px;
+            display:flex;
+            flex-direction:column;
         }
 
         .new-chat-btn {
-            width: 100%;
-            border: 1px solid rgba(59,130,246,.35);
-            background:
-                linear-gradient(
-                    135deg,
-                    rgba(59,130,246,.18),
-                    rgba(124,58,237,.18)
-                );
-            color: var(--text);
-            border-radius: 12px;
-            padding: 12px 14px;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            transition: .2s;
+            width:100%;
+            border:1px solid rgba(59,130,246,.35);
+            background:linear-gradient(135deg,rgba(59,130,246,.18),rgba(124,58,237,.18));
+            color:var(--text);
+            border-radius:12px;
+            padding:12px 14px;
+            font-weight:700;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            gap:8px;
         }
 
         .new-chat-btn:hover {
-            transform: translateY(-1px);
-            border-color: rgba(59,130,246,.65);
+            border-color:rgba(59,130,246,.65);
         }
 
         .search-box {
-            margin-top: 12px;
-            position: relative;
+            margin-top:12px;
+            position:relative;
         }
 
         .search-box input {
-            width: 100%;
-            border: 1px solid var(--border);
-            background: rgba(255,255,255,.035);
-            color: var(--text);
-            outline: none;
-            border-radius: 10px;
-            padding: 10px 12px 10px 36px;
+            width:100%;
+            border:1px solid var(--border);
+            background:rgba(255,255,255,.035);
+            color:var(--text);
+            outline:none;
+            border-radius:10px;
+            padding:10px 12px 10px 36px;
         }
 
         .search-box span {
-            position: absolute;
-            left: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--muted);
+            position:absolute;
+            left:12px;
+            top:50%;
+            transform:translateY(-50%);
+            color:var(--muted);
         }
 
         .section-title {
-            margin: 18px 4px 8px;
-            color: var(--muted);
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: .08em;
-            font-weight: 700;
+            margin:18px 4px 8px;
+            color:var(--muted);
+            font-size:11px;
+            text-transform:uppercase;
+            letter-spacing:.08em;
+            font-weight:700;
         }
 
         .chat-list {
-            flex: 1;
-            min-height: 0;
-            overflow-y: auto;
-            padding-right: 3px;
+            flex:1;
+            min-height:0;
+            overflow-y:auto;
+            padding-right:3px;
         }
 
         .chat-item {
-            width: 100%;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            border: 1px solid transparent;
-            background: transparent;
-            color: var(--text);
-            border-radius: 10px;
-            padding: 10px;
-            margin-bottom: 4px;
-            text-align: left;
-            transition: .15s;
+            width:100%;
+            display:flex;
+            align-items:center;
+            gap:8px;
+            border:1px solid transparent;
+            background:transparent;
+            color:var(--text);
+            border-radius:10px;
+            padding:10px;
+            margin-bottom:4px;
         }
 
         .chat-item:hover {
-            background: rgba(255,255,255,.045);
+            background:rgba(255,255,255,.045);
         }
 
         .chat-item.active {
-            background: rgba(59,130,246,.10);
-            border-color: rgba(59,130,246,.18);
+            background:rgba(59,130,246,.10);
+            border-color:rgba(59,130,246,.18);
+        }
+
+        .chat-open {
+            flex:1;
+            min-width:0;
+            border:none;
+            background:none;
+            color:inherit;
+            text-align:left;
         }
 
         .chat-item-title {
-            flex: 1;
-            min-width: 0;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            font-size: 13px;
+            white-space:nowrap;
+            overflow:hidden;
+            text-overflow:ellipsis;
+            font-size:13px;
         }
 
         .chat-delete {
-            opacity: 0;
-            border: none;
-            background: transparent;
-            color: var(--muted);
-            padding: 4px;
+            opacity:0;
+            border:none;
+            background:transparent;
+            color:var(--muted);
+            padding:4px;
         }
 
         .chat-item:hover .chat-delete {
-            opacity: 1;
+            opacity:1;
         }
 
         .chat-delete:hover {
-            color: var(--danger);
+            color:var(--danger);
         }
 
         .sidebar-bottom {
-            border-top: 1px solid var(--border);
-            padding: 12px;
+            border-top:1px solid var(--border);
+            padding:12px;
         }
 
         .account-card {
-            background: rgba(255,255,255,.035);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 11px;
-            margin-bottom: 10px;
+            background:rgba(255,255,255,.035);
+            border:1px solid var(--border);
+            border-radius:12px;
+            padding:11px;
+            margin-bottom:10px;
         }
 
         .account-name {
-            font-weight: 700;
-            font-size: 13px;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            font-weight:700;
+            font-size:13px;
+            overflow:hidden;
+            text-overflow:ellipsis;
         }
 
         .account-email {
-            color: var(--muted);
-            font-size: 11px;
-            margin-top: 3px;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            color:var(--muted);
+            font-size:11px;
+            margin-top:3px;
+            overflow:hidden;
+            text-overflow:ellipsis;
         }
 
         .bottom-actions {
-            display: grid;
-            gap: 5px;
+            display:grid;
+            gap:5px;
         }
 
         .side-action {
-            width: 100%;
-            padding: 9px 10px;
-            border: none;
-            background: transparent;
-            color: var(--muted);
-            border-radius: 9px;
-            text-align: left;
+            width:100%;
+            padding:9px 10px;
+            border:none;
+            background:transparent;
+            color:var(--muted);
+            border-radius:9px;
+            text-align:left;
         }
 
         .side-action:hover {
-            background: rgba(255,255,255,.04);
-            color: var(--text);
+            background:rgba(255,255,255,.04);
+            color:var(--text);
         }
 
         .side-action.danger:hover {
-            color: var(--danger);
+            color:var(--danger);
         }
 
-        /* =========================
-           MAIN
-        ========================= */
+        /* MAIN */
 
         .main {
-            flex: 1;
-            min-width: 0;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
+            flex:1;
+            min-width:0;
+            height:100%;
+            display:flex;
+            flex-direction:column;
         }
 
         .topbar {
-            height: 68px;
-            flex-shrink: 0;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 0 20px;
-            background: rgba(8,11,24,.88);
-            backdrop-filter: blur(18px);
-            border-bottom: 1px solid var(--border);
-            z-index: 20;
+            height:68px;
+            flex-shrink:0;
+            display:flex;
+            align-items:center;
+            gap:12px;
+            padding:0 20px;
+            background:rgba(8,11,24,.88);
+            backdrop-filter:blur(18px);
+            border-bottom:1px solid var(--border);
+            z-index:20;
         }
 
         .mobile-menu {
-            display: none;
-            border: none;
-            background: transparent;
-            color: var(--text);
-            font-size: 22px;
-        }
-
-        .topbar-brand {
-            min-width: 0;
+            display:none;
+            border:none;
+            background:transparent;
+            color:var(--text);
+            font-size:22px;
         }
 
         .topbar-title {
-            font-weight: 800;
-            font-size: 16px;
+            font-weight:800;
+            font-size:16px;
         }
 
         .topbar-subtitle {
-            color: var(--muted);
-            font-size: 11px;
-            margin-top: 2px;
+            color:var(--muted);
+            font-size:11px;
+            margin-top:2px;
         }
 
         .online {
-            margin-left: auto;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            color: var(--muted);
-            font-size: 12px;
+            margin-left:auto;
+            display:flex;
+            align-items:center;
+            gap:6px;
+            color:var(--muted);
+            font-size:12px;
         }
 
         .online-dot {
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-            background: var(--success);
-            box-shadow: 0 0 10px rgba(34,197,94,.7);
+            width:7px;
+            height:7px;
+            border-radius:50%;
+            background:var(--success);
+            box-shadow:0 0 10px rgba(34,197,94,.7);
         }
 
-        /* =========================
-           CHAT AREA
-        ========================= */
+        /* MESSAGES */
 
         .messages {
-            flex: 1;
-            min-height: 0;
-            overflow-y: auto;
-            padding: 30px 20px 140px;
+            flex:1;
+            min-height:0;
+            overflow-y:auto;
+            padding:30px 20px 140px;
         }
 
         .messages-inner {
-            width: min(900px, 100%);
-            margin: 0 auto;
+            width:min(900px,100%);
+            margin:0 auto;
         }
 
         .welcome {
-            min-height: calc(100vh - 230px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            padding: 40px 20px;
+            min-height:calc(100vh - 230px);
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            text-align:center;
+            padding:40px 20px;
         }
 
         .welcome-inner {
-            max-width: 620px;
+            max-width:620px;
         }
 
         .welcome-logo {
-            width: 68px;
-            height: 68px;
-            border-radius: 20px;
-            display: grid;
-            place-items: center;
-            margin: 0 auto 20px;
-            font-size: 34px;
-            font-weight: 900;
-            background:
-                linear-gradient(
-                    135deg,
-                    var(--blue),
-                    var(--violet)
-                );
-            box-shadow:
-                0 15px 50px rgba(59,130,246,.22);
+            width:68px;
+            height:68px;
+            border-radius:20px;
+            margin:0 auto 20px;
+            font-size:34px;
         }
 
         .welcome h1 {
-            font-size: clamp(28px, 5vw, 44px);
-            line-height: 1.1;
-            margin-bottom: 12px;
+            font-size:clamp(28px,5vw,44px);
+            line-height:1.1;
+            margin-bottom:12px;
         }
 
         .welcome p {
-            color: var(--muted);
-            line-height: 1.6;
-            font-size: 15px;
+            color:var(--muted);
+            line-height:1.6;
+            font-size:15px;
         }
 
         .message {
-            display: flex;
-            gap: 12px;
-            margin-bottom: 22px;
-            animation: messageIn .2s ease;
+            display:flex;
+            gap:12px;
+            margin-bottom:22px;
+            animation:messageIn .2s ease;
         }
 
         @keyframes messageIn {
             from {
-                opacity: 0;
-                transform: translateY(4px);
+                opacity:0;
+                transform:translateY(4px);
             }
             to {
-                opacity: 1;
-                transform: translateY(0);
+                opacity:1;
+                transform:translateY(0);
             }
         }
 
         .message.user {
-            justify-content: flex-end;
+            justify-content:flex-end;
         }
 
         .avatar {
-            width: 34px;
-            height: 34px;
-            flex-shrink: 0;
-            border-radius: 10px;
-            display: grid;
-            place-items: center;
-            font-size: 14px;
-            font-weight: 800;
-            background: var(--panel-2);
-            border: 1px solid var(--border);
+            width:34px;
+            height:34px;
+            flex-shrink:0;
+            border-radius:10px;
+            display:grid;
+            place-items:center;
+            font-size:14px;
+            font-weight:800;
+            background:var(--panel-2);
+            border:1px solid var(--border);
         }
 
         .message.user .avatar {
-            order: 2;
-            background:
-                linear-gradient(
-                    135deg,
-                    var(--blue),
-                    var(--violet)
-                );
+            order:2;
+            background:linear-gradient(135deg,var(--blue),var(--violet));
         }
 
         .bubble {
-            max-width: min(760px, 82%);
-            border-radius: 15px;
-            padding: 12px 15px;
-            line-height: 1.6;
-            font-size: 14px;
-            overflow-wrap: anywhere;
+            max-width:min(760px,82%);
+            border-radius:15px;
+            padding:12px 15px;
+            line-height:1.6;
+            font-size:14px;
+            overflow-wrap:anywhere;
         }
 
         .message.assistant .bubble {
-            background: rgba(255,255,255,.035);
-            border: 1px solid var(--border);
+            background:rgba(255,255,255,.035);
+            border:1px solid var(--border);
         }
 
         .message.user .bubble {
-            background:
-                linear-gradient(
-                    135deg,
-                    rgba(59,130,246,.20),
-                    rgba(124,58,237,.20)
-                );
-            border: 1px solid rgba(59,130,246,.20);
+            background:linear-gradient(135deg,rgba(59,130,246,.20),rgba(124,58,237,.20));
+            border:1px solid rgba(59,130,246,.20);
         }
 
         .bubble p {
-            margin-bottom: 9px;
+            margin-bottom:9px;
         }
 
         .bubble p:last-child {
-            margin-bottom: 0;
+            margin-bottom:0;
         }
 
-        .bubble ul,
-        .bubble ol {
-            margin: 7px 0 9px 20px;
+        .bubble ul,.bubble ol {
+            margin:7px 0 9px 20px;
         }
 
         .bubble li {
-            margin: 4px 0;
+            margin:4px 0;
         }
 
         .bubble code {
-            background: rgba(0,0,0,.25);
-            padding: 2px 5px;
-            border-radius: 5px;
-            font-size: .9em;
+            background:rgba(0,0,0,.25);
+            padding:2px 5px;
+            border-radius:5px;
+            font-size:.9em;
         }
 
         .bubble pre {
-            margin: 10px 0;
-            padding: 12px;
-            overflow-x: auto;
-            background: #070a14;
-            border: 1px solid var(--border);
-            border-radius: 9px;
+            margin:10px 0;
+            padding:12px;
+            overflow-x:auto;
+            background:#070a14;
+            border:1px solid var(--border);
+            border-radius:9px;
         }
 
         .bubble pre code {
-            background: transparent;
-            padding: 0;
+            background:transparent;
+            padding:0;
         }
 
         .typing {
-            display: inline-flex;
-            gap: 4px;
-            align-items: center;
+            display:inline-flex;
+            gap:4px;
+            align-items:center;
         }
 
         .typing span {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: var(--muted);
-            animation: typing .9s infinite;
+            width:6px;
+            height:6px;
+            border-radius:50%;
+            background:var(--muted);
+            animation:typing .9s infinite;
         }
 
         .typing span:nth-child(2) {
-            animation-delay: .15s;
+            animation-delay:.15s;
         }
 
         .typing span:nth-child(3) {
-            animation-delay: .3s;
+            animation-delay:.3s;
         }
 
         @keyframes typing {
-            0%, 60%, 100% {
-                opacity: .25;
-                transform: translateY(0);
+            0%,60%,100% {
+                opacity:.25;
+                transform:translateY(0);
             }
             30% {
-                opacity: 1;
-                transform: translateY(-3px);
+                opacity:1;
+                transform:translateY(-3px);
             }
         }
 
-        /* =========================
-           COMPOSER
-        ========================= */
+        /* COMPOSER */
 
         .composer-wrap {
-            position: fixed;
-            left: 280px;
-            right: 0;
-            bottom: 0;
-            padding: 16px 20px 20px;
-            background:
-                linear-gradient(
-                    to top,
-                    rgba(8,11,24,1) 50%,
-                    rgba(8,11,24,.0)
-                );
-            z-index: 30;
+            position:fixed;
+            left:280px;
+            right:0;
+            bottom:0;
+            padding:16px 20px 20px;
+            background:linear-gradient(to top,rgba(8,11,24,1) 50%,rgba(8,11,24,0));
+            z-index:30;
         }
 
         .composer {
-            width: min(900px, 100%);
-            margin: 0 auto;
-            background: rgba(16,21,43,.96);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            box-shadow: var(--shadow);
-            display: flex;
-            align-items: flex-end;
-            gap: 8px;
-            padding: 9px;
+            width:min(900px,100%);
+            margin:0 auto;
+            background:rgba(16,21,43,.96);
+            border:1px solid var(--border);
+            border-radius:18px;
+            box-shadow:var(--shadow);
+            padding:9px;
+        }
+
+        #normalComposer {
+            width:100%;
+            display:flex;
+            align-items:flex-end;
+            gap:8px;
         }
 
         .composer textarea {
-            flex: 1;
-            min-width: 0;
-            max-height: 160px;
-            resize: none;
-            border: none;
-            outline: none;
-            background: transparent;
-            color: var(--text);
-            padding: 10px;
-            line-height: 1.45;
+            flex:1;
+            min-width:0;
+            max-height:160px;
+            resize:none;
+            border:none;
+            outline:none;
+            background:transparent;
+            color:var(--text);
+            padding:10px;
+            line-height:1.45;
         }
 
         .composer textarea::placeholder {
-            color: #687086;
+            color:#687086;
+        }
+
+        .icon-btn,.send-btn {
+            width:42px;
+            height:42px;
+            flex-shrink:0;
+            border-radius:12px;
+            display:grid;
+            place-items:center;
         }
 
         .icon-btn {
-            width: 40px;
-            height: 40px;
-            flex-shrink: 0;
-            border: none;
-            border-radius: 10px;
-            background: transparent;
-            color: var(--muted);
-            display: grid;
-            place-items: center;
-            font-size: 18px;
+            border:1px solid transparent;
+            background:transparent;
+            color:var(--muted);
+            font-size:19px;
         }
 
         .icon-btn:hover {
-            background: rgba(255,255,255,.05);
-            color: var(--text);
+            background:rgba(255,255,255,.05);
+            color:var(--text);
         }
 
-        .send-btn {
-            width: 40px;
-            height: 40px;
-            flex-shrink: 0;
-            border: none;
-            border-radius: 10px;
-            color: white;
-            background:
-                linear-gradient(
-                    135deg,
-                    var(--blue),
-                    var(--violet)
-                );
-            display: grid;
-            place-items: center;
-            font-size: 17px;
-        }
+        /* MODERN MICROPHONE */
 
-        .send-btn:disabled {
-            opacity: .45;
-            cursor: not-allowed;
+        #micButton.recording-ready {
+            color:#fff;
+            background:linear-gradient(135deg,var(--blue),var(--violet));
+            box-shadow:0 0 22px rgba(59,130,246,.25);
         }
 
         .recording {
-            display: none;
-            align-items: center;
-            gap: 10px;
-            width: 100%;
-            padding: 10px 12px;
+            display:none;
+            width:100%;
+            align-items:center;
+            gap:12px;
+            min-height:54px;
+            padding:7px 8px;
         }
 
         .recording.active {
-            display: flex;
+            display:flex;
         }
 
-        .recording-pulse {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: #ef4444;
-            box-shadow: 0 0 0 0 rgba(239,68,68,.6);
-            animation: pulse 1.2s infinite;
+        .recording-icon {
+            width:40px;
+            height:40px;
+            flex-shrink:0;
+            display:grid;
+            place-items:center;
+            border-radius:50%;
+            color:#fff;
+            background:linear-gradient(135deg,var(--blue),var(--violet));
+            box-shadow:0 0 25px rgba(59,130,246,.3);
+            animation:micGlow 1.4s infinite;
         }
 
-        @keyframes pulse {
-            70% {
-                box-shadow: 0 0 0 9px rgba(239,68,68,0);
+        @keyframes micGlow {
+            0%,100% {
+                box-shadow:0 0 10px rgba(59,130,246,.25);
             }
-            100% {
-                box-shadow: 0 0 0 0 rgba(239,68,68,0);
+            50% {
+                box-shadow:0 0 25px rgba(124,58,237,.65);
             }
+        }
+
+        .recording-info {
+            min-width:75px;
+        }
+
+        .recording-label {
+            font-size:12px;
+            font-weight:700;
         }
 
         .recording-time {
-            color: var(--muted);
-            font-size: 13px;
-            flex: 1;
+            color:var(--muted);
+            font-size:11px;
+            margin-top:2px;
         }
 
-        .recording-stop,
-        .recording-cancel {
-            border: none;
-            border-radius: 8px;
-            padding: 7px 10px;
-            font-size: 12px;
+        .wave {
+            flex:1;
+            height:34px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            gap:3px;
+            overflow:hidden;
+        }
+
+        .wave span {
+            width:3px;
+            height:8px;
+            border-radius:5px;
+            background:linear-gradient(to top,var(--blue),var(--violet));
+            animation:wave 1s ease-in-out infinite;
+        }
+
+        .wave span:nth-child(1){animation-delay:.05s}
+        .wave span:nth-child(2){animation-delay:.15s}
+        .wave span:nth-child(3){animation-delay:.25s}
+        .wave span:nth-child(4){animation-delay:.35s}
+        .wave span:nth-child(5){animation-delay:.45s}
+        .wave span:nth-child(6){animation-delay:.55s}
+        .wave span:nth-child(7){animation-delay:.65s}
+        .wave span:nth-child(8){animation-delay:.75s}
+        .wave span:nth-child(9){animation-delay:.65s}
+        .wave span:nth-child(10){animation-delay:.55s}
+        .wave span:nth-child(11){animation-delay:.45s}
+        .wave span:nth-child(12){animation-delay:.35s}
+
+        @keyframes wave {
+            0%,100% {
+                height:7px;
+                opacity:.45;
+            }
+            50% {
+                height:28px;
+                opacity:1;
+            }
+        }
+
+        .recording-stop,.recording-cancel {
+            border:none;
+            border-radius:10px;
+            padding:9px 12px;
+            font-size:12px;
+            font-weight:700;
         }
 
         .recording-stop {
-            background: var(--blue);
-            color: white;
+            background:linear-gradient(135deg,var(--blue),var(--violet));
+            color:#fff;
         }
 
         .recording-cancel {
-            background: rgba(255,255,255,.06);
-            color: var(--muted);
+            background:rgba(255,255,255,.06);
+            color:var(--muted);
         }
 
-        /* =========================
-           TOAST
-        ========================= */
+        .send-btn {
+            border:none;
+            color:#fff;
+            background:linear-gradient(135deg,var(--blue),var(--violet));
+            font-size:17px;
+        }
+
+        .send-btn:disabled,.icon-btn:disabled {
+            opacity:.45;
+            cursor:not-allowed;
+        }
+
+        /* TOAST */
 
         .toast {
-            position: fixed;
-            left: 50%;
-            bottom: 95px;
-            transform: translateX(-50%) translateY(15px);
-            opacity: 0;
-            pointer-events: none;
-            background: #171c32;
-            border: 1px solid var(--border);
-            color: var(--text);
-            padding: 10px 15px;
-            border-radius: 10px;
-            box-shadow: var(--shadow);
-            font-size: 13px;
-            z-index: 100;
-            transition: .2s;
+            position:fixed;
+            left:50%;
+            bottom:95px;
+            transform:translateX(-50%) translateY(15px);
+            opacity:0;
+            pointer-events:none;
+            background:#171c32;
+            border:1px solid var(--border);
+            color:var(--text);
+            padding:10px 15px;
+            border-radius:10px;
+            box-shadow:var(--shadow);
+            font-size:13px;
+            z-index:100;
+            transition:.2s;
         }
 
         .toast.show {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
+            opacity:1;
+            transform:translateX(-50%) translateY(0);
         }
-
-        /* =========================
-           MOBILE
-        ========================= */
 
         .mobile-overlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,.55);
-            z-index: 40;
+            display:none;
+            position:fixed;
+            inset:0;
+            background:rgba(0,0,0,.55);
+            z-index:40;
         }
 
-        @media (max-width: 800px) {
+        @media(max-width:800px) {
+
             .sidebar {
-                position: fixed;
-                left: 0;
-                top: 0;
-                bottom: 0;
-                transform: translateX(-100%);
-                transition: transform .22s ease;
+                position:fixed;
+                left:0;
+                top:0;
+                bottom:0;
+                transform:translateX(-100%);
+                transition:transform .22s ease;
             }
 
             .sidebar.open {
-                transform: translateX(0);
+                transform:translateX(0);
             }
 
             .mobile-overlay.open {
-                display: block;
+                display:block;
             }
 
             .mobile-menu {
-                display: block;
+                display:block;
             }
 
             .composer-wrap {
-                left: 0;
-                padding: 10px;
+                left:0;
+                padding:10px;
             }
 
             .topbar {
-                padding: 0 14px;
+                padding:0 14px;
             }
 
             .messages {
-                padding: 20px 12px 125px;
+                padding:20px 12px 125px;
             }
 
             .bubble {
-                max-width: 88%;
+                max-width:88%;
             }
         }
 
-        @media (max-width: 500px) {
+        @media(max-width:500px) {
+
             .online {
-                display: none;
+                display:none;
             }
 
             .welcome h1 {
-                font-size: 30px;
+                font-size:30px;
             }
 
             .welcome p {
-                font-size: 14px;
+                font-size:14px;
             }
 
             .bubble {
-                font-size: 13px;
+                font-size:13px;
             }
 
-            .composer {
-                border-radius: 14px;
+            .wave {
+                display:none;
+            }
+
+            .recording {
+                gap:7px;
             }
         }
     </style>
@@ -824,19 +815,9 @@
 
 <div class="app">
 
-    <!-- =========================
-         MOBILE OVERLAY
-    ========================== -->
-
-    <div
-        id="mobileOverlay"
-        class="mobile-overlay"
-        onclick="closeSidebar()"
-    ></div>
-
-    <!-- =========================
-         SIDEBAR
-    ========================== -->
+    <div id="mobileOverlay"
+         class="mobile-overlay"
+         onclick="closeSidebar()"></div>
 
     <aside id="sidebar" class="sidebar">
 
@@ -851,10 +832,8 @@
 
         <div class="sidebar-content">
 
-            <button
-                class="new-chat-btn"
-                onclick="createNewChat()"
-            >
+            <button class="new-chat-btn"
+                    onclick="createNewChat()">
                 <span>＋</span>
                 <span>New Chat</span>
             </button>
@@ -862,22 +841,18 @@
             <div class="search-box">
                 <span>⌕</span>
 
-                <input
-                    id="chatSearch"
-                    type="text"
-                    placeholder="Search chats..."
-                    autocomplete="off"
-                >
+                <input id="chatSearch"
+                       type="text"
+                       placeholder="Search chats..."
+                       autocomplete="off">
             </div>
 
             <div class="section-title">
                 Previous chats
             </div>
 
-            <div
-                id="chatList"
-                class="chat-list"
-            ></div>
+            <div id="chatList"
+                 class="chat-list"></div>
 
         </div>
 
@@ -885,17 +860,13 @@
 
             <div class="account-card">
 
-                <div
-                    id="accountName"
-                    class="account-name"
-                >
+                <div id="accountName"
+                     class="account-name">
                     Loading...
                 </div>
 
-                <div
-                    id="accountEmail"
-                    class="account-email"
-                >
+                <div id="accountEmail"
+                     class="account-email">
                     Loading...
                 </div>
 
@@ -903,26 +874,20 @@
 
             <div class="bottom-actions">
 
-                <button
-                    id="adminButton"
-                    class="side-action"
-                    style="display:none"
-                    onclick="window.location.href='/admin'"
-                >
+                <button id="adminButton"
+                        class="side-action"
+                        style="display:none"
+                        onclick="window.location.href='/admin'">
                     ⚙️ Admin Dashboard
                 </button>
 
-                <button
-                    class="side-action"
-                    onclick="logoutUser()"
-                >
+                <button class="side-action"
+                        onclick="logoutUser()">
                     🚪 Logout
                 </button>
 
-                <button
-                    class="side-action danger"
-                    onclick="deleteAccount()"
-                >
+                <button class="side-action danger"
+                        onclick="deleteAccount()">
                     🗑️ Delete account
                 </button>
 
@@ -932,32 +897,20 @@
 
     </aside>
 
-    <!-- =========================
-         MAIN
-    ========================== -->
-
     <main class="main">
 
         <header class="topbar">
 
-            <button
-                class="mobile-menu"
-                onclick="toggleSidebar()"
-                aria-label="Open menu"
-            >
+            <button class="mobile-menu"
+                    onclick="toggleSidebar()">
                 ☰
             </button>
 
-            <div class="topbar-brand">
-
-                <div class="topbar-title">
-                    AskOra
-                </div>
-
+            <div>
+                <div class="topbar-title">AskOra</div>
                 <div class="topbar-subtitle">
                     Ask. Get answers.
                 </div>
-
             </div>
 
             <div class="online">
@@ -967,30 +920,20 @@
 
         </header>
 
-        <section
-            id="messages"
-            class="messages"
-        >
+        <section id="messages"
+                 class="messages">
 
-            <div
-                id="messagesInner"
-                class="messages-inner"
-            >
+            <div id="messagesInner"
+                 class="messages-inner">
 
-                <div
-                    id="welcome"
-                    class="welcome"
-                >
+                <div id="welcome"
+                     class="welcome">
 
                     <div class="welcome-inner">
 
-                        <div class="welcome-logo">
-                            A
-                        </div>
+                        <div class="welcome-logo">A</div>
 
-                        <h1>
-                            How can I help?
-                        </h1>
+                        <h1>How can I help?</h1>
 
                         <p>
                             Ask me anything. Get clear,
@@ -1009,80 +952,85 @@
 
 </div>
 
-<!-- =========================
-     COMPOSER
-========================== -->
+
+<!-- COMPOSER -->
 
 <div class="composer-wrap">
 
     <div class="composer">
 
-        <div
-            id="normalComposer"
-            style="
-                width:100%;
-                display:flex;
-                align-items:flex-end;
-                gap:8px;
-            "
-        >
+        <div id="normalComposer">
 
-            <textarea
-                id="messageInput"
-                rows="1"
-                placeholder="Ask AskOra anything..."
-                autocomplete="off"
-            ></textarea>
+            <textarea id="messageInput"
+                      rows="1"
+                      placeholder="Ask AskOra anything..."
+                      autocomplete="off"></textarea>
 
-            <button
-                id="micButton"
-                class="icon-btn"
-                title="Voice input"
-                type="button"
-                onclick="startRecording()"
-            >
+            <button id="micButton"
+                    class="icon-btn recording-ready"
+                    title="Voice input"
+                    type="button"
+                    onclick="startRecording()">
                 🎙️
             </button>
 
-            <button
-                id="sendButton"
-                class="send-btn"
-                type="button"
-                onclick="sendMessage()"
-            >
+            <button id="sendButton"
+                    class="send-btn"
+                    type="button"
+                    onclick="sendMessage()">
                 ➤
             </button>
 
         </div>
 
-        <div
-            id="recordingBar"
-            class="recording"
-        >
 
-            <span class="recording-pulse"></span>
+        <!-- MODERN RECORDING UI -->
 
-            <span
-                id="recordingTime"
-                class="recording-time"
-            >
-                Recording 00:00
-            </span>
+        <div id="recordingBar"
+             class="recording">
 
-            <button
-                class="recording-cancel"
-                type="button"
-                onclick="cancelRecording()"
-            >
+            <div class="recording-icon">
+                🎙️
+            </div>
+
+            <div class="recording-info">
+
+                <div class="recording-label">
+                    Listening...
+                </div>
+
+                <div id="recordingTime"
+                     class="recording-time">
+                    00:00
+                </div>
+
+            </div>
+
+            <div class="wave">
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+
+            <button class="recording-cancel"
+                    type="button"
+                    onclick="cancelRecording()">
                 Cancel
             </button>
 
-            <button
-                class="recording-stop"
-                type="button"
-                onclick="stopRecording()"
-            >
-                Stop
+            <button class="recording-stop"
+                    type="button"
+                    onclick="stopRecording()">
+                Send
             </button>
 
         </div>
@@ -1091,18 +1039,13 @@
 
 </div>
 
-<div
-    id="toast"
-    class="toast"
-></div>
+
+<div id="toast"
+     class="toast"></div>
 
 
 <script>
 "use strict";
-
-/* =========================================================
-   ASKORA FRONTEND
-========================================================= */
 
 let CSRF = "";
 let currentUser = null;
@@ -1118,16 +1061,13 @@ let recordingStartedAt = null;
 let recordingTimer = null;
 
 
-/* =========================================================
-   BASIC HELPERS
-========================================================= */
-
 function $(id) {
     return document.getElementById(id);
 }
 
 
 function showToast(message) {
+
     const toast = $("toast");
 
     if (!toast) return;
@@ -1144,6 +1084,7 @@ function showToast(message) {
 
 
 function escapeHtml(value) {
+
     return String(value ?? "")
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
@@ -1153,9 +1094,7 @@ function escapeHtml(value) {
 }
 
 
-/* =========================================================
-   SIMPLE MARKDOWN
-========================================================= */
+/* MARKDOWN */
 
 function renderMarkdown(text) {
 
@@ -1163,11 +1102,10 @@ function renderMarkdown(text) {
 
     html = html.replace(
         /```([\s\S]*?)```/g,
-        function(_, code) {
-            return "<pre><code>" +
-                code.trim() +
-                "</code></pre>";
-        }
+        (_, code) =>
+            "<pre><code>" +
+            code.trim() +
+            "</code></pre>"
     );
 
     html = html.replace(
@@ -1215,18 +1153,13 @@ function renderMarkdown(text) {
         "</p><p>"
     );
 
-    html = html.replace(
-        /\n/g,
-        "<br>"
-    );
+    html = html.replace(/\n/g, "<br>");
 
     return "<p>" + html + "</p>";
 }
 
 
-/* =========================================================
-   API
-========================================================= */
+/* API */
 
 async function apiFetch(url, options = {}) {
 
@@ -1242,31 +1175,8 @@ async function apiFetch(url, options = {}) {
         config.headers["X-CSRF-Token"] = CSRF;
     }
 
-    let response;
-
-    try {
-
-        response = await fetch(url, config);
-
-    } catch (error) {
-
-        console.error("Network error:", error);
-
-        throw new Error(
-            "Unable to connect to AskOra."
-        );
-    }
-
-    /*
-       IMPORTANT:
-
-       Do NOT redirect automatically on 401.
-
-       Automatic redirects were causing the
-       login -> home -> login refresh loop.
-
-       Authentication is handled once during init().
-    */
+    const response =
+        await fetch(url, config);
 
     if (response.status === 401) {
         throw new Error("AUTH_REQUIRED");
@@ -1276,50 +1186,38 @@ async function apiFetch(url, options = {}) {
 }
 
 
-/* =========================================================
-   AUTHENTICATION
-========================================================= */
+/* AUTH */
 
 async function checkAuthentication() {
 
     try {
 
-        const response = await fetch(
-            "/api/me",
-            {
-                method: "GET",
-                credentials: "same-origin",
-                cache: "no-store",
-                headers: {
-                    "Accept": "application/json"
+        const response =
+            await fetch("/api/me", {
+                credentials:"same-origin",
+                cache:"no-store",
+                headers:{
+                    "Accept":"application/json"
                 }
-            }
-        );
+            });
 
         if (!response.ok) {
-
-            console.error(
-                "Authentication check failed:",
-                response.status
-            );
-
             return false;
         }
 
-        const data = await response.json();
-
-        console.log(
-            "AskOra authentication:",
-            data.authenticated
-        );
+        const data =
+            await response.json();
 
         if (
             data.authenticated === true &&
             data.user
         ) {
 
-            CSRF = data.csrf_token || "";
-            currentUser = data.user;
+            CSRF =
+                data.csrf_token || "";
+
+            currentUser =
+                data.user;
 
             return true;
         }
@@ -1328,19 +1226,12 @@ async function checkAuthentication() {
 
     } catch (error) {
 
-        console.error(
-            "Authentication check error:",
-            error
-        );
+        console.error(error);
 
         return false;
     }
 }
 
-
-/* =========================================================
-   ACCOUNT UI
-========================================================= */
 
 function updateAccountUI() {
 
@@ -1352,23 +1243,19 @@ function updateAccountUI() {
     $("accountEmail").textContent =
         currentUser.email || "";
 
-    if (currentUser.is_admin) {
-        $("adminButton").style.display = "block";
-    } else {
-        $("adminButton").style.display = "none";
-    }
+    $("adminButton").style.display =
+        currentUser.is_admin
+            ? "block"
+            : "none";
 }
 
 
-/* =========================================================
-   CHAT LIST
-========================================================= */
+/* HISTORY */
 
 async function loadChats() {
 
-    const response = await apiFetch(
-        "/api/chats"
-    );
+    const response =
+        await apiFetch("/api/chats");
 
     if (!response.ok) {
         throw new Error(
@@ -1376,11 +1263,13 @@ async function loadChats() {
         );
     }
 
-    const data = await response.json();
+    const data =
+        await response.json();
 
-    chats = Array.isArray(data.chats)
-        ? data.chats
-        : [];
+    chats =
+        Array.isArray(data.chats)
+            ? data.chats
+            : [];
 
     renderChatList();
 }
@@ -1392,21 +1281,43 @@ function renderChatList(filter = "") {
 
     if (!list) return;
 
-    const search = filter
-        .trim()
-        .toLowerCase();
+    const search =
+        filter.trim().toLowerCase();
 
-    const filtered = chats.filter(chat => {
+    /*
+       Empty "New conversation" chats are
+       deliberately hidden from History.
 
-        if (!search) return true;
+       They only become History items after
+       the user sends the first message and
+       the backend gives them a real title.
+    */
 
-        return String(
-            chat.title || ""
-        )
-            .toLowerCase()
-            .includes(search);
+    const filtered =
+        chats.filter(chat => {
 
-    });
+            const title =
+                String(chat.title || "").trim();
+
+            const isEmpty =
+                !title ||
+                title.toLowerCase() ===
+                "new conversation" ||
+                title.toLowerCase() ===
+                "new chat";
+
+            if (isEmpty) {
+                return false;
+            }
+
+            if (!search) {
+                return true;
+            }
+
+            return title
+                .toLowerCase()
+                .includes(search);
+        });
 
     if (!filtered.length) {
 
@@ -1416,112 +1327,75 @@ function renderChatList(filter = "") {
                 font-size:12px;
                 padding:12px 8px;
             ">
-                No chats found.
+                No previous chats yet.
             </div>
         `;
 
         return;
     }
 
-    list.innerHTML = filtered.map(chat => {
+    list.innerHTML =
+        filtered.map(chat => {
 
-        const active =
-            Number(chat.id) ===
-            Number(currentChatId);
+            const active =
+                Number(chat.id) ===
+                Number(currentChatId);
 
-        return `
-            <div
-                class="chat-item ${active ? "active" : ""}"
-                data-chat-id="${chat.id}"
-            >
+            return `
+                <div class="chat-item ${active ? "active" : ""}">
 
-                <button
-                    style="
-                        flex:1;
-                        min-width:0;
-                        border:none;
-                        background:none;
-                        color:inherit;
-                        text-align:left;
-                    "
-                    onclick="openChat(${chat.id})"
-                >
-                    <div class="chat-item-title">
-                        ${escapeHtml(
-                            chat.title ||
-                            "New conversation"
-                        )}
-                    </div>
-                </button>
+                    <button
+                        class="chat-open"
+                        onclick="openChat(${chat.id})"
+                    >
+                        <div class="chat-item-title">
+                            ${escapeHtml(
+                                chat.title ||
+                                "Conversation"
+                            )}
+                        </div>
+                    </button>
 
-                <button
-                    class="chat-delete"
-                    title="Delete chat"
-                    onclick="
-                        event.stopPropagation();
-                        deleteChat(${chat.id});
-                    "
-                >
-                    ×
-                </button>
+                    <button
+                        class="chat-delete"
+                        title="Delete chat"
+                        onclick="
+                            event.stopPropagation();
+                            deleteChat(${chat.id});
+                        "
+                    >
+                        ×
+                    </button>
 
-            </div>
-        `;
+                </div>
+            `;
 
-    }).join("");
+        }).join("");
 }
 
 
-/* =========================================================
-   CREATE / OPEN CHAT
-========================================================= */
-
-async function createOrLoadInitialChat() {
-
-    if (chats.length > 0) {
-
-        const newest = chats[0];
-
-        await openChat(
-            newest.id,
-            false
-        );
-
-        return;
-    }
-
-    await createNewChat(false);
-}
-
+/* NEW CHAT */
 
 async function createNewChat(closeMobile = true) {
 
     try {
 
-        const response = await apiFetch(
-            "/api/chats",
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type":
-                        "application/json"
-                },
-                body: JSON.stringify({
-                    title: "New conversation"
-                })
-            }
-        );
-
-        if (!response.ok) {
-
-            const text =
-                await response.text();
-
-            console.error(
-                "Create chat failed:",
-                text
+        const response =
+            await apiFetch(
+                "/api/chats",
+                {
+                    method:"POST",
+                    headers:{
+                        "Content-Type":
+                            "application/json"
+                    },
+                    body:JSON.stringify({
+                        title:"New conversation"
+                    })
+                }
             );
 
+        if (!response.ok) {
             throw new Error(
                 "Unable to create chat."
             );
@@ -1541,9 +1415,9 @@ async function createNewChat(closeMobile = true) {
         currentChatId =
             data.chat.id;
 
-        renderChatList();
-
         clearMessages();
+
+        renderChatList();
 
         if (closeMobile) {
             closeSidebar();
@@ -1555,17 +1429,6 @@ async function createNewChat(closeMobile = true) {
 
         console.error(error);
 
-        if (
-            error.message ===
-            "AUTH_REQUIRED"
-        ) {
-            showToast(
-                "Your session has expired. Please log in again."
-            );
-
-            return;
-        }
-
         showToast(
             error.message ||
             "Unable to create chat."
@@ -1574,6 +1437,23 @@ async function createNewChat(closeMobile = true) {
 }
 
 
+/*
+   IMPORTANT:
+
+   Every time the website loads,
+   AskOra creates a NEW empty chat.
+
+   Previous conversations remain in History.
+*/
+
+async function createOrLoadInitialChat() {
+
+    await createNewChat(false);
+}
+
+
+/* OPEN HISTORY CHAT */
+
 async function openChat(
     chatId,
     closeMobileMenu = true
@@ -1581,7 +1461,8 @@ async function openChat(
 
     try {
 
-        currentChatId = chatId;
+        currentChatId =
+            chatId;
 
         renderChatList();
 
@@ -1607,9 +1488,7 @@ async function openChat(
                 : [];
 
         if (!messages.length) {
-
             showWelcome();
-
         } else {
 
             messages.forEach(message => {
@@ -1632,17 +1511,6 @@ async function openChat(
 
         console.error(error);
 
-        if (
-            error.message ===
-            "AUTH_REQUIRED"
-        ) {
-            showToast(
-                "Your session has expired. Please log in again."
-            );
-
-            return;
-        }
-
         showToast(
             error.message ||
             "Unable to load chat."
@@ -1651,18 +1519,15 @@ async function openChat(
 }
 
 
-/* =========================================================
-   DELETE CHAT
-========================================================= */
+/* DELETE HISTORY */
 
 async function deleteChat(chatId) {
 
-    const confirmed =
-        confirm(
-            "Delete this conversation?"
-        );
-
-    if (!confirmed) return;
+    if (!confirm(
+        "Delete this conversation?"
+    )) {
+        return;
+    }
 
     try {
 
@@ -1670,7 +1535,7 @@ async function deleteChat(chatId) {
             await apiFetch(
                 `/api/chats/${chatId}`,
                 {
-                    method: "DELETE"
+                    method:"DELETE"
                 }
             );
 
@@ -1694,18 +1559,7 @@ async function deleteChat(chatId) {
 
             currentChatId = null;
 
-            if (chats.length) {
-
-                await openChat(
-                    chats[0].id,
-                    false
-                );
-
-            } else {
-
-                await createNewChat(false);
-
-            }
+            await createNewChat(false);
         }
 
         renderChatList();
@@ -1722,9 +1576,7 @@ async function deleteChat(chatId) {
 }
 
 
-/* =========================================================
-   MESSAGE UI
-========================================================= */
+/* MESSAGE UI */
 
 function clearMessages() {
 
@@ -1736,7 +1588,7 @@ function clearMessages() {
 function showWelcome() {
 
     $("messagesInner").innerHTML = `
-        <div id="welcome" class="welcome">
+        <div class="welcome">
 
             <div class="welcome-inner">
 
@@ -1760,10 +1612,7 @@ function showWelcome() {
 }
 
 
-function addMessage(
-    role,
-    content
-) {
+function addMessage(role, content) {
 
     const welcome =
         $("welcome");
@@ -1804,7 +1653,6 @@ function addMessage(
 
         bubble.textContent =
             content;
-
     }
 
     wrapper.appendChild(avatar);
@@ -1868,17 +1716,13 @@ function scrollToBottom() {
     if (!messages) return;
 
     requestAnimationFrame(() => {
-
         messages.scrollTop =
             messages.scrollHeight;
-
     });
 }
 
 
-/* =========================================================
-   SEND MESSAGE
-========================================================= */
+/* SEND TEXT */
 
 async function sendMessage() {
 
@@ -1907,6 +1751,7 @@ async function sendMessage() {
     $("micButton").disabled = true;
 
     input.value = "";
+
     resizeTextarea();
 
     addMessage(
@@ -1923,12 +1768,12 @@ async function sendMessage() {
             await apiFetch(
                 "/api/chat",
                 {
-                    method: "POST",
-                    headers: {
+                    method:"POST",
+                    headers:{
                         "Content-Type":
                             "application/json"
                     },
-                    body: JSON.stringify({
+                    body:JSON.stringify({
                         chat_id:
                             currentChatId,
                         message:
@@ -1938,15 +1783,6 @@ async function sendMessage() {
             );
 
         if (!response.ok) {
-
-            const errorText =
-                await response.text();
-
-            console.error(
-                "Chat error:",
-                errorText
-            );
-
             throw new Error(
                 "Unable to get a response."
             );
@@ -1957,19 +1793,17 @@ async function sendMessage() {
 
         typing.remove();
 
-        const answer =
-            data.answer ||
-            data.message ||
-            "I couldn't generate a response.";
-
         addMessage(
             "assistant",
-            answer
+            data.answer ||
+            data.response ||
+            "I couldn't generate a response."
         );
 
         /*
-           Update chat title if backend
-           returns the updated chat.
+           Backend should return the updated
+           chat with the first question as
+           its title.
         */
 
         if (data.chat) {
@@ -1990,8 +1824,17 @@ async function sendMessage() {
                 );
             }
 
-            renderChatList();
+        } else {
+
+            /*
+               Fallback for older backend:
+               reload History from PostgreSQL.
+            */
+
+            await loadChats();
         }
+
+        renderChatList();
 
     } catch (error) {
 
@@ -2001,22 +1844,10 @@ async function sendMessage() {
             typing.remove();
         }
 
-        if (
-            error.message ===
-            "AUTH_REQUIRED"
-        ) {
-
-            showToast(
-                "Your session has expired. Please log in again."
-            );
-
-        } else {
-
-            addMessage(
-                "assistant",
-                "Sorry, something went wrong while generating the response."
-            );
-        }
+        addMessage(
+            "assistant",
+            "Sorry, something went wrong while generating the response."
+        );
 
     } finally {
 
@@ -2033,16 +1864,15 @@ async function sendMessage() {
 }
 
 
-/* =========================================================
-   TEXTAREA
-========================================================= */
+/* TEXTAREA */
 
 function resizeTextarea() {
 
     const input =
         $("messageInput");
 
-    input.style.height = "auto";
+    input.style.height =
+        "auto";
 
     input.style.height =
         Math.min(
@@ -2052,9 +1882,7 @@ function resizeTextarea() {
 }
 
 
-/* =========================================================
-   VOICE INPUT
-========================================================= */
+/* VOICE */
 
 async function startRecording() {
 
@@ -2077,7 +1905,7 @@ async function startRecording() {
         mediaStream =
             await navigator.mediaDevices
                 .getUserMedia({
-                    audio: true
+                    audio:true
                 });
 
         recordedChunks = [];
@@ -2115,9 +1943,7 @@ async function startRecording() {
 
                 cleanupRecording();
 
-                await sendVoice(
-                    blob
-                );
+                await sendVoice(blob);
             };
 
         mediaRecorder.start();
@@ -2167,16 +1993,16 @@ function updateRecordingTimer() {
     const minutes =
         String(
             Math.floor(elapsed / 60)
-        ).padStart(2, "0");
+        ).padStart(2,"0");
 
     const seconds =
         String(
             elapsed % 60
-        ).padStart(2, "0");
+        ).padStart(2,"0");
 
     $("recordingTime")
         .textContent =
-        `Recording ${minutes}:${seconds}`;
+        `${minutes}:${seconds}`;
 }
 
 
@@ -2184,7 +2010,8 @@ function stopRecording() {
 
     if (
         mediaRecorder &&
-        mediaRecorder.state !== "inactive"
+        mediaRecorder.state !==
+        "inactive"
     ) {
 
         mediaRecorder.stop();
@@ -2196,7 +2023,8 @@ function cancelRecording() {
 
     if (mediaRecorder) {
 
-        mediaRecorder.onstop = null;
+        mediaRecorder.onstop =
+            null;
 
         if (
             mediaRecorder.state !==
@@ -2217,7 +2045,6 @@ function cleanupRecording() {
     );
 
     recordingTimer = null;
-
     recordingStartedAt = null;
 
     if (mediaStream) {
@@ -2257,8 +2084,7 @@ async function sendVoice(blob) {
 
         await createNewChat(false);
 
-        if (!currentChatId)
-            return;
+        if (!currentChatId) return;
     }
 
     const typing =
@@ -2284,13 +2110,12 @@ async function sendVoice(blob) {
             await apiFetch(
                 "/api/voice",
                 {
-                    method: "POST",
-                    body: formData
+                    method:"POST",
+                    body:formData
                 }
             );
 
         if (!response.ok) {
-
             throw new Error(
                 "Voice request failed."
             );
@@ -2336,8 +2161,12 @@ async function sendVoice(blob) {
                 );
             }
 
-            renderChatList();
+        } else {
+
+            await loadChats();
         }
+
+        renderChatList();
 
     } catch (error) {
 
@@ -2355,115 +2184,7 @@ async function sendVoice(blob) {
 }
 
 
-/* =========================================================
-   LOGOUT
-========================================================= */
-
-async function logoutUser() {
-
-    try {
-
-        const response =
-            await fetch(
-                "/logout",
-                {
-                    method: "GET",
-                    credentials:
-                        "same-origin"
-                }
-            );
-
-        /*
-           Do not manually redirect repeatedly.
-           The server handles the final destination.
-        */
-
-        if (
-            response.redirected
-        ) {
-
-            window.location.replace(
-                response.url
-            );
-
-        } else {
-
-            window.location.replace(
-                "/login"
-            );
-        }
-
-    } catch (error) {
-
-        console.error(error);
-
-        window.location.replace(
-            "/login"
-        );
-    }
-}
-
-
-/* =========================================================
-   DELETE ACCOUNT
-========================================================= */
-
-async function deleteAccount() {
-
-    const first =
-        confirm(
-            "Are you sure you want to permanently delete your AskOra account?"
-        );
-
-    if (!first) return;
-
-    const second =
-        confirm(
-            "This will delete your AskOra chats and account data. Continue?"
-        );
-
-    if (!second) return;
-
-    try {
-
-        const response =
-            await apiFetch(
-                "/api/account/delete",
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type":
-                            "application/json"
-                    },
-                    body: JSON.stringify({})
-                }
-            );
-
-        if (!response.ok) {
-
-            throw new Error(
-                "Unable to delete account."
-            );
-        }
-
-        window.location.replace(
-            "/login"
-        );
-
-    } catch (error) {
-
-        console.error(error);
-
-        showToast(
-            "Unable to delete your account."
-        );
-    }
-}
-
-
-/* =========================================================
-   SIDEBAR
-========================================================= */
+/* SIDEBAR */
 
 function toggleSidebar() {
 
@@ -2485,25 +2206,19 @@ function closeSidebar() {
 }
 
 
-/* =========================================================
-   SEARCH
-========================================================= */
+/* SEARCH */
 
 $("chatSearch").addEventListener(
     "input",
     event => {
-
         renderChatList(
             event.target.value
         );
-
     }
 );
 
 
-/* =========================================================
-   KEYBOARD
-========================================================= */
+/* KEYBOARD */
 
 $("messageInput").addEventListener(
     "input",
@@ -2528,17 +2243,9 @@ $("messageInput").addEventListener(
 );
 
 
-/* =========================================================
-   INITIALIZATION
-========================================================= */
+/* INIT */
 
 async function init() {
-
-    /*
-       Prevent multiple initialization calls.
-       This is important for avoiding duplicate
-       requests and refresh loops.
-    */
 
     if (isInitializing) {
         return;
@@ -2548,77 +2255,31 @@ async function init() {
 
     try {
 
-        /*
-           FIRST:
-           Check authentication exactly once.
-        */
-
         const authenticated =
             await checkAuthentication();
 
         if (!authenticated) {
 
-            /*
-               Do NOT repeatedly redirect.
-
-               Show a message instead.
-               If the browser truly has no
-               valid session, the user can
-               manually go to login.
-            */
-
-            $("messagesInner").innerHTML = `
-                <div class="welcome">
-
-                    <div class="welcome-inner">
-
-                        <div class="welcome-logo">
-                            A
-                        </div>
-
-                        <h1>
-                            Session unavailable
-                        </h1>
-
-                        <p style="margin-bottom:20px;">
-                            Your AskOra login session could
-                            not be verified.
-                        </p>
-
-                        <button
-                            onclick="window.location.replace('/login')"
-                            style="
-                                border:none;
-                                border-radius:10px;
-                                padding:11px 18px;
-                                color:white;
-                                font-weight:700;
-                                background:
-                                    linear-gradient(
-                                        135deg,
-                                        #3b82f6,
-                                        #7c3aed
-                                    );
-                            "
-                        >
-                            Go to Login
-                        </button>
-
-                    </div>
-
-                </div>
-            `;
+            window.location.replace(
+                "/login"
+            );
 
             return;
         }
 
-        /*
-           Authentication succeeded.
-        */
-
         updateAccountUI();
 
         await loadChats();
+
+        /*
+           ALWAYS create a fresh chat when
+           AskOra is opened/reloaded.
+
+           Existing conversations remain
+           stored in PostgreSQL and appear
+           in History after they contain
+           a real message.
+        */
 
         await createOrLoadInitialChat();
 
@@ -2629,48 +2290,9 @@ async function init() {
             error
         );
 
-        $("messagesInner").innerHTML = `
-            <div class="welcome">
-
-                <div class="welcome-inner">
-
-                    <div class="welcome-logo">
-                        A
-                    </div>
-
-                    <h1>
-                        AskOra
-                    </h1>
-
-                    <p>
-                        Something went wrong while
-                        loading your account.
-                    </p>
-
-                    <button
-                        onclick="location.reload()"
-                        style="
-                            margin-top:18px;
-                            border:none;
-                            border-radius:10px;
-                            padding:11px 18px;
-                            color:white;
-                            font-weight:700;
-                            background:
-                                linear-gradient(
-                                    135deg,
-                                    #3b82f6,
-                                    #7c3aed
-                                );
-                        "
-                    >
-                        Try Again
-                    </button>
-
-                </div>
-
-            </div>
-        `;
+        showToast(
+            "Unable to load AskOra."
+        );
 
     } finally {
 
@@ -2679,17 +2301,11 @@ async function init() {
 }
 
 
-/* =========================================================
-   START
-========================================================= */
+/* START */
 
 document.addEventListener(
     "DOMContentLoaded",
-    () => {
-
-        init();
-
-    }
+    init
 );
 
 </script>
