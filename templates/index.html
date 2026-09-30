@@ -570,7 +570,6 @@
             border:1px solid transparent;
             background:transparent;
             color:var(--muted);
-            font-size:19px;
         }
 
         .icon-btn:hover {
@@ -578,12 +577,43 @@
             color:var(--text);
         }
 
-        /* MODERN MICROPHONE */
+        /* CHATGPT-STYLE MICROPHONE */
+
+        #micButton {
+            border:1px solid rgba(255,255,255,.08);
+            background:rgba(255,255,255,.035);
+            color:#dce7ff;
+            transition:.2s ease;
+        }
+
+        #micButton svg,
+        .recording-icon svg {
+            width:20px;
+            height:20px;
+            fill:none;
+            stroke:currentColor;
+            stroke-width:1.9;
+            stroke-linecap:round;
+            stroke-linejoin:round;
+        }
+
+        #micButton:hover {
+            background:rgba(59,130,246,.14);
+            border-color:rgba(59,130,246,.40);
+            color:#fff;
+            box-shadow:0 0 0 4px rgba(59,130,246,.07);
+        }
 
         #micButton.recording-ready {
+            background:rgba(255,255,255,.035);
+            color:#dce7ff;
+            box-shadow:none;
+        }
+
+        #micButton.recording-ready:hover {
+            background:rgba(59,130,246,.14);
             color:#fff;
-            background:linear-gradient(135deg,var(--blue),var(--violet));
-            box-shadow:0 0 22px rgba(59,130,246,.25);
+            box-shadow:0 0 0 4px rgba(59,130,246,.07);
         }
 
         .recording {
@@ -970,8 +1000,16 @@
                     class="icon-btn recording-ready"
                     title="Voice input"
                     type="button"
+                    aria-label="Voice input"
                     onclick="startRecording()">
-                🎙️
+
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 14.5a3.5 3.5 0 0 0 3.5-3.5V6a3.5 3.5 0 0 0-7 0v5a3.5 3.5 0 0 0 3.5 3.5Z"></path>
+                    <path d="M19 11a7 7 0 0 1-14 0"></path>
+                    <path d="M12 18v4"></path>
+                    <path d="M8 22h8"></path>
+                </svg>
+
             </button>
 
             <button id="sendButton"
@@ -990,7 +1028,14 @@
              class="recording">
 
             <div class="recording-icon">
-                🎙️
+
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 14.5a3.5 3.5 0 0 0 3.5-3.5V6a3.5 3.5 0 0 0-7 0v5a3.5 3.5 0 0 0 3.5 3.5Z"></path>
+                    <path d="M19 11a7 7 0 0 1-14 0"></path>
+                    <path d="M12 18v4"></path>
+                    <path d="M8 22h8"></path>
+                </svg>
+
             </div>
 
             <div class="recording-info">
@@ -1284,15 +1329,6 @@ function renderChatList(filter = "") {
     const search =
         filter.trim().toLowerCase();
 
-    /*
-       Empty "New conversation" chats are
-       deliberately hidden from History.
-
-       They only become History items after
-       the user sends the first message and
-       the backend gives them a real title.
-    */
-
     const filtered =
         chats.filter(chat => {
 
@@ -1437,14 +1473,7 @@ async function createNewChat(closeMobile = true) {
 }
 
 
-/*
-   IMPORTANT:
-
-   Every time the website loads,
-   AskOra creates a NEW empty chat.
-
-   Previous conversations remain in History.
-*/
+/* ALWAYS CREATE FRESH CHAT */
 
 async function createOrLoadInitialChat() {
 
@@ -1800,12 +1829,6 @@ async function sendMessage() {
             "I couldn't generate a response."
         );
 
-        /*
-           Backend should return the updated
-           chat with the first question as
-           its title.
-        */
-
         if (data.chat) {
 
             const index =
@@ -1825,11 +1848,6 @@ async function sendMessage() {
             }
 
         } else {
-
-            /*
-               Fallback for older backend:
-               reload History from PostgreSQL.
-            */
 
             await loadChats();
         }
@@ -2270,16 +2288,6 @@ async function init() {
         updateAccountUI();
 
         await loadChats();
-
-        /*
-           ALWAYS create a fresh chat when
-           AskOra is opened/reloaded.
-
-           Existing conversations remain
-           stored in PostgreSQL and appear
-           in History after they contain
-           a real message.
-        */
 
         await createOrLoadInitialChat();
 
